@@ -5,8 +5,16 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 class ReminderService {
   ReminderService(this._notifications);
 
+  static const int _maxNotificationId = 0x7fffffff;
   final FlutterLocalNotificationsPlugin _notifications;
   final List<Timer> _timers = [];
+
+  int _nextNotificationId() {
+    final now = DateTime.now().microsecondsSinceEpoch;
+    final entropy = _timers.length;
+    final value = (now ^ entropy).remainder(_maxNotificationId);
+    return value == 0 ? 1 : value;
+  }
 
   Future<void> init() async {
     const androidSettings = AndroidInitializationSettings('@mipmap/ic_launcher');
@@ -17,9 +25,11 @@ class ReminderService {
   }
 
   Future<String> scheduleInMinutes(int minutes) async {
-    final scheduledId = DateTime.now().millisecondsSinceEpoch.remainder(1 << 20);
+    final scheduledId = _nextNotificationId();
 
-    final timer = Timer(Duration(minutes: minutes), () async {
+    late final Timer timer;
+    timer = Timer(Duration(minutes: minutes), () async {
+      _timers.remove(timer);
       await _notifications.show(
         scheduledId,
         'Círculo Dorado',
@@ -37,7 +47,8 @@ class ReminderService {
     });
     _timers.add(timer);
 
-    return 'Recordatorio activado para revisar en $minutes minuto(s).';
+    final unit = minutes == 1 ? 'minuto' : 'minutos';
+    return 'Recordatorio activado para revisar en $minutes $unit.';
   }
 
   void dispose() {

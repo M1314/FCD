@@ -34,6 +34,7 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
+  static const double _desktopBreakpoint = 1000;
   final _api = CirculoApi();
   final _downloads = MediaDownloadService();
   final _progress = ProgressService();
@@ -77,19 +78,47 @@ class _HomeScreenState extends State<HomeScreen> {
     }
 
     if (media.type == 'video') {
-      final controller = VideoPlayerController.networkUrl(Uri.parse(media.streamUrl));
-      await controller.initialize();
-      controller.setLooping(false);
-      controller.setVolume(1);
-      setState(() {
-        _videoController = controller;
-        _status = 'Video listo para reproducir.';
-      });
+      try {
+        final controller =
+            VideoPlayerController.networkUrl(Uri.parse(media.streamUrl));
+        await controller.initialize();
+        controller.setLooping(false);
+        controller.setVolume(1);
+        if (!mounted) {
+          return;
+        }
+        setState(() {
+          _videoController = controller;
+          _status = 'Video listo para reproducir.';
+        });
+      } catch (error) {
+        if (!mounted) {
+          return;
+        }
+        setState(() {
+          _status = 'No se pudo preparar el video: $error';
+        });
+      }
       return;
     }
 
     await _audioPlayer.stop();
+    setState(() {
+      _status = 'Audio listo para reproducir.';
+    });
+  }
+
+  Future<void> _playSelectedAudio() async {
+    final media = _selectedMedia;
+    if (media == null || media.type != 'audio') {
+      return;
+    }
+
     await _audioPlayer.play(UrlSource(media.streamUrl));
+    if (!mounted) {
+      return;
+    }
+
     setState(() {
       _status = 'Reproducción de audio iniciada.';
     });
@@ -156,7 +185,7 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     final completion = _progress.completionPercent(_snippets);
-    final isDesktop = MediaQuery.of(context).size.width >= 1000;
+    final isDesktop = MediaQuery.of(context).size.width >= _desktopBreakpoint;
 
     return Scaffold(
       appBar: AppBar(
@@ -270,8 +299,14 @@ class _HomeScreenState extends State<HomeScreen> {
             else
               Text('Audio seleccionado: ${selected.title}'),
             const SizedBox(height: 8),
+            if (selected?.type == 'audio')
+              FilledButton.tonal(
+                onPressed: _playSelectedAudio,
+                child: const Text('Reproducir audio'),
+              ),
+            if (selected?.type == 'audio') const SizedBox(height: 8),
             FilledButton(
-              onPressed: _downloadSelected,
+              onPressed: selected == null ? null : _downloadSelected,
               child: Text(selected == null ? 'Sin contenido' : 'Descargar ${selected.type}'),
             ),
           ],

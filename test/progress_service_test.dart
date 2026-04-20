@@ -58,9 +58,10 @@ void main() {
     final service = ProgressService();
 
     await service.saveSnippet('progress.study', true);
+    await service.saveSnippet('progress.study', false);
     final snippets = await service.loadSnippets();
 
-    expect(snippets['progress.study'], true);
+    expect(snippets['progress.study'], false);
     expect(snippets['progress.practice'], false);
     expect(snippets['progress.notes'], false);
   });
