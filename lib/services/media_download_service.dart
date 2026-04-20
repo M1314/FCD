@@ -18,7 +18,10 @@ class MediaDownloadService {
 
     final directory = await getApplicationDocumentsDirectory();
     final extension = media.type == 'video' ? 'mp4' : 'mp3';
-    final safeName = media.title.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]+'), '-');
+    final safeName = media.title
+        .toLowerCase()
+        .replaceAll(RegExp(r'[^a-z0-9áéíóúüñ]+'), '-')
+        .replaceAll(RegExp(r'^-+|-+$'), '');
     final file = File('${directory.path}/$safeName.$extension');
     await file.writeAsBytes(response.bodyBytes, flush: true);
     return file.path;

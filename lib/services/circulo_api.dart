@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
 import '../models/class_lesson.dart';
@@ -24,8 +25,8 @@ class CirculoApi {
             .map((entry) => ClassLesson.fromJson(entry as Map<String, dynamic>))
             .toList();
       }
-    } catch (_) {
-      // Fallback below.
+    } catch (error) {
+      debugPrint('CirculoApi.fetchClasses fallback: $error');
     }
 
     return _fallbackLessons;

@@ -81,10 +81,9 @@ class _HomeScreenState extends State<HomeScreen> {
       await controller.initialize();
       controller.setLooping(false);
       controller.setVolume(1);
-      controller.play();
       setState(() {
         _videoController = controller;
-        _status = 'Reproducción de video optimizada con buffer inicial.';
+        _status = 'Video listo para reproducir.';
       });
       return;
     }
@@ -102,6 +101,7 @@ class _HomeScreenState extends State<HomeScreen> {
     _audioPlayer.dispose();
     _api.dispose();
     _downloads.dispose();
+    _reminders.dispose();
     super.dispose();
   }
 
@@ -120,25 +120,25 @@ class _HomeScreenState extends State<HomeScreen> {
       setState(() {
         _status = 'Descargado en: $path';
       });
-    } catch (_) {
+    } catch (error) {
       if (!mounted) {
         return;
       }
 
       setState(() {
-        _status = 'No se pudo completar la descarga.';
+        _status = 'No se pudo completar la descarga: $error';
       });
     }
   }
 
-  Future<void> _toggleSnippet(String label, bool value) async {
-    await _progress.saveSnippet(label, value);
+  Future<void> _toggleSnippet(String storageKey, bool value) async {
+    await _progress.saveSnippet(storageKey, value);
     if (!mounted) {
       return;
     }
 
     setState(() {
-      _snippets = {..._snippets, label: value};
+      _snippets = {..._snippets, storageKey: value};
     });
   }
 
@@ -195,12 +195,15 @@ class _HomeScreenState extends State<HomeScreen> {
                   padding: const EdgeInsets.all(16),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
-                    children: const [
-                      Text('Scaffolding escritorio', style: TextStyle(fontWeight: FontWeight.bold)),
-                      SizedBox(height: 8),
-                      Text('• Calendario semanal'),
-                      Text('• Estadísticas extendidas'),
-                      Text('• Comunidad y notas largas'),
+                    children: [
+                      const Text(
+                        'Scaffolding escritorio',
+                        style: TextStyle(fontWeight: FontWeight.bold),
+                      ),
+                      const SizedBox(height: 8),
+                      const Text('• Calendario semanal'),
+                      const Text('• Estadísticas extendidas'),
+                      const Text('• Comunidad y notas largas'),
                     ],
                   ),
                 ),
@@ -292,7 +295,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 onChanged: (value) {
                   _toggleSnippet(entry.key, value ?? false);
                 },
-                title: Text(entry.key),
+                title: Text(_progress.labelForKey(entry.key)),
               ),
           ],
         ),
