@@ -718,7 +718,7 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
     _audioPlayer = null;
     _webViewController = null;
 
-    await previousVideoController?.dispose();
+    previousVideoController?.dispose();
     if (previousAudioPlayer != null) {
       await previousAudioPlayer.stop();
       await previousAudioPlayer.dispose();
