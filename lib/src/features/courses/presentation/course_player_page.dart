@@ -84,8 +84,7 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.paused ||
-        state == AppLifecycleState.detached) {
+    if (state == AppLifecycleState.paused) {
       _saveProgress();
       _videoController?.pause();
       _audioPlayer?.pause();
@@ -825,15 +824,8 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
     );
 
     if (restorePositionMs > 0) {
-      var hasSeeked = false;
-      _videoController?.addEventsListener((event) {
-        if (hasSeeked) {
-          return;
-        }
-        if (event.betterPlayerEventType == BetterPlayerEventType.initialized) {
-          hasSeeked = true;
-          _videoController?.seekTo(Duration(milliseconds: restorePositionMs));
-        }
+      Future<void>.delayed(const Duration(milliseconds: 350), () {
+        _videoController?.seekTo(Duration(milliseconds: restorePositionMs));
       });
     }
   }
