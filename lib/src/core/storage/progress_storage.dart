@@ -59,6 +59,7 @@ class CourseProgress {
 }
 
 int _readInt(dynamic value) {
+  // JSON numeric values can be returned as int or double depending on parser.
   if (value is int) {
     return value;
   }

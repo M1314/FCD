@@ -41,6 +41,8 @@ class CoursePlayerPage extends StatefulWidget {
 
 class _CoursePlayerPageState extends State<CoursePlayerPage>
     with WidgetsBindingObserver {
+  static const Duration _videoRestoreDelay = Duration(milliseconds: 350);
+
   late final DownloadRepository _downloadRepository;
   final ProgressStorage _progressStorage = ProgressStorage();
   final FavoritesStorage _favoritesStorage = FavoritesStorage();
@@ -825,7 +827,7 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
 
     if (restorePositionMs > 0) {
       // Better Player may ignore immediate seeks until the first frame is ready.
-      Future<void>.delayed(const Duration(milliseconds: 350), () {
+      Future<void>.delayed(_videoRestoreDelay, () {
         _videoController?.seekTo(Duration(milliseconds: restorePositionMs));
       });
     }
