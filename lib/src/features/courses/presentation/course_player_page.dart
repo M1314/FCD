@@ -824,6 +824,7 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
     );
 
     if (restorePositionMs > 0) {
+      // Better Player may ignore immediate seeks until the first frame is ready.
       Future<void>.delayed(const Duration(milliseconds: 350), () {
         _videoController?.seekTo(Duration(milliseconds: restorePositionMs));
       });

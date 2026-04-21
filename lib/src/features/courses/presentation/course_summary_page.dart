@@ -270,7 +270,7 @@ class _LearningModalitiesCard extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           Text(
-            'Alterna entre visual, auditivo y práctica guiada para integrar mejor $courseName.',
+            'Alterna entre visual, auditivo y práctica guiada para integrar mejor "$courseName".',
             style: Theme.of(
               context,
             ).textTheme.bodySmall?.copyWith(color: AppTheme.mutedText),
