@@ -12,6 +12,7 @@ class Course {
     required this.priceUsd,
     required this.lessonsCount,
     required this.maxLessons,
+    this.category = '',
   });
 
   final int id;
@@ -24,6 +25,7 @@ class Course {
   final double priceUsd;
   final int lessonsCount;
   final int maxLessons;
+  final String category;
 
   factory Course.fromJson(Map<String, dynamic> json) {
     return Course(
@@ -56,6 +58,11 @@ class Course {
         'intCantidadMeses',
         'maxLessons',
         'availableLessons',
+      ]),
+      category: readString(json, const <String>[
+        'categoria',
+        'strCategoria',
+        'category',
       ]),
     );
   }

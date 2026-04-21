@@ -21,6 +21,12 @@ class _CatalogPageState extends State<CatalogPage> {
   List<Course> _filtered = <Course>[];
   final TextEditingController _searchController = TextEditingController();
 
+  /// Ordered list of category names (preserves insertion / API order).
+  List<String> _categoryOrder = <String>[];
+
+  /// Map from category name → courses in that category.
+  Map<String, List<Course>> _grouped = <String, List<Course>>{};
+
   @override
   void initState() {
     super.initState();
@@ -43,7 +49,8 @@ class _CatalogPageState extends State<CatalogPage> {
               .where(
                 (course) =>
                     course.name.toLowerCase().contains(query) ||
-                    course.subtitle.toLowerCase().contains(query),
+                    course.subtitle.toLowerCase().contains(query) ||
+                    course.category.toLowerCase().contains(query),
               )
               .toList();
     });
@@ -61,9 +68,23 @@ class _CatalogPageState extends State<CatalogPage> {
       if (!mounted) {
         return;
       }
+
+      final categoryOrder = <String>[];
+      final grouped = <String, List<Course>>{};
+      for (final course in courses) {
+        final cat = course.category.isNotEmpty ? course.category : 'General';
+        if (!grouped.containsKey(cat)) {
+          categoryOrder.add(cat);
+          grouped[cat] = <Course>[];
+        }
+        grouped[cat]!.add(course);
+      }
+
       setState(() {
         _allCourses = courses;
         _filtered = courses;
+        _categoryOrder = categoryOrder;
+        _grouped = grouped;
         _loading = false;
       });
       _applyFilter();
@@ -96,7 +117,7 @@ class _CatalogPageState extends State<CatalogPage> {
     return Column(
       children: <Widget>[
         _buildSearchBar(),
-        Expanded(child: _buildList()),
+        Expanded(child: _buildBody()),
       ],
     );
   }
@@ -123,8 +144,19 @@ class _CatalogPageState extends State<CatalogPage> {
     );
   }
 
-  Widget _buildList() {
-    if (_filtered.isEmpty) {
+  Widget _buildBody() {
+    final isSearching = _searchController.text.trim().isNotEmpty;
+
+    if (isSearching) {
+      return _buildFlatList(_filtered);
+    }
+
+    return _buildGroupedList();
+  }
+
+  /// Flat list used while the user is searching.
+  Widget _buildFlatList(List<Course> courses) {
+    if (courses.isEmpty) {
       return const Center(
         child: Padding(
           padding: EdgeInsets.all(24),
@@ -141,11 +173,87 @@ class _CatalogPageState extends State<CatalogPage> {
       child: ListView.separated(
         physics: const AlwaysScrollableScrollPhysics(),
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 30),
-        itemCount: _filtered.length,
-        separatorBuilder: (context, index) => const SizedBox(height: 12),
-        itemBuilder: (context, index) {
-          return _CatalogCard(course: _filtered[index]);
-        },
+        itemCount: courses.length,
+        separatorBuilder: (_, __) => const SizedBox(height: 12),
+        itemBuilder: (_, index) => _CatalogCard(course: courses[index]),
+      ),
+    );
+  }
+
+  /// Grouped list used when no search query is active.
+  Widget _buildGroupedList() {
+    if (_allCourses.isEmpty) {
+      return const Center(
+        child: Padding(
+          padding: EdgeInsets.all(24),
+          child: Text('No hay cursos disponibles.', textAlign: TextAlign.center),
+        ),
+      );
+    }
+
+    return RefreshIndicator(
+      onRefresh: _loadCourses,
+      child: CustomScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        slivers: <Widget>[
+          for (final category in _categoryOrder)
+            ...<Widget>[
+              _CategoryHeader(title: category),
+              SliverPadding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                sliver: SliverList(
+                  delegate: SliverChildBuilderDelegate(
+                    (context, index) {
+                      final courses = _grouped[category]!;
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 12),
+                        child: _CatalogCard(course: courses[index]),
+                      );
+                    },
+                    childCount: _grouped[category]!.length,
+                  ),
+                ),
+              ),
+            ],
+          const SliverPadding(padding: EdgeInsets.only(bottom: 18)),
+        ],
+      ),
+    );
+  }
+}
+
+class _CategoryHeader extends StatelessWidget {
+  const _CategoryHeader({required this.title});
+
+  final String title;
+
+  @override
+  Widget build(BuildContext context) {
+    return SliverToBoxAdapter(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 20, 16, 8),
+        child: Row(
+          children: <Widget>[
+            Container(
+              width: 4,
+              height: 22,
+              decoration: BoxDecoration(
+                color: AppTheme.deepBrown,
+                borderRadius: BorderRadius.circular(4),
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                title,
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  color: AppTheme.deepBrown,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -350,3 +458,4 @@ class _CatalogMessageView extends StatelessWidget {
     );
   }
 }
+
