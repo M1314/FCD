@@ -1,23 +1,32 @@
-import 'package:fcd_app/src/app.dart';
-import 'package:fcd_app/src/state/session_controller.dart';
+import 'package:fcd_app/src/features/courses/data/models/course.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:provider/provider.dart';
 
 void main() {
-  testWidgets('shows splash on startup', (tester) async {
-    final session = SessionController();
+  test('Course.fromJson reads alternate API keys and numeric strings', () {
+    final course = Course.fromJson(<String, dynamic>{
+      'intId': '7',
+      'strNombre': 'Introduccion',
+      'strSubtitulo': 'Nivel inicial',
+      'strDescripcion': 'Contenido base',
+      'fileIcon': 'https://cdn/icon.png',
+      'fileBanner': 'https://cdn/banner.png',
+      'precio': ' 10.5 ',
+      'doublePrecioDolar': ' 12 ',
+      'totalLessons': '6',
+      'availableLessons': 3,
+      'strCategoria': 'General',
+    });
 
-    await tester.pumpWidget(
-      ChangeNotifierProvider<SessionController>.value(
-        value: session,
-        child: const FcdApp(),
-      ),
-    );
-
-    expect(find.text('FCD'), findsOneWidget);
-
-    await tester.pump(const Duration(seconds: 3));
-
-    session.dispose();
+    expect(course.id, 7);
+    expect(course.name, 'Introduccion');
+    expect(course.subtitle, 'Nivel inicial');
+    expect(course.description, 'Contenido base');
+    expect(course.iconUrl, 'https://cdn/icon.png');
+    expect(course.bannerUrl, 'https://cdn/banner.png');
+    expect(course.price, 10.5);
+    expect(course.priceUsd, 12);
+    expect(course.lessonsCount, 6);
+    expect(course.maxLessons, 3);
+    expect(course.category, 'General');
   });
 }

@@ -174,7 +174,7 @@ class _CatalogPageState extends State<CatalogPage> {
         physics: const AlwaysScrollableScrollPhysics(),
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 30),
         itemCount: courses.length,
-        separatorBuilder: (_, __) => const SizedBox(height: 12),
+        separatorBuilder: (_, index) => const SizedBox(height: 12),
         itemBuilder: (_, index) => _CatalogCard(course: courses[index]),
       ),
     );
@@ -458,4 +458,3 @@ class _CatalogMessageView extends StatelessWidget {
     );
   }
 }
-
