@@ -1,37 +1,50 @@
 # FCD App (Flutter)
 
-Aplicacion mobile-first en Flutter para Fraternidad del Circulo Dorado.
+Aplicación mobile-first en Flutter para Fraternidad del Círculo Dorado.
 
-## Lo que incluye esta base
+## Estado actual
 
-- Login real contra el backend existente.
-- Restauracion de sesion con refresh token.
-- Navegacion mobile-first por tabs:
-  - Cursos
-  - IA
-  - Descargas
-- Splash screen visual personalizado.
-- Cursos del usuario y detalle de curso.
+La app ya integra autenticación real, consumo de backend productivo, reproductor multimedia de lecciones, descargas locales, catálogo de cursos, favoritos, asistente IA y sección de cuenta.
+
+### Navegación principal (tabs)
+
+- Mis Cursos
+- Catálogo
+- IA
+- Favoritos
+- Descargas
+- Cuenta
+
+## Funcionalidades implementadas
+
+- Login real contra backend (`/login`) y restauración de sesión con refresh token (`/refresh`).
+- Bootstrap de sesión + pantalla splash animada.
+- Listado de cursos del usuario y detalle del curso con resumen previo.
+- Catálogo general de cursos (`/course/All/0`) con búsqueda y agrupación por categoría.
 - Reproductor de lecciones con:
-  - Video (Better Player Plus con configuracion de buffer/cache)
-  - Audio (Just Audio)
-  - Documentos (WebView con visor Google Docs)
-- Descarga de archivos al dispositivo y listado local de descargas.
-- Chat IA con historial por categoria y envio de mensajes al endpoint de IA.
+  - Video (`better_player_plus`, buffer/cache, controles avanzados).
+  - Audio (`just_audio`).
+  - Documentos (WebView + visor de Google Docs).
+- Marcado de lecciones completadas y seguimiento de progreso.
+- Favoritos de lecciones persistidos por usuario en local.
+- Descarga de recursos al dispositivo + historial local de descargas.
+- Chat IA por categorías con historial y verificación de acceso a plan/trial.
+- Pantalla de cuenta con datos de usuario, estado de plan IA y cierre de sesión.
 
-## Backend detectado en el sitio actual
+## Backend y endpoints usados
 
-Desde el bundle de `circulo-dorado.org` se detecto el backend principal:
+Base URL por defecto:
 
-- Base URL: `https://circulo-dorado.org:6007/api`
+- `https://circulo-dorado.org:6007/api`
 
-Endpoints usados en esta app:
+Endpoints utilizados:
 
 - Auth:
   - `POST /login`
   - `POST /refresh`
 - Cursos y lecciones:
   - `GET /course/MyCourses/{userId}`
+  - `GET /course/All/0`
   - `GET /course/0/{courseId}`
   - `GET /lesson/course-lessons/{courseId}/{maxLessons}`
   - `POST /lesson/setLessonUserStatus`
@@ -44,26 +57,20 @@ Endpoints usados en esta app:
   - `GET /ai-plan/user-check?user_id=...`
   - `POST /ai-trial/check`
 
-## Configuracion
-
-### Requisitos
+## Requisitos
 
 - Flutter stable (3.41+)
 - Dart 3.11+
 
-### Instalar dependencias
+## Configuración
+
+Instalar dependencias:
 
 ```bash
 flutter pub get
 ```
 
-### API base URL por entorno
-
-Por defecto usa:
-
-- `https://circulo-dorado.org:6007/api`
-
-Si quieres otro backend:
+Cambiar backend por entorno:
 
 ```bash
 flutter run --dart-define=FCD_API_BASE_URL=https://tu-backend/api
@@ -75,36 +82,34 @@ flutter run --dart-define=FCD_API_BASE_URL=https://tu-backend/api
 flutter run
 ```
 
-## Calidad
+## Calidad y pruebas
 
 ```bash
 flutter analyze
 flutter test --no-test-assets
 ```
 
+Actualmente hay cobertura de pruebas para parseo defensivo de JSON y modelos clave de cursos/lecciones.
+
 ## Estructura principal
 
-- `lib/main.dart`: bootstrap + provider raiz.
-- `lib/src/app.dart`: app shell y gate de splash/login/home.
-- `lib/src/core`: tema, cliente HTTP, storage, utilidades.
-- `lib/src/features/auth`: login y sesion.
-- `lib/src/features/courses`: listado, resumen y reproductor.
-- `lib/src/features/ai`: chat IA.
-- `lib/src/features/downloads`: historial local de descargas.
-- `lib/src/state/session_controller.dart`: estado global de sesion y repositorios.
+- `lib/main.dart`: bootstrap inicial y provider raíz.
+- `lib/src/app.dart`: gate de splash/login/home.
+- `lib/src/core`: configuración, cliente HTTP, tema, storage y utilidades.
+- `lib/src/features/auth`: login y manejo de sesión.
+- `lib/src/features/courses`: cursos, resumen y reproductor de lecciones.
+- `lib/src/features/catalog`: catálogo completo de cursos.
+- `lib/src/features/ai`: chat IA y acceso a plan/trial.
+- `lib/src/features/favorites`: lecciones favoritas.
+- `lib/src/features/downloads`: descargas e historial local.
+- `lib/src/features/account`: información de cuenta y logout.
+- `lib/src/state/session_controller.dart`: estado global de sesión y repositorios.
 
-## Notas de video streaming
+## Documentación adicional
 
-Para mejorar la experiencia respecto al sitio web, el reproductor de video usa:
-
-- Buffering configurado para evitar cortes frecuentes.
-- Cache local de segmentos de video en Android.
-- Controles con velocidad de reproduccion y PiP.
-
-Si el backend entrega HLS (`.m3u8`) o MP4 progresivo, Better Player Plus lo soporta.
+- `docs/fcd_flutter_code_walkthrough.md`: recorrido guiado del código para onboarding técnico.
 
 ## Limitaciones actuales
 
-- El flujo de registro/recuperacion de password no esta en esta primera version.
-- No se implemento creacion de chat (`POST /chats`) porque el front web actual carga por categorias predefinidas y guarda mensajes sobre `chatId` fijo.
-- El contenido exacto visible depende de permisos y compras del usuario en backend.
+- Flujo de registro/recuperación de contraseña no implementado en app.
+- El contenido visible depende de permisos/compras del usuario en backend.
