@@ -50,11 +50,13 @@ class Course {
       price: readDouble(json, const <String>['doublePrecio', 'precio']),
       priceUsd: readDouble(json, const <String>['doublePrecioDolar']),
       lessonsCount: readInt(json, const <String>[
+        'total_lecciones_curso',
         'intNumberOfLessons',
         'lessonsCount',
         'totalLessons',
       ]),
       maxLessons: readInt(json, const <String>[
+        'lecciones_por_mes',
         'intCantidadMeses',
         'maxLessons',
         'availableLessons',

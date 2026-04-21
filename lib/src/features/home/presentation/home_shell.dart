@@ -3,6 +3,7 @@ import 'package:fcd_app/src/features/ai/presentation/ai_chat_page.dart';
 import 'package:fcd_app/src/features/catalog/presentation/catalog_page.dart';
 import 'package:fcd_app/src/features/courses/presentation/courses_page.dart';
 import 'package:fcd_app/src/features/downloads/presentation/downloads_page.dart';
+import 'package:fcd_app/src/features/favorites/presentation/favorites_page.dart';
 import 'package:flutter/material.dart';
 
 class HomeShell extends StatefulWidget {
@@ -19,6 +20,7 @@ class _HomeShellState extends State<HomeShell> {
     CoursesPage(),
     CatalogPage(),
     AiChatPage(),
+    FavoritesPage(),
     DownloadsPage(),
     AccountPage(),
   ];
@@ -54,6 +56,11 @@ class _HomeShellState extends State<HomeShell> {
             label: 'IA',
           ),
           NavigationDestination(
+            icon: Icon(Icons.bookmark_outline_rounded),
+            selectedIcon: Icon(Icons.bookmark_rounded),
+            label: 'Favoritos',
+          ),
+          NavigationDestination(
             icon: Icon(Icons.download_outlined),
             selectedIcon: Icon(Icons.download_rounded),
             label: 'Descargas',
@@ -75,8 +82,10 @@ class _HomeShellState extends State<HomeShell> {
       case 2:
         return 'Asistente IA';
       case 3:
-        return 'Mis Descargas';
+        return 'Mis Favoritos';
       case 4:
+        return 'Mis Descargas';
+      case 5:
         return 'Mi Cuenta';
       default:
         return 'Mis Cursos';

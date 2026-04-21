@@ -23,6 +23,7 @@ class CoursePlayerPage extends StatefulWidget {
     required this.course,
     required this.lessons,
     this.forceStart = false,
+    this.initialLessonIndex,
   });
 
   final Course course;
@@ -30,6 +31,9 @@ class CoursePlayerPage extends StatefulWidget {
 
   /// When true the player always starts from lesson 0, ignoring saved progress.
   final bool forceStart;
+
+  /// When set, the player starts at this lesson index, ignoring saved progress.
+  final int? initialLessonIndex;
 
   @override
   State<CoursePlayerPage> createState() => _CoursePlayerPageState();
@@ -113,7 +117,10 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
     }
 
     if (mounted) {
-      if (!widget.forceStart) {
+      if (widget.initialLessonIndex != null) {
+        _lessonIndex = widget.initialLessonIndex!.clamp(0, widget.lessons.length - 1);
+        _resourceIndex = 0;
+      } else if (!widget.forceStart) {
         // Prefer saved local progress; fall back to first pending lesson.
         final saved = await _progressStorage.getProgress(widget.course.id);
         if (saved != null &&
