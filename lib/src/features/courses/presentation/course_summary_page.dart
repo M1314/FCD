@@ -1,3 +1,4 @@
+import 'package:fcd_app/src/core/storage/progress_storage.dart';
 import 'package:fcd_app/src/core/theme/app_theme.dart';
 import 'package:fcd_app/src/core/widgets/network_image_tile.dart';
 import 'package:fcd_app/src/features/courses/data/models/course.dart';
@@ -5,7 +6,7 @@ import 'package:fcd_app/src/features/courses/data/models/course_lesson.dart';
 import 'package:fcd_app/src/features/courses/presentation/course_player_page.dart';
 import 'package:flutter/material.dart';
 
-class CourseSummaryPage extends StatelessWidget {
+class CourseSummaryPage extends StatefulWidget {
   const CourseSummaryPage({
     super.key,
     required this.course,
@@ -16,10 +17,41 @@ class CourseSummaryPage extends StatelessWidget {
   final List<CourseLesson> lessons;
 
   @override
+  State<CourseSummaryPage> createState() => _CourseSummaryPageState();
+}
+
+class _CourseSummaryPageState extends State<CourseSummaryPage> {
+  final ProgressStorage _progressStorage = ProgressStorage();
+  CourseProgress? _savedProgress;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSavedProgress();
+  }
+
+  Future<void> _loadSavedProgress() async {
+    final progress = await _progressStorage.getProgress(widget.course.id);
+    if (!mounted) {
+      return;
+    }
+    setState(() {
+      _savedProgress = progress;
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final artwork = course.bannerUrl.isNotEmpty
-        ? course.bannerUrl
-        : course.iconUrl;
+    final artwork = widget.course.bannerUrl.isNotEmpty
+        ? widget.course.bannerUrl
+        : widget.course.iconUrl;
+
+    final hasSavedProgress =
+        _savedProgress != null && _savedProgress!.lessonIndex > 0;
+    final resumeLessonName = hasSavedProgress &&
+            _savedProgress!.lessonIndex < widget.lessons.length
+        ? widget.lessons[_savedProgress!.lessonIndex].name
+        : null;
 
     return Scaffold(
       appBar: AppBar(title: const Text('Resumen del curso')),
@@ -38,13 +70,13 @@ class CourseSummaryPage extends StatelessWidget {
                   ),
                   const SizedBox(height: 14),
                   Text(
-                    course.name,
+                    widget.course.name,
                     style: Theme.of(context).textTheme.titleLarge,
                   ),
-                  if (course.subtitle.isNotEmpty) ...<Widget>[
+                  if (widget.course.subtitle.isNotEmpty) ...<Widget>[
                     const SizedBox(height: 6),
                     Text(
-                      course.subtitle,
+                      widget.course.subtitle,
                       style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                         color: AppTheme.mutedText,
                       ),
@@ -52,9 +84,9 @@ class CourseSummaryPage extends StatelessWidget {
                   ],
                   const SizedBox(height: 12),
                   Text(
-                    course.description.isEmpty
+                    widget.course.description.isEmpty
                         ? 'Este curso esta disponible en tu membresia.'
-                        : course.description,
+                        : widget.course.description,
                     style: Theme.of(context).textTheme.bodyMedium,
                   ),
                   const SizedBox(height: 18),
@@ -64,19 +96,19 @@ class CourseSummaryPage extends StatelessWidget {
                     children: <Widget>[
                       _InfoPill(
                         icon: Icons.menu_book_rounded,
-                        text: '${lessons.length} lecciones',
+                        text: '${widget.lessons.length} lecciones',
                       ),
                       _InfoPill(
                         icon: Icons.picture_as_pdf_rounded,
-                        text: '${_countDocs(lessons)} documentos',
+                        text: '${_countDocs(widget.lessons)} documentos',
                       ),
                       _InfoPill(
                         icon: Icons.play_circle_fill_rounded,
-                        text: '${_countVideos(lessons)} videos',
+                        text: '${_countVideos(widget.lessons)} videos',
                       ),
                       _InfoPill(
                         icon: Icons.headphones_rounded,
-                        text: '${_countAudios(lessons)} audios',
+                        text: '${_countAudios(widget.lessons)} audios',
                       ),
                     ],
                   ),
@@ -86,7 +118,7 @@ class CourseSummaryPage extends StatelessWidget {
                     style: Theme.of(context).textTheme.titleMedium,
                   ),
                   const SizedBox(height: 8),
-                  ...lessons.asMap().entries.map(
+                  ...widget.lessons.asMap().entries.map(
                     (entry) =>
                         _LessonItem(index: entry.key + 1, lesson: entry.value),
                   ),
@@ -97,21 +129,63 @@ class CourseSummaryPage extends StatelessWidget {
               top: false,
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(16, 6, 16, 12),
-                child: ElevatedButton.icon(
-                  onPressed: () {
-                    Navigator.of(context).pushReplacement(
-                      MaterialPageRoute<void>(
-                        builder: (_) =>
-                            CoursePlayerPage(course: course, lessons: lessons),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: <Widget>[
+                    if (hasSavedProgress && resumeLessonName != null) ...<Widget>[
+                      ElevatedButton.icon(
+                        onPressed: _startCourse,
+                        icon: const Icon(Icons.play_arrow_rounded),
+                        label: Text(
+                          'Continuar: ${resumeLessonName.length > 30 ? '${resumeLessonName.substring(0, 30)}...' : resumeLessonName}',
+                        ),
                       ),
-                    );
-                  },
-                  icon: const Icon(Icons.play_arrow_rounded),
-                  label: const Text('Comenzar curso'),
+                      const SizedBox(height: 8),
+                      OutlinedButton(
+                        onPressed: () async {
+                          await _startFromBeginning();
+                        },
+                        child: const Text('Empezar desde el principio'),
+                      ),
+                    ] else
+                      ElevatedButton.icon(
+                        onPressed: _startCourse,
+                        icon: const Icon(Icons.play_arrow_rounded),
+                        label: const Text('Comenzar curso'),
+                      ),
+                  ],
                 ),
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+
+  void _startCourse() {
+    Navigator.of(context).pushReplacement(
+      MaterialPageRoute<void>(
+        builder: (_) => CoursePlayerPage(
+          course: widget.course,
+          lessons: widget.lessons,
+        ),
+      ),
+    );
+  }
+
+  void _startFromBeginning() async {
+    await _progressStorage.clearProgress(widget.course.id);
+    if (!mounted) {
+      return;
+    }
+    Navigator.of(context).pushReplacement(
+      MaterialPageRoute<void>(
+        builder: (_) => CoursePlayerPage(
+          course: widget.course,
+          lessons: widget.lessons,
+          forceStart: true,
         ),
       ),
     );

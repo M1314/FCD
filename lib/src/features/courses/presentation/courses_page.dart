@@ -17,11 +17,35 @@ class _CoursesPageState extends State<CoursesPage> {
   bool _loading = true;
   String? _error;
   List<Course> _courses = <Course>[];
+  List<Course> _filtered = <Course>[];
+  final TextEditingController _searchController = TextEditingController();
 
   @override
   void initState() {
     super.initState();
+    _searchController.addListener(_applyFilter);
     _loadCourses();
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  void _applyFilter() {
+    final query = _searchController.text.trim().toLowerCase();
+    setState(() {
+      _filtered = query.isEmpty
+          ? _courses
+          : _courses
+              .where(
+                (course) =>
+                    course.name.toLowerCase().contains(query) ||
+                    course.subtitle.toLowerCase().contains(query),
+              )
+              .toList();
+    });
   }
 
   @override
@@ -49,18 +73,55 @@ class _CoursesPageState extends State<CoursesPage> {
       );
     }
 
-    return RefreshIndicator(
-      onRefresh: _loadCourses,
-      child: ListView.separated(
-        physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.fromLTRB(16, 16, 16, 30),
-        itemBuilder: (context, index) {
-          final course = _courses[index];
-          return _CourseCard(course: course, onTap: () => _openCourse(course));
-        },
-        separatorBuilder: (context, index) => const SizedBox(height: 12),
-        itemCount: _courses.length,
-      ),
+    return Column(
+      children: <Widget>[
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 6),
+          child: TextField(
+            controller: _searchController,
+            textInputAction: TextInputAction.search,
+            decoration: InputDecoration(
+              hintText: 'Buscar mis cursos...',
+              prefixIcon: const Icon(Icons.search_rounded),
+              suffixIcon: _searchController.text.isNotEmpty
+                  ? IconButton(
+                      icon: const Icon(Icons.clear_rounded),
+                      onPressed: _searchController.clear,
+                    )
+                  : null,
+            ),
+          ),
+        ),
+        Expanded(
+          child: _filtered.isEmpty
+              ? const Center(
+                  child: Padding(
+                    padding: EdgeInsets.all(24),
+                    child: Text(
+                      'No se encontraron cursos con ese criterio.',
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+                )
+              : RefreshIndicator(
+                  onRefresh: _loadCourses,
+                  child: ListView.separated(
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 30),
+                    itemBuilder: (context, index) {
+                      final course = _filtered[index];
+                      return _CourseCard(
+                        course: course,
+                        onTap: () => _openCourse(course),
+                      );
+                    },
+                    separatorBuilder: (context, index) =>
+                        const SizedBox(height: 12),
+                    itemCount: _filtered.length,
+                  ),
+                ),
+        ),
+      ],
     );
   }
 
@@ -90,6 +151,7 @@ class _CoursesPageState extends State<CoursesPage> {
         _courses = courses;
         _loading = false;
       });
+      _applyFilter();
     } catch (error) {
       if (!mounted) {
         return;
