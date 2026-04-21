@@ -21,6 +21,8 @@ class CourseSummaryPage extends StatefulWidget {
 }
 
 class _CourseSummaryPageState extends State<CourseSummaryPage> {
+  static const int _lessonNameMaxLength = 30;
+
   final ProgressStorage _progressStorage = ProgressStorage();
   CourseProgress? _savedProgress;
 
@@ -138,7 +140,7 @@ class _CourseSummaryPageState extends State<CourseSummaryPage> {
                         onPressed: _startCourse,
                         icon: const Icon(Icons.play_arrow_rounded),
                         label: Text(
-                          'Continuar: ${resumeLessonName.length > 30 ? '${resumeLessonName.substring(0, 30)}...' : resumeLessonName}',
+                          'Continuar: ${resumeLessonName.length > _lessonNameMaxLength ? '${resumeLessonName.substring(0, _lessonNameMaxLength)}...' : resumeLessonName}',
                         ),
                       ),
                       const SizedBox(height: 8),
@@ -175,7 +177,7 @@ class _CourseSummaryPageState extends State<CourseSummaryPage> {
     );
   }
 
-  void _startFromBeginning() async {
+  Future<void> _startFromBeginning() async {
     await _progressStorage.clearProgress(widget.course.id);
     if (!mounted) {
       return;
