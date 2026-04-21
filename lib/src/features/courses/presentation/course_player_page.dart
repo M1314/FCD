@@ -711,11 +711,18 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
   }
 
   Future<void> _prepareCurrentResource() async {
-    _videoController?.dispose();
+    final previousVideoController = _videoController;
+    final previousAudioPlayer = _audioPlayer;
+
     _videoController = null;
-    await _audioPlayer?.dispose();
     _audioPlayer = null;
     _webViewController = null;
+
+    await previousVideoController?.dispose();
+    if (previousAudioPlayer != null) {
+      await previousAudioPlayer.stop();
+      await previousAudioPlayer.dispose();
+    }
 
     final resource = currentResource;
     if (resource == null) {
