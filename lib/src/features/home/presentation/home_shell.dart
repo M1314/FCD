@@ -4,7 +4,6 @@ import 'package:fcd_app/src/features/catalog/presentation/catalog_page.dart';
 import 'package:fcd_app/src/features/courses/presentation/courses_page.dart';
 import 'package:fcd_app/src/features/downloads/presentation/downloads_page.dart';
 import 'package:fcd_app/src/features/favorites/presentation/favorites_page.dart';
-import 'package:fcd_app/src/core/theme/app_theme.dart';
 import 'package:flutter/material.dart';
 
 class HomeShell extends StatefulWidget {
@@ -36,9 +35,9 @@ class _HomeShellState extends State<HomeShell> {
             Text(_titleForIndex(_selectedIndex)),
             Text(
               _subtitleForIndex(_selectedIndex),
-              style: Theme.of(
-                context,
-              ).textTheme.bodySmall?.copyWith(color: AppTheme.mutedText),
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
             ),
           ],
         ),
@@ -72,7 +71,7 @@ class _HomeShellState extends State<HomeShell> {
             NavigationDestination(
               icon: Icon(Icons.storefront_outlined),
               selectedIcon: Icon(Icons.storefront),
-              label: 'Catalogo',
+              label: 'Catálogo',
             ),
             NavigationDestination(
               icon: Icon(Icons.auto_awesome_outlined),
@@ -103,7 +102,7 @@ class _HomeShellState extends State<HomeShell> {
   String _titleForIndex(int index) {
     switch (index) {
       case 1:
-        return 'Catalogo';
+        return 'Catálogo';
       case 2:
         return 'Asistente IA';
       case 3:

@@ -85,7 +85,6 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.paused ||
-        state == AppLifecycleState.inactive ||
         state == AppLifecycleState.detached) {
       _saveProgress();
       _videoController?.pause();
@@ -774,9 +773,6 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
 
     if (resource.isVideo) {
       _setupVideo(resource.url);
-      if (_savedMediaPositionMs > 0) {
-        _videoController?.seekTo(Duration(milliseconds: _savedMediaPositionMs));
-      }
       return;
     }
     if (resource.isAudio) {
@@ -791,6 +787,7 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
   }
 
   void _setupVideo(String url) {
+    final restorePositionMs = _savedMediaPositionMs;
     final dataSource = BetterPlayerDataSource(
       BetterPlayerDataSourceType.network,
       url,
@@ -826,6 +823,19 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
       ),
       betterPlayerDataSource: dataSource,
     );
+
+    if (restorePositionMs > 0) {
+      var hasSeeked = false;
+      _videoController?.addEventsListener((event) {
+        if (hasSeeked) {
+          return;
+        }
+        if (event.betterPlayerEventType == BetterPlayerEventType.initialized) {
+          hasSeeked = true;
+          _videoController?.seekTo(Duration(milliseconds: restorePositionMs));
+        }
+      });
+    }
   }
 
   Future<void> _setupAudio(String url) async {
