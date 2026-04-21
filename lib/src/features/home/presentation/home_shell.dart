@@ -1,9 +1,10 @@
+import 'package:fcd_app/src/features/account/presentation/account_page.dart';
 import 'package:fcd_app/src/features/ai/presentation/ai_chat_page.dart';
+import 'package:fcd_app/src/features/catalog/presentation/catalog_page.dart';
 import 'package:fcd_app/src/features/courses/presentation/courses_page.dart';
 import 'package:fcd_app/src/features/downloads/presentation/downloads_page.dart';
-import 'package:fcd_app/src/state/session_controller.dart';
+import 'package:fcd_app/src/features/favorites/presentation/favorites_page.dart';
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
 
 class HomeShell extends StatefulWidget {
   const HomeShell({super.key});
@@ -15,42 +16,21 @@ class HomeShell extends StatefulWidget {
 class _HomeShellState extends State<HomeShell> {
   int _selectedIndex = 0;
 
+  static const List<Widget> _pages = <Widget>[
+    CoursesPage(),
+    CatalogPage(),
+    AiChatPage(),
+    FavoritesPage(),
+    DownloadsPage(),
+    AccountPage(),
+  ];
+
   @override
   Widget build(BuildContext context) {
-    final session = context.watch<SessionController>();
-    final user = session.user;
-
-    final pages = <Widget>[
-      const CoursesPage(),
-      const AiChatPage(),
-      const DownloadsPage(),
-    ];
-
     return Scaffold(
-      appBar: AppBar(
-        title: Text(_titleForIndex(_selectedIndex)),
-        actions: <Widget>[
-          if (user != null)
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 14),
-              child: Center(
-                child: Text(
-                  user.name,
-                  style: Theme.of(
-                    context,
-                  ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
-                ),
-              ),
-            ),
-          IconButton(
-            onPressed: () => context.read<SessionController>().logout(),
-            icon: const Icon(Icons.logout_rounded),
-            tooltip: 'Cerrar sesion',
-          ),
-        ],
-      ),
+      appBar: AppBar(title: Text(_titleForIndex(_selectedIndex))),
       body: SafeArea(
-        child: IndexedStack(index: _selectedIndex, children: pages),
+        child: IndexedStack(index: _selectedIndex, children: _pages),
       ),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _selectedIndex,
@@ -61,9 +41,14 @@ class _HomeShellState extends State<HomeShell> {
         },
         destinations: const <NavigationDestination>[
           NavigationDestination(
-            icon: Icon(Icons.menu_book_rounded),
+            icon: Icon(Icons.menu_book_outlined),
             selectedIcon: Icon(Icons.menu_book),
-            label: 'Cursos',
+            label: 'Mis Cursos',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.storefront_outlined),
+            selectedIcon: Icon(Icons.storefront),
+            label: 'Catalogo',
           ),
           NavigationDestination(
             icon: Icon(Icons.auto_awesome_outlined),
@@ -71,9 +56,19 @@ class _HomeShellState extends State<HomeShell> {
             label: 'IA',
           ),
           NavigationDestination(
+            icon: Icon(Icons.bookmark_outline_rounded),
+            selectedIcon: Icon(Icons.bookmark_rounded),
+            label: 'Favoritos',
+          ),
+          NavigationDestination(
             icon: Icon(Icons.download_outlined),
             selectedIcon: Icon(Icons.download_rounded),
             label: 'Descargas',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.person_outline_rounded),
+            selectedIcon: Icon(Icons.person_rounded),
+            label: 'Cuenta',
           ),
         ],
       ),
@@ -83,9 +78,15 @@ class _HomeShellState extends State<HomeShell> {
   String _titleForIndex(int index) {
     switch (index) {
       case 1:
-        return 'Asistente IA';
+        return 'Catalogo';
       case 2:
+        return 'Asistente IA';
+      case 3:
+        return 'Mis Favoritos';
+      case 4:
         return 'Mis Descargas';
+      case 5:
+        return 'Mi Cuenta';
       default:
         return 'Mis Cursos';
     }

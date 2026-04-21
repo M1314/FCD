@@ -1,6 +1,8 @@
 import 'package:better_player_plus/better_player_plus.dart';
 import 'package:dio/dio.dart';
 import 'package:fcd_app/src/core/config/api_config.dart';
+import 'package:fcd_app/src/core/storage/favorites_storage.dart';
+import 'package:fcd_app/src/core/storage/progress_storage.dart';
 import 'package:fcd_app/src/core/theme/app_theme.dart';
 import 'package:fcd_app/src/features/courses/data/models/course.dart';
 import 'package:fcd_app/src/features/courses/data/models/course_lesson.dart';
@@ -20,10 +22,18 @@ class CoursePlayerPage extends StatefulWidget {
     super.key,
     required this.course,
     required this.lessons,
+    this.forceStart = false,
+    this.initialLessonIndex,
   });
 
   final Course course;
   final List<CourseLesson> lessons;
+
+  /// When true the player always starts from lesson 0, ignoring saved progress.
+  final bool forceStart;
+
+  /// When set, the player starts at this lesson index, ignoring saved progress.
+  final int? initialLessonIndex;
 
   @override
   State<CoursePlayerPage> createState() => _CoursePlayerPageState();
@@ -32,6 +42,8 @@ class CoursePlayerPage extends StatefulWidget {
 class _CoursePlayerPageState extends State<CoursePlayerPage>
     with WidgetsBindingObserver {
   late final DownloadRepository _downloadRepository;
+  final ProgressStorage _progressStorage = ProgressStorage();
+  final FavoritesStorage _favoritesStorage = FavoritesStorage();
 
   int _lessonIndex = 0;
   int _resourceIndex = 0;
@@ -39,6 +51,7 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
   bool _isDownloading = false;
   double _downloadProgress = 0;
   bool _isCompleted = false;
+  bool _isCurrentFavorite = false;
 
   BetterPlayerController? _videoController;
   AudioPlayer? _audioPlayer;
@@ -46,6 +59,7 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
   CancelToken? _downloadCancelToken;
 
   final Set<int> _completedLessonIds = <int>{};
+  Set<int> _favoriteIds = <int>{};
 
   @override
   void initState() {
@@ -95,13 +109,41 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
       _completedLessonIds.clear();
     }
 
+    // Load favorites
+    try {
+      _favoriteIds = await _favoritesStorage.getFavorites(user.id);
+    } catch (_) {
+      _favoriteIds = <int>{};
+    }
+
     if (mounted) {
-      final firstPending = widget.lessons.indexWhere(
-        (lesson) => !_completedLessonIds.contains(lesson.id),
-      );
-      _lessonIndex = firstPending == -1 ? 0 : firstPending;
-      _resourceIndex = 0;
+      if (widget.initialLessonIndex != null) {
+        _lessonIndex = widget.initialLessonIndex!.clamp(0, widget.lessons.length - 1);
+        _resourceIndex = 0;
+      } else if (!widget.forceStart) {
+        // Prefer saved local progress; fall back to first pending lesson.
+        final saved = await _progressStorage.getProgress(widget.course.id);
+        if (saved != null &&
+            saved.lessonIndex < widget.lessons.length) {
+          _lessonIndex = saved.lessonIndex;
+          final resources = widget.lessons[saved.lessonIndex].resources;
+          _resourceIndex = resources.isEmpty
+              ? 0
+              : saved.resourceIndex.clamp(0, resources.length - 1);
+        } else {
+          final firstPending = widget.lessons.indexWhere(
+            (lesson) => !_completedLessonIds.contains(lesson.id),
+          );
+          _lessonIndex = firstPending == -1 ? 0 : firstPending;
+          _resourceIndex = 0;
+        }
+      } else {
+        _lessonIndex = 0;
+        _resourceIndex = 0;
+      }
+
       _isCompleted = _completedLessonIds.contains(currentLesson.id);
+      _isCurrentFavorite = _favoriteIds.contains(currentLesson.id);
       await _prepareCurrentResource();
       setState(() {
         _isLoading = false;
@@ -286,13 +328,31 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: <Widget>[
-          Text(
-            currentLesson.name,
-            style: Theme.of(context).textTheme.titleMedium,
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
+          Row(
+            children: <Widget>[
+              Expanded(
+                child: Text(
+                  currentLesson.name,
+                  style: Theme.of(context).textTheme.titleMedium,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              IconButton(
+                onPressed: _toggleFavorite,
+                icon: Icon(
+                  _isCurrentFavorite
+                      ? Icons.bookmark_rounded
+                      : Icons.bookmark_outline_rounded,
+                  color: _isCurrentFavorite ? AppTheme.bronze : AppTheme.mutedText,
+                ),
+                tooltip: _isCurrentFavorite
+                    ? 'Quitar de favoritos'
+                    : 'Guardar en favoritos',
+              ),
+            ],
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 4),
           Text(
             currentLesson.hasEvaluation
                 ? 'Incluye evaluacion al final.'
@@ -341,6 +401,7 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
                   setState(() {
                     _resourceIndex = index;
                   });
+                  await _saveProgress();
                   await _prepareCurrentResource();
                   if (mounted) {
                     setState(() {});
@@ -553,8 +614,10 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
       _lessonIndex += 1;
       _resourceIndex = 0;
       _isCompleted = _completedLessonIds.contains(currentLesson.id);
+      _isCurrentFavorite = _favoriteIds.contains(currentLesson.id);
     });
 
+    await _saveProgress();
     await _prepareCurrentResource();
     if (mounted) {
       setState(() {});
@@ -570,12 +633,60 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
       _lessonIndex -= 1;
       _resourceIndex = 0;
       _isCompleted = _completedLessonIds.contains(currentLesson.id);
+      _isCurrentFavorite = _favoriteIds.contains(currentLesson.id);
     });
 
+    await _saveProgress();
     await _prepareCurrentResource();
     if (mounted) {
       setState(() {});
     }
+  }
+
+  Future<void> _saveProgress() async {
+    try {
+      await _progressStorage.saveProgress(
+        courseId: widget.course.id,
+        lessonIndex: _lessonIndex,
+        resourceIndex: _resourceIndex,
+      );
+    } catch (_) {}
+  }
+
+  Future<void> _toggleFavorite() async {
+    final session = context.read<SessionController>();
+    final user = session.user;
+    if (user == null) {
+      return;
+    }
+
+    try {
+      final nowFav = await _favoritesStorage.toggleFavorite(
+        user.id,
+        currentLesson.id,
+      );
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _isCurrentFavorite = nowFav;
+        if (nowFav) {
+          _favoriteIds.add(currentLesson.id);
+        } else {
+          _favoriteIds.remove(currentLesson.id);
+        }
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            nowFav
+                ? 'Leccion guardada en favoritos.'
+                : 'Leccion eliminada de favoritos.',
+          ),
+          duration: const Duration(seconds: 2),
+        ),
+      );
+    } catch (_) {}
   }
 
   Future<void> _markCurrentAsSeen() async {

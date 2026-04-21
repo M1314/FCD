@@ -12,6 +12,7 @@ class Course {
     required this.priceUsd,
     required this.lessonsCount,
     required this.maxLessons,
+    this.category = '',
   });
 
   final int id;
@@ -24,6 +25,7 @@ class Course {
   final double priceUsd;
   final int lessonsCount;
   final int maxLessons;
+  final String category;
 
   factory Course.fromJson(Map<String, dynamic> json) {
     return Course(
@@ -48,14 +50,21 @@ class Course {
       price: readDouble(json, const <String>['doublePrecio', 'precio']),
       priceUsd: readDouble(json, const <String>['doublePrecioDolar']),
       lessonsCount: readInt(json, const <String>[
+        'total_lecciones_curso',
         'intNumberOfLessons',
         'lessonsCount',
         'totalLessons',
       ]),
       maxLessons: readInt(json, const <String>[
+        'lecciones_por_mes',
         'intCantidadMeses',
         'maxLessons',
         'availableLessons',
+      ]),
+      category: readString(json, const <String>[
+        'categoria',
+        'strCategoria',
+        'category',
       ]),
     );
   }

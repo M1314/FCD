@@ -3,6 +3,7 @@ import 'package:fcd_app/src/state/session_controller.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -67,6 +68,23 @@ class _LoginPageState extends State<LoginPage> {
                           ),
                         const Spacer(),
                         const SizedBox(height: 10),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: <Widget>[
+                            Text(
+                              '¿No tienes cuenta?',
+                              style: Theme.of(context).textTheme.bodySmall
+                                  ?.copyWith(color: AppTheme.mutedText),
+                            ),
+                            TextButton(
+                              onPressed: () => _openWeb(
+                                context,
+                                'https://circulo-dorado.org/registro',
+                              ),
+                              child: const Text('Registrarse'),
+                            ),
+                          ],
+                        ),
                         Text(
                           'Conectado con circulo-dorado.org',
                           textAlign: TextAlign.center,
@@ -198,6 +216,14 @@ class _LoginPageState extends State<LoginPage> {
                   context,
                 ).textTheme.bodySmall?.copyWith(color: AppTheme.mutedText),
               ),
+              const SizedBox(height: 6),
+              TextButton(
+                onPressed: () => _openWeb(
+                  context,
+                  'https://circulo-dorado.org/recuperar-clave',
+                ),
+                child: const Text('Recuperar contrasena'),
+              ),
             ],
           ),
         ),
@@ -226,6 +252,18 @@ class _LoginPageState extends State<LoginPage> {
       return 'Minimo 8 caracteres.';
     }
     return null;
+  }
+
+  Future<void> _openWeb(BuildContext context, String url) async {
+    final uri = Uri.parse(url);
+    if (!await launchUrl(uri, mode: LaunchMode.externalApplication)) {
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No se pudo abrir el navegador.')),
+      );
+    }
   }
 
   Future<void> _submit() async {
