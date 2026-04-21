@@ -1,0 +1,249 @@
+import 'dart:io';
+
+import 'package:fcd_app/src/core/theme/app_theme.dart';
+import 'package:fcd_app/src/features/downloads/data/models/downloaded_file.dart';
+import 'package:fcd_app/src/features/downloads/data/repositories/download_repository.dart';
+import 'package:fcd_app/src/state/session_controller.dart';
+import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
+import 'package:open_filex/open_filex.dart';
+import 'package:provider/provider.dart';
+
+class DownloadsPage extends StatefulWidget {
+  const DownloadsPage({super.key});
+
+  @override
+  State<DownloadsPage> createState() => _DownloadsPageState();
+}
+
+class _DownloadsPageState extends State<DownloadsPage> {
+  late final DownloadRepository _downloadRepository;
+
+  bool _loading = true;
+  List<DownloadedFile> _files = <DownloadedFile>[];
+
+  @override
+  void initState() {
+    super.initState();
+    _downloadRepository = DownloadRepository(
+      apiClient: context.read<SessionController>().apiClient,
+    );
+    _load();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_loading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    if (_files.isEmpty) {
+      return _DownloadsEmpty(onRefresh: _load);
+    }
+
+    return Column(
+      children: <Widget>[
+        Padding(
+          padding: const EdgeInsets.fromLTRB(14, 8, 14, 0),
+          child: Row(
+            children: <Widget>[
+              Expanded(
+                child: Text(
+                  '${_files.length} archivo(s) descargado(s)',
+                  style: Theme.of(
+                    context,
+                  ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w700),
+                ),
+              ),
+              TextButton.icon(
+                onPressed: _clear,
+                icon: const Icon(Icons.delete_outline_rounded),
+                label: const Text('Limpiar historial'),
+              ),
+            ],
+          ),
+        ),
+        Expanded(
+          child: RefreshIndicator(
+            onRefresh: _load,
+            child: ListView.separated(
+              physics: const AlwaysScrollableScrollPhysics(),
+              padding: const EdgeInsets.fromLTRB(14, 10, 14, 20),
+              itemBuilder: (context, index) {
+                final file = _files[index];
+                return _DownloadCard(file: file, onOpen: () => _open(file));
+              },
+              separatorBuilder: (context, index) => const SizedBox(height: 10),
+              itemCount: _files.length,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Future<void> _load() async {
+    setState(() {
+      _loading = true;
+    });
+
+    final files = await _downloadRepository.getDownloads();
+    if (!mounted) {
+      return;
+    }
+
+    setState(() {
+      _files = files;
+      _loading = false;
+    });
+  }
+
+  Future<void> _open(DownloadedFile file) async {
+    final localFile = File(file.localPath);
+    if (!await localFile.exists()) {
+      if (!mounted) {
+        return;
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('El archivo ya no existe en el almacenamiento local.'),
+        ),
+      );
+      return;
+    }
+
+    final result = await OpenFilex.open(file.localPath);
+    if (!mounted) {
+      return;
+    }
+
+    if (result.type != ResultType.done) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('No se pudo abrir: ${result.message}')),
+      );
+    }
+  }
+
+  Future<void> _clear() async {
+    await _downloadRepository.clearHistory();
+    if (!mounted) {
+      return;
+    }
+    await _load();
+  }
+}
+
+class _DownloadCard extends StatelessWidget {
+  const _DownloadCard({required this.file, required this.onOpen});
+
+  final DownloadedFile file;
+  final VoidCallback onOpen;
+
+  @override
+  Widget build(BuildContext context) {
+    final formatter = DateFormat('dd/MM/yyyy HH:mm');
+
+    return Material(
+      color: const Color(0xFFFFFCF8),
+      borderRadius: BorderRadius.circular(14),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(14),
+        onTap: onOpen,
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Row(
+            children: <Widget>[
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF2E3CF),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(_iconFor(file.type), color: AppTheme.deepBrown),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    Text(
+                      file.name.isEmpty ? 'Archivo' : file.name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      formatter.format(file.downloadedAt),
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: AppTheme.mutedText,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const Icon(Icons.open_in_new_rounded, color: AppTheme.deepBrown),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  IconData _iconFor(String type) {
+    switch (type) {
+      case 'audio':
+        return Icons.headphones_rounded;
+      case 'video':
+        return Icons.play_circle_fill_rounded;
+      default:
+        return Icons.description_rounded;
+    }
+  }
+}
+
+class _DownloadsEmpty extends StatelessWidget {
+  const _DownloadsEmpty({required this.onRefresh});
+
+  final Future<void> Function() onRefresh;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: <Widget>[
+            const Icon(
+              Icons.download_done_rounded,
+              size: 54,
+              color: AppTheme.deepBrown,
+            ),
+            const SizedBox(height: 10),
+            Text(
+              'Aun no tienes descargas',
+              style: Theme.of(context).textTheme.titleMedium,
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Cuando descargues archivos desde una leccion apareceran aqui.',
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.bodyMedium,
+            ),
+            const SizedBox(height: 16),
+            ElevatedButton(
+              onPressed: onRefresh,
+              child: const Text('Actualizar'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
