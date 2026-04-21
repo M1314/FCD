@@ -15,12 +15,11 @@ jobs:
     permissions:
       contents: read
     steps:
-      - name: Install Flutter
-        shell: bash
-        run: |
-          set -euo pipefail
-          git clone --branch stable --depth 1 https://github.com/flutter/flutter.git "$RUNNER_TEMP/flutter"
-          echo "$RUNNER_TEMP/flutter/bin" >> "$GITHUB_PATH"
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2.23.0
+        with:
+          channel: stable
+          cache: true
 
       - name: Verify Flutter
         shell: bash
