@@ -52,6 +52,7 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
   double _downloadProgress = 0;
   bool _isCompleted = false;
   bool _isCurrentFavorite = false;
+  int _savedMediaPositionMs = 0;
 
   BetterPlayerController? _videoController;
   AudioPlayer? _audioPlayer;
@@ -75,6 +76,7 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _saveProgress();
     _videoController?.dispose();
     _audioPlayer?.dispose();
     _downloadCancelToken?.cancel();
@@ -84,6 +86,7 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.paused) {
+      _saveProgress();
       _videoController?.pause();
       _audioPlayer?.pause();
     }
@@ -118,28 +121,33 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
 
     if (mounted) {
       if (widget.initialLessonIndex != null) {
-        _lessonIndex = widget.initialLessonIndex!.clamp(0, widget.lessons.length - 1);
+        _lessonIndex = widget.initialLessonIndex!.clamp(
+          0,
+          widget.lessons.length - 1,
+        );
         _resourceIndex = 0;
       } else if (!widget.forceStart) {
         // Prefer saved local progress; fall back to first pending lesson.
         final saved = await _progressStorage.getProgress(widget.course.id);
-        if (saved != null &&
-            saved.lessonIndex < widget.lessons.length) {
+        if (saved != null && saved.lessonIndex < widget.lessons.length) {
           _lessonIndex = saved.lessonIndex;
           final resources = widget.lessons[saved.lessonIndex].resources;
           _resourceIndex = resources.isEmpty
               ? 0
               : saved.resourceIndex.clamp(0, resources.length - 1);
+          _savedMediaPositionMs = saved.mediaPositionMs;
         } else {
           final firstPending = widget.lessons.indexWhere(
             (lesson) => !_completedLessonIds.contains(lesson.id),
           );
           _lessonIndex = firstPending == -1 ? 0 : firstPending;
           _resourceIndex = 0;
+          _savedMediaPositionMs = 0;
         }
       } else {
         _lessonIndex = 0;
         _resourceIndex = 0;
+        _savedMediaPositionMs = 0;
       }
 
       _isCompleted = _completedLessonIds.contains(currentLesson.id);
@@ -348,7 +356,9 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
                   _isCurrentFavorite
                       ? Icons.bookmark_rounded
                       : Icons.bookmark_outline_rounded,
-                  color: _isCurrentFavorite ? AppTheme.bronze : AppTheme.mutedText,
+                  color: _isCurrentFavorite
+                      ? AppTheme.bronze
+                      : AppTheme.mutedText,
                 ),
                 tooltip: _isCurrentFavorite
                     ? 'Quitar de favoritos'
@@ -405,6 +415,7 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
                   setState(() {
                     _resourceIndex = index;
                   });
+                  _savedMediaPositionMs = 0;
                   await _saveProgress();
                   await _prepareCurrentResource();
                   if (mounted) {
@@ -624,6 +635,7 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
       _isCompleted = _completedLessonIds.contains(currentLesson.id);
       _isCurrentFavorite = _favoriteIds.contains(currentLesson.id);
     });
+    _savedMediaPositionMs = 0;
 
     await _saveProgress();
     await _prepareCurrentResource();
@@ -643,6 +655,7 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
       _isCompleted = _completedLessonIds.contains(currentLesson.id);
       _isCurrentFavorite = _favoriteIds.contains(currentLesson.id);
     });
+    _savedMediaPositionMs = 0;
 
     await _saveProgress();
     await _prepareCurrentResource();
@@ -653,12 +666,33 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
 
   Future<void> _saveProgress() async {
     try {
+      final mediaPositionMs = await _readCurrentMediaPositionMs();
+      _savedMediaPositionMs = mediaPositionMs;
       await _progressStorage.saveProgress(
         courseId: widget.course.id,
         lessonIndex: _lessonIndex,
         resourceIndex: _resourceIndex,
+        mediaPositionMs: mediaPositionMs,
       );
     } catch (_) {}
+  }
+
+  Future<int> _readCurrentMediaPositionMs() async {
+    final resource = currentResource;
+    if (resource == null) {
+      return 0;
+    }
+
+    if (resource.isAudio && _audioPlayer != null) {
+      return _audioPlayer!.position.inMilliseconds;
+    }
+
+    if (resource.isVideo && _videoController != null) {
+      final position = await _videoController!.videoPlayerController?.position;
+      return position?.inMilliseconds ?? 0;
+    }
+
+    return 0;
   }
 
   Future<void> _toggleFavorite() async {
@@ -739,10 +773,16 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
 
     if (resource.isVideo) {
       _setupVideo(resource.url);
+      if (_savedMediaPositionMs > 0) {
+        _videoController?.seekTo(Duration(milliseconds: _savedMediaPositionMs));
+      }
       return;
     }
     if (resource.isAudio) {
       await _setupAudio(resource.url);
+      if (_savedMediaPositionMs > 0) {
+        await _audioPlayer?.seek(Duration(milliseconds: _savedMediaPositionMs));
+      }
       return;
     }
 

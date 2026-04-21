@@ -48,10 +48,9 @@ class _CourseSummaryPageState extends State<CourseSummaryPage> {
         ? widget.course.bannerUrl
         : widget.course.iconUrl;
 
-    final hasSavedProgress =
-        _savedProgress != null && _savedProgress!.lessonIndex > 0;
-    final resumeLessonName = hasSavedProgress &&
-            _savedProgress!.lessonIndex < widget.lessons.length
+    final hasSavedProgress = _hasSavedProgress(_savedProgress);
+    final resumeLessonName =
+        hasSavedProgress && _savedProgress!.lessonIndex < widget.lessons.length
         ? widget.lessons[_savedProgress!.lessonIndex].name
         : null;
 
@@ -114,6 +113,8 @@ class _CourseSummaryPageState extends State<CourseSummaryPage> {
                       ),
                     ],
                   ),
+                  const SizedBox(height: 18),
+                  _LearningModalitiesCard(courseName: widget.course.name),
                   const SizedBox(height: 20),
                   Text(
                     'Temario',
@@ -135,7 +136,8 @@ class _CourseSummaryPageState extends State<CourseSummaryPage> {
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: <Widget>[
-                    if (hasSavedProgress && resumeLessonName != null) ...<Widget>[
+                    if (hasSavedProgress &&
+                        resumeLessonName != null) ...<Widget>[
                       ElevatedButton.icon(
                         onPressed: _startCourse,
                         icon: const Icon(Icons.play_arrow_rounded),
@@ -169,10 +171,8 @@ class _CourseSummaryPageState extends State<CourseSummaryPage> {
   void _startCourse() {
     Navigator.of(context).pushReplacement(
       MaterialPageRoute<void>(
-        builder: (_) => CoursePlayerPage(
-          course: widget.course,
-          lessons: widget.lessons,
-        ),
+        builder: (_) =>
+            CoursePlayerPage(course: widget.course, lessons: widget.lessons),
       ),
     );
   }
@@ -201,6 +201,15 @@ class _CourseSummaryPageState extends State<CourseSummaryPage> {
 
   int _countAudios(List<CourseLesson> lessons) =>
       lessons.fold(0, (sum, item) => sum + item.audios.length);
+
+  bool _hasSavedProgress(CourseProgress? progress) {
+    if (progress == null) {
+      return false;
+    }
+    return progress.lessonIndex > 0 ||
+        progress.resourceIndex > 0 ||
+        progress.mediaPositionMs > 0;
+  }
 }
 
 class _InfoPill extends StatelessWidget {
@@ -224,6 +233,98 @@ class _InfoPill extends StatelessWidget {
           const SizedBox(width: 6),
           Text(
             text,
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              color: AppTheme.deepBrown,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _LearningModalitiesCard extends StatelessWidget {
+  const _LearningModalitiesCard({required this.courseName});
+
+  final String courseName;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(16),
+        gradient: const LinearGradient(
+          colors: <Color>[Color(0xFFF5EAD9), Color(0xFFEDD4AE)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Text(
+            'Modalidades sugeridas para profundizar',
+            style: Theme.of(context).textTheme.titleMedium,
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Alterna entre visual, auditivo y practica guiada para integrar mejor $courseName.',
+            style: Theme.of(
+              context,
+            ).textTheme.bodySmall?.copyWith(color: AppTheme.mutedText),
+          ),
+          const SizedBox(height: 10),
+          const Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: <Widget>[
+              _ModalityPill(
+                icon: Icons.play_circle_fill_rounded,
+                label: 'Video consciente',
+              ),
+              _ModalityPill(
+                icon: Icons.headphones_rounded,
+                label: 'Escucha activa',
+              ),
+              _ModalityPill(
+                icon: Icons.edit_note_rounded,
+                label: 'Notas de integracion',
+              ),
+              _ModalityPill(
+                icon: Icons.self_improvement_rounded,
+                label: 'Practica/reflexion',
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ModalityPill extends StatelessWidget {
+  const _ModalityPill({required this.icon, required this.label});
+
+  final IconData icon;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+      decoration: BoxDecoration(
+        color: Colors.white.withAlpha(222),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: <Widget>[
+          Icon(icon, size: 16, color: AppTheme.deepBrown),
+          const SizedBox(width: 6),
+          Text(
+            label,
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
               color: AppTheme.deepBrown,
               fontWeight: FontWeight.w700,
