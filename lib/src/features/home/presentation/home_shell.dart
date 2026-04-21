@@ -126,11 +126,11 @@ class _HomeShellState extends State<HomeShell> {
       case 3:
         return 'Tus lecciones guardadas';
       case 4:
-        return 'Contenido disponible sin conexion';
+        return 'Contenido disponible sin conexión';
       case 5:
-        return 'Gestiona tu sesion y perfil';
+        return 'Gestiona tu sesión y perfil';
       default:
-        return 'Retoma tu practica donde la dejaste';
+        return 'Retoma tu práctica donde la dejaste';
     }
   }
 }

@@ -76,7 +76,6 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
-    _saveProgress();
     _videoController?.dispose();
     _audioPlayer?.dispose();
     _downloadCancelToken?.cancel();
@@ -85,7 +84,9 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.paused) {
+    if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.inactive ||
+        state == AppLifecycleState.detached) {
       _saveProgress();
       _videoController?.pause();
       _audioPlayer?.pause();
