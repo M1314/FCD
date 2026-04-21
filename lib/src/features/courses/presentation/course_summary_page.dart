@@ -306,6 +306,7 @@ class _LearningModalitiesCard extends StatelessWidget {
 
 class _ModalityPill extends StatelessWidget {
   const _ModalityPill({required this.icon, required this.label});
+  static const int _pillBackgroundAlpha = 222;
 
   final IconData icon;
   final String label;
@@ -315,7 +316,7 @@ class _ModalityPill extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
       decoration: BoxDecoration(
-        color: Colors.white.withAlpha(222),
+        color: Colors.white.withAlpha(_pillBackgroundAlpha),
         borderRadius: BorderRadius.circular(999),
       ),
       child: Row(

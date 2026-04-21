@@ -41,6 +41,7 @@ class CoursePlayerPage extends StatefulWidget {
 
 class _CoursePlayerPageState extends State<CoursePlayerPage>
     with WidgetsBindingObserver {
+  // Delay needed so Better Player is ready to accept seek operations.
   static const Duration _videoRestoreDelay = Duration(milliseconds: 350);
 
   late final DownloadRepository _downloadRepository;
