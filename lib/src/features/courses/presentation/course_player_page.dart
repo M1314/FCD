@@ -810,15 +810,17 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
           if (requestId == _resourcePreparationRequestId) {
             rethrow;
           }
+          // The request became stale while seeking; cleanup is handled below.
         }
       }
-      if (!mounted || requestId != _resourcePreparationRequestId) {
-        if (_audioPlayer == audioPlayer) {
-          _audioPlayer = null;
-        }
-        await audioPlayer.stop();
-        await audioPlayer.dispose();
+      if (mounted && requestId == _resourcePreparationRequestId) {
+        return;
       }
+      if (_audioPlayer == audioPlayer) {
+        _audioPlayer = null;
+      }
+      await audioPlayer.stop();
+      await audioPlayer.dispose();
       return;
     }
 
