@@ -16,6 +16,37 @@ class AuthRepository {
     required String email,
     required String password,
   }) async {
+    return _loginWithCredentials(
+      email: email,
+      password: password,
+      persistCredentials: true,
+    );
+  }
+
+  Future<bool> hasSavedLoginCredentials() {
+    return _storage.hasSavedLoginCredentials();
+  }
+
+  Future<AuthSession> loginWithSavedCredentials() async {
+    final credentials = await _storage.getSavedLoginCredentials();
+    if (credentials == null) {
+      throw const AppException(
+        'Inicia sesión con correo y contraseña para activar biometría.',
+      );
+    }
+
+    return _loginWithCredentials(
+      email: credentials.email,
+      password: credentials.password,
+      persistCredentials: false,
+    );
+  }
+
+  Future<AuthSession> _loginWithCredentials({
+    required String email,
+    required String password,
+    required bool persistCredentials,
+  }) async {
     final payload = await _apiClient.post(
       '/login',
       data: <String, dynamic>{'strEmail': email, 'strPassword': password},
@@ -43,25 +74,12 @@ class AuthRepository {
       refreshToken: refreshToken,
     );
 
-    await _storage.saveLoginCredentials(email: email, password: password);
+    if (persistCredentials) {
+      await _storage.saveLoginCredentials(email: email, password: password);
+    }
     await _persistSession(session);
     _apiClient.setTokens(accessToken: accessToken, refreshToken: refreshToken);
     return session;
-  }
-
-  Future<bool> hasSavedLoginCredentials() {
-    return _storage.hasSavedLoginCredentials();
-  }
-
-  Future<AuthSession> loginWithSavedCredentials() async {
-    final credentials = await _storage.getSavedLoginCredentials();
-    if (credentials == null) {
-      throw const AppException(
-        'Inicia sesión con correo y contraseña para activar biometría.',
-      );
-    }
-
-    return login(email: credentials.email, password: credentials.password);
   }
 
   Future<AuthSession?> restoreSession() async {
