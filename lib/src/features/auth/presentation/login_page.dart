@@ -332,7 +332,7 @@ class _LoginPageState extends State<LoginPage> {
         });
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('No se pudo completar la autenticacion Face ID.'),
+            content: Text('No se pudo completar la autenticación Face ID.'),
           ),
         );
         return;

@@ -59,7 +59,7 @@ class LocalBiometricAuthenticator implements BiometricAuthenticator {
         return false;
       }
       return await _client.authenticate(
-        localizedReason: 'Usa Face ID para iniciar sesion.',
+        localizedReason: 'Usa Face ID para iniciar sesión.',
       );
     } on Exception {
       return false;
