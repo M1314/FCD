@@ -50,7 +50,7 @@ int readInt(Map<String, dynamic> json, List<String> keys, {int fallback = 0}) {
     return value.toInt();
   }
   if (value is String) {
-    return int.tryParse(value) ?? fallback;
+    return int.tryParse(value.trim()) ?? fallback;
   }
   return fallback;
 }
@@ -68,7 +68,7 @@ double readDouble(
     return value.toDouble();
   }
   if (value is String) {
-    return double.tryParse(value) ?? fallback;
+    return double.tryParse(value.trim()) ?? fallback;
   }
   return fallback;
 }
@@ -87,7 +87,13 @@ bool readBool(
   }
   if (value is String) {
     final normalized = value.toLowerCase().trim();
-    return normalized == 'true' || normalized == '1';
+    if (normalized == 'true' || normalized == '1') {
+      return true;
+    }
+    if (normalized == 'false' || normalized == '0') {
+      return false;
+    }
+    return fallback;
   }
   return fallback;
 }

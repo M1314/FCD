@@ -78,7 +78,6 @@ class _LoginPageState extends State<LoginPage> {
                             ),
                             TextButton(
                               onPressed: () => _openWeb(
-                                context,
                                 'https://circulo-dorado.org/registro',
                               ),
                               child: const Text('Registrarse'),
@@ -219,7 +218,6 @@ class _LoginPageState extends State<LoginPage> {
               const SizedBox(height: 6),
               TextButton(
                 onPressed: () => _openWeb(
-                  context,
                   'https://circulo-dorado.org/recuperar-clave',
                 ),
                 child: const Text('Recuperar contrasena'),
@@ -254,7 +252,7 @@ class _LoginPageState extends State<LoginPage> {
     return null;
   }
 
-  Future<void> _openWeb(BuildContext context, String url) async {
+  Future<void> _openWeb(String url) async {
     final uri = Uri.parse(url);
     if (!await launchUrl(uri, mode: LaunchMode.externalApplication)) {
       if (!mounted) {
