@@ -245,9 +245,9 @@ bool _startsWithIdPrefix(String key) {
   if (key.startsWith('id_') || key.startsWith('id-')) {
     return true;
   }
-  if (key.length > 2) {
-    final code = key.codeUnitAt(2);
-    return code >= '0'.codeUnitAt(0) && code <= '9'.codeUnitAt(0);
+  if (key.length <= 2) {
+    return false;
   }
-  return false;
+  final third = key[2];
+  return third.compareTo('0') >= 0 && third.compareTo('9') <= 0;
 }
