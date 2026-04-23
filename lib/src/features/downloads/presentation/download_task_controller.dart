@@ -15,6 +15,8 @@ class DownloadTaskResult {
 }
 
 class DownloadTaskController extends ChangeNotifier {
+  static const String _defaultResourceName = 'Archivo';
+
   DownloadTaskController({required DownloadRepository downloadRepository})
     : _downloadRepository = downloadRepository;
 
@@ -35,7 +37,9 @@ class DownloadTaskController extends ChangeNotifier {
 
     _isDownloading = true;
     _progress = 0;
-    _resourceName = resource.name.trim().isEmpty ? 'Archivo' : resource.name;
+    _resourceName = resource.name.trim().isEmpty
+        ? _defaultResourceName
+        : resource.name;
     notifyListeners();
 
     try {
