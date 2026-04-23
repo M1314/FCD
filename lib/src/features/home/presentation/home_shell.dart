@@ -97,9 +97,7 @@ class _HomeShellState extends State<HomeShell> {
   Widget build(BuildContext context) {
     final isTablet = MediaQuery.sizeOf(context).width >= 900;
 
-    final content = SafeArea(
-      child: IndexedStack(index: _selectedIndex, children: _pages),
-    );
+    final content = IndexedStack(index: _selectedIndex, children: _pages);
 
     return Scaffold(
       appBar: AppBar(title: Text(_titleForIndex(_selectedIndex))),
@@ -119,10 +117,12 @@ class _HomeShellState extends State<HomeShell> {
                   ),
                 ),
                 const VerticalDivider(width: 1),
-                Expanded(child: content),
+                Expanded(
+                  child: SafeArea(left: false, child: content),
+                ),
               ],
             )
-          : content,
+          : SafeArea(child: content),
       bottomNavigationBar: isTablet
           ? null
           : NavigationBar(
