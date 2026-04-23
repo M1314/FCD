@@ -652,6 +652,21 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
       return;
     }
 
+    final existingFile = await _downloadRepository.getExistingDownloadedFile(
+      resource,
+    );
+    if (existingFile != null) {
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Este recurso ya fue descargado previamente.'),
+        ),
+      );
+      return;
+    }
+
     setState(() {
       _isDownloading = true;
       _downloadProgress = 0;

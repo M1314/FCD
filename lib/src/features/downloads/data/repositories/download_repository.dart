@@ -26,6 +26,11 @@ class DownloadRepository {
     required ProgressCallback onProgress,
     CancelToken? cancelToken,
   }) async {
+    final existingFile = await getExistingDownloadedFile(resource);
+    if (existingFile != null) {
+      return existingFile;
+    }
+
     final baseDir = await getBaseDirectory();
     final folder = Directory('${baseDir.path}/downloads');
     if (!await folder.exists()) {
@@ -49,7 +54,7 @@ class DownloadRepository {
 
     await _saveToHistory(
       DownloadedFile(
-        id: '${resource.type.name}:${resource.url.hashCode}',
+        id: _resourceId(resource),
         url: resource.url,
         name: resource.name,
         type: resource.type.name,
@@ -59,6 +64,22 @@ class DownloadRepository {
     );
 
     return file;
+  }
+
+  Future<File?> getExistingDownloadedFile(LessonResource resource) async {
+    final downloads = await getDownloads();
+    for (final existing in downloads) {
+      if (existing.id != _resourceId(resource)) {
+        continue;
+      }
+
+      final file = File(existing.localPath);
+      if (!await file.exists()) {
+        return null;
+      }
+      return file;
+    }
+    return null;
   }
 
   Future<List<DownloadedFile>> getDownloads() async {
@@ -107,6 +128,10 @@ class DownloadRepository {
       _downloadHistoryKey,
       parsed.map((entry) => entry.toRawJson()).toList(),
     );
+  }
+
+  String _resourceId(LessonResource resource) {
+    return '${resource.type.name}:${resource.url.hashCode}';
   }
 
   String _extensionFromResource(LessonResource resource) {
