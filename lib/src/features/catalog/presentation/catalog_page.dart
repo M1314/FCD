@@ -70,7 +70,7 @@ class _CatalogPageState extends State<CatalogPage> {
         return;
       }
 
-      final lessonCounts = await _loadLessonCounts(courses);
+      final lessonCounts = await _loadLessonCounts(session, courses);
       if (!mounted) {
         return;
       }
@@ -109,21 +109,27 @@ class _CatalogPageState extends State<CatalogPage> {
     }
   }
 
-  Future<Map<int, int>> _loadLessonCounts(List<Course> courses) async {
-    final session = context.read<SessionController>();
-    final futures = courses.map((course) async {
-      try {
-        final lessons = await session.courseRepository.getAllLessonsByCourse(
-          courseId: course.id,
-        );
-        return MapEntry(course.id, lessons.length);
-      } catch (_) {
-        return MapEntry(course.id, course.lessonsCount);
-      }
-    }).toList();
-
-    final results = await Future.wait(futures);
-    return Map<int, int>.fromEntries(results);
+  Future<Map<int, int>> _loadLessonCounts(
+    SessionController session,
+    List<Course> courses,
+  ) async {
+    const batchSize = 6;
+    final counts = <int, int>{};
+    for (var i = 0; i < courses.length; i += batchSize) {
+      final batch = courses.skip(i).take(batchSize);
+      final results = await Future.wait(batch.map((course) async {
+        try {
+          final lessons = await session.courseRepository.getAllLessonsByCourse(
+            courseId: course.id,
+          );
+          return MapEntry(course.id, lessons.length);
+        } catch (_) {
+          return MapEntry(course.id, course.lessonsCount);
+        }
+      }));
+      counts.addEntries(results);
+    }
+    return counts;
   }
 
   int _lessonCountFor(Course course) {
