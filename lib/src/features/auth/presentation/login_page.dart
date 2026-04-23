@@ -238,7 +238,7 @@ class _LoginPageState extends State<LoginPage> {
                 OutlinedButton.icon(
                   onPressed: _isSubmitting ? null : _submitWithBiometrics,
                   icon: const Icon(Icons.face_6_outlined),
-                  label: const Text('Ingresar con Face ID'),
+                  label: const Text('Ingresar con biometría'),
                 ),
               ],
               const SizedBox(height: 8),
@@ -332,7 +332,7 @@ class _LoginPageState extends State<LoginPage> {
         });
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('No se pudo completar la autenticación Face ID.'),
+            content: Text('No se pudo completar la autenticación biométrica.'),
           ),
         );
         return;
