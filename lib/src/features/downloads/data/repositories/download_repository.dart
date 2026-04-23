@@ -71,13 +71,13 @@ class DownloadRepository {
   Future<File?> getExistingDownloadedFile(LessonResource resource) async {
     final downloads = await getDownloads();
     for (final existing in downloads) {
-      if (existing.id != _resourceId(resource)) {
+      if (!_matchesResource(existing, resource)) {
         continue;
       }
 
       final file = File(existing.localPath);
       if (!await file.exists()) {
-        await _removeFromHistoryById(existing.id);
+        await _removeResourceFromHistory(resource);
         return null;
       }
       return file;
@@ -86,22 +86,26 @@ class DownloadRepository {
   }
 
   Future<List<DownloadedFile>> getDownloads() async {
-    final prefs = await SharedPreferences.getInstance();
-    final rawList = prefs.getStringList(_downloadHistoryKey) ?? <String>[];
-
-    final files = rawList
-        .map((entry) {
-          try {
-            return DownloadedFile.fromRawJson(entry);
-          } catch (_) {
-            return null;
-          }
-        })
-        .whereType<DownloadedFile>()
-        .toList();
-
+    final files = await _readHistory();
     files.sort((a, b) => b.downloadedAt.compareTo(a.downloadedAt));
     return files;
+  }
+
+  Future<DownloadCleanupResult> removeMissingDownloads() async {
+    final files = await getDownloads();
+    final existing = <DownloadedFile>[];
+    for (final file in files) {
+      final local = File(file.localPath);
+      if (await local.exists()) {
+        existing.add(file);
+      }
+    }
+
+    final removed = files.length - existing.length;
+    if (removed > 0) {
+      await _setHistory(existing);
+    }
+    return DownloadCleanupResult(removed: removed, files: existing);
   }
 
   Future<void> clearHistory() async {
@@ -110,33 +114,25 @@ class DownloadRepository {
   }
 
   Future<void> _saveToHistory(DownloadedFile file) async {
-    final prefs = await SharedPreferences.getInstance();
-    final current = prefs.getStringList(_downloadHistoryKey) ?? <String>[];
-
-    final parsed = current
-        .map((entry) {
-          try {
-            return DownloadedFile.fromRawJson(entry);
-          } catch (_) {
-            return null;
-          }
-        })
-        .whereType<DownloadedFile>()
-        .toList();
-
-    parsed.removeWhere((entry) => entry.id == file.id);
+    final parsed = await _readHistory();
+    parsed.removeWhere((entry) => _isSameResourceEntry(entry, file));
     parsed.insert(0, file);
 
+    await _setHistory(parsed);
+  }
+
+  Future<void> _setHistory(List<DownloadedFile> files) async {
+    final prefs = await SharedPreferences.getInstance();
     await prefs.setStringList(
       _downloadHistoryKey,
-      parsed.map((entry) => entry.toRawJson()).toList(),
+      files.map((entry) => entry.toRawJson()).toList(),
     );
   }
 
-  Future<void> _removeFromHistoryById(String id) async {
+  Future<List<DownloadedFile>> _readHistory() async {
     final prefs = await SharedPreferences.getInstance();
-    final current = prefs.getStringList(_downloadHistoryKey) ?? <String>[];
-    final parsed = current
+    final rawList = prefs.getStringList(_downloadHistoryKey) ?? <String>[];
+    return rawList
         .map((entry) {
           try {
             return DownloadedFile.fromRawJson(entry);
@@ -146,16 +142,32 @@ class DownloadRepository {
         })
         .whereType<DownloadedFile>()
         .toList();
+  }
 
-    parsed.removeWhere((entry) => entry.id == id);
-    await prefs.setStringList(
-      _downloadHistoryKey,
-      parsed.map((entry) => entry.toRawJson()).toList(),
-    );
+  Future<void> _removeResourceFromHistory(LessonResource resource) async {
+    final parsed = await _readHistory();
+    parsed.removeWhere((entry) => _matchesResource(entry, resource));
+    await _setHistory(parsed);
+  }
+
+  bool _matchesResource(DownloadedFile existing, LessonResource resource) {
+    final stableId = _resourceId(resource);
+    final legacyId = _legacyResourceId(resource);
+    return existing.id == stableId ||
+        existing.id == legacyId ||
+        (existing.type == resource.type.name && existing.url == resource.url);
+  }
+
+  bool _isSameResourceEntry(DownloadedFile a, DownloadedFile b) {
+    return a.id == b.id || (a.type == b.type && a.url == b.url);
+  }
+
+  String _legacyResourceId(LessonResource resource) {
+    return '${resource.type.name}:${resource.url.hashCode}';
   }
 
   String _resourceId(LessonResource resource) {
-    return '${resource.type.name}:${resource.url.hashCode}';
+    return '${resource.type.name}:${resource.url}';
   }
 
   String _extensionFromResource(LessonResource resource) {
@@ -192,4 +204,11 @@ class DownloadRepository {
     }
     return '$withTime.$extension';
   }
+}
+
+class DownloadCleanupResult {
+  const DownloadCleanupResult({required this.removed, required this.files});
+
+  final int removed;
+  final List<DownloadedFile> files;
 }

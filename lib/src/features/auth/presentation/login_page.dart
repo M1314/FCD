@@ -44,9 +44,14 @@ class _LoginPageState extends State<LoginPage> {
           child: LayoutBuilder(
             builder: (context, constraints) {
               return SingleChildScrollView(
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 20,
+                  vertical: 24,
+                ),
                 child: ConstrainedBox(
-                  constraints: BoxConstraints(minHeight: constraints.maxHeight - 48),
+                  constraints: BoxConstraints(
+                    minHeight: constraints.maxHeight - 48,
+                  ),
                   child: IntrinsicHeight(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -61,9 +66,8 @@ class _LoginPageState extends State<LoginPage> {
                             child: Text(
                               session.errorMessage!,
                               textAlign: TextAlign.center,
-                              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                color: Colors.red.shade700,
-                              ),
+                              style: Theme.of(context).textTheme.bodyMedium
+                                  ?.copyWith(color: Colors.red.shade700),
                             ),
                           ),
                         const Spacer(),
@@ -87,9 +91,8 @@ class _LoginPageState extends State<LoginPage> {
                         Text(
                           'Conectado con circulo-dorado.org',
                           textAlign: TextAlign.center,
-                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: AppTheme.mutedText,
-                          ),
+                          style: Theme.of(context).textTheme.bodySmall
+                              ?.copyWith(color: AppTheme.mutedText),
                         ),
                       ],
                     ),
@@ -217,9 +220,8 @@ class _LoginPageState extends State<LoginPage> {
               ),
               const SizedBox(height: 6),
               TextButton(
-                onPressed: () => _openWeb(
-                  'https://circulo-dorado.org/recuperar-clave',
-                ),
+                onPressed: () =>
+                    _openWeb('https://circulo-dorado.org/recuperar-clave'),
                 child: const Text('Recuperar contrasena'),
               ),
             ],
@@ -293,10 +295,6 @@ class _LoginPageState extends State<LoginPage> {
       _isSubmitting = false;
     });
 
-    if (!success) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('No se pudo iniciar sesion.')),
-      );
-    }
+    if (!success) return;
   }
 }

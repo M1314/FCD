@@ -91,7 +91,7 @@ class CourseRepository {
     required int courseId,
     required int lessonId,
   }) async {
-    await _apiClient.post(
+    final payload = await _apiClient.post(
       '/lesson/setLessonUserStatus',
       authenticated: true,
       data: <String, dynamic>{
@@ -101,6 +101,15 @@ class CourseRepository {
         'status': 1,
       },
     );
+
+    final status = payload['intResponse'] as int? ?? 500;
+    if (status != 200) {
+      throw AppException(
+        payload['strAnswer']?.toString() ??
+            'No se pudo actualizar el estado de la leccion.',
+        statusCode: status,
+      );
+    }
   }
 
   Future<Set<int>> getCompletedLessonIds({

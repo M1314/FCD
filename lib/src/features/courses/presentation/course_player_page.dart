@@ -57,6 +57,7 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
   double _downloadProgress = 0;
   bool _isCompleted = false;
   bool _isCurrentFavorite = false;
+  String? _initializationError;
   int _savedMediaPositionMs = 0;
   int _resourcePreparationRequestId = 0;
   String? _activeMediaResourceKey;
@@ -100,9 +101,27 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
   }
 
   Future<void> _initializeProgress() async {
+    if (widget.lessons.isEmpty) {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _isLoading = false;
+        _initializationError = 'Este curso aun no tiene lecciones disponibles.';
+      });
+      return;
+    }
+
     final session = context.read<SessionController>();
     final user = session.user;
     if (user == null) {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _isLoading = false;
+        _initializationError = 'Sesion no valida. Vuelve a iniciar sesion.';
+      });
       return;
     }
 
@@ -126,44 +145,50 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
       _favoriteIds = <int>{};
     }
 
-    if (mounted) {
-      if (widget.initialLessonIndex != null) {
-        _lessonIndex = widget.initialLessonIndex!.clamp(
-          0,
-          widget.lessons.length - 1,
-        );
-        _resourceIndex = 0;
-      } else if (!widget.forceStart) {
-        // Prefer saved local progress; fall back to first pending lesson.
-        final saved = await _progressStorage.getProgress(widget.course.id);
-        if (saved != null && saved.lessonIndex < widget.lessons.length) {
-          _lessonIndex = saved.lessonIndex;
-          final resources = widget.lessons[saved.lessonIndex].resources;
-          _resourceIndex = resources.isEmpty
-              ? 0
-              : saved.resourceIndex.clamp(0, resources.length - 1);
-          _savedMediaPositionMs = saved.mediaPositionMs;
-        } else {
-          final firstPending = widget.lessons.indexWhere(
-            (lesson) => !_completedLessonIds.contains(lesson.id),
-          );
-          _lessonIndex = firstPending == -1 ? 0 : firstPending;
-          _resourceIndex = 0;
-          _savedMediaPositionMs = 0;
-        }
+    if (!mounted) {
+      return;
+    }
+    if (widget.initialLessonIndex != null) {
+      _lessonIndex = widget.initialLessonIndex!.clamp(
+        0,
+        widget.lessons.length - 1,
+      );
+      _resourceIndex = 0;
+    } else if (!widget.forceStart) {
+      final saved = await _progressStorage.getProgress(widget.course.id);
+      if (!mounted) {
+        return;
+      }
+      if (saved != null && saved.lessonIndex < widget.lessons.length) {
+        _lessonIndex = saved.lessonIndex;
+        final resources = widget.lessons[saved.lessonIndex].resources;
+        _resourceIndex = resources.isEmpty
+            ? 0
+            : saved.resourceIndex.clamp(0, resources.length - 1);
+        _savedMediaPositionMs = saved.mediaPositionMs;
       } else {
-        _lessonIndex = 0;
+        final firstPending = widget.lessons.indexWhere(
+          (lesson) => !_completedLessonIds.contains(lesson.id),
+        );
+        _lessonIndex = firstPending == -1 ? 0 : firstPending;
         _resourceIndex = 0;
         _savedMediaPositionMs = 0;
       }
-
-      _isCompleted = _completedLessonIds.contains(currentLesson.id);
-      _isCurrentFavorite = _favoriteIds.contains(currentLesson.id);
-      await _prepareCurrentResource();
-      setState(() {
-        _isLoading = false;
-      });
+    } else {
+      _lessonIndex = 0;
+      _resourceIndex = 0;
+      _savedMediaPositionMs = 0;
     }
+
+    _isCompleted = _completedLessonIds.contains(currentLesson.id);
+    _isCurrentFavorite = _favoriteIds.contains(currentLesson.id);
+    await _prepareCurrentResource();
+    if (!mounted) {
+      return;
+    }
+    setState(() {
+      _isLoading = false;
+    });
   }
 
   CourseLesson get currentLesson => widget.lessons[_lessonIndex];
@@ -212,6 +237,17 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
   Widget build(BuildContext context) {
     if (_isLoading) {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
+    if (_initializationError != null) {
+      return Scaffold(
+        appBar: AppBar(),
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Text(_initializationError!, textAlign: TextAlign.center),
+          ),
+        ),
+      );
     }
 
     return Scaffold(
@@ -712,7 +748,7 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
       }
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text('No se pudo descargar: $error')));
+      ).showSnackBar(const SnackBar(content: Text('No se pudo descargar.')));
     } finally {
       if (mounted) {
         setState(() {
@@ -794,12 +830,14 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
     // Best-effort fallback for exits where we cannot await async work (dispose).
     // Primary path is the awaited save when user leaves via back navigation.
     unawaited(
-      _progressStorage.saveProgress(
-        courseId: widget.course.id,
-        lessonIndex: _lessonIndex,
-        resourceIndex: _resourceIndex,
-        mediaPositionMs: mediaPositionMs,
-      ).catchError((_) {}),
+      _progressStorage
+          .saveProgress(
+            courseId: widget.course.id,
+            lessonIndex: _lessonIndex,
+            resourceIndex: _resourceIndex,
+            mediaPositionMs: mediaPositionMs,
+          )
+          .catchError((_) {}),
     );
   }
 

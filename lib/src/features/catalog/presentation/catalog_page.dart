@@ -1,3 +1,4 @@
+import 'package:fcd_app/src/core/errors/error_ui.dart';
 import 'package:fcd_app/src/core/theme/app_theme.dart';
 import 'package:fcd_app/src/core/widgets/network_image_tile.dart';
 import 'package:fcd_app/src/features/courses/data/models/course.dart';
@@ -46,13 +47,13 @@ class _CatalogPageState extends State<CatalogPage> {
       _filtered = query.isEmpty
           ? _allCourses
           : _allCourses
-              .where(
-                (course) =>
-                    course.name.toLowerCase().contains(query) ||
-                    course.subtitle.toLowerCase().contains(query) ||
-                    course.category.toLowerCase().contains(query),
-              )
-              .toList();
+                .where(
+                  (course) =>
+                      course.name.toLowerCase().contains(query) ||
+                      course.subtitle.toLowerCase().contains(query) ||
+                      course.category.toLowerCase().contains(query),
+                )
+                .toList();
     });
   }
 
@@ -93,7 +94,10 @@ class _CatalogPageState extends State<CatalogPage> {
         return;
       }
       setState(() {
-        _error = error.toString();
+        _error = userMessageFromError(
+          error,
+          fallbackMessage: 'No se pudo cargar el catalogo en este momento.',
+        );
         _loading = false;
       });
     }
@@ -128,6 +132,7 @@ class _CatalogPageState extends State<CatalogPage> {
       child: TextField(
         controller: _searchController,
         textInputAction: TextInputAction.search,
+        onTapOutside: (_) => FocusScope.of(context).unfocus(),
         decoration: InputDecoration(
           hintText: 'Buscar cursos...',
           prefixIcon: const Icon(Icons.search_rounded),
@@ -171,6 +176,7 @@ class _CatalogPageState extends State<CatalogPage> {
     return RefreshIndicator(
       onRefresh: _loadCourses,
       child: ListView.separated(
+        keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
         physics: const AlwaysScrollableScrollPhysics(),
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 30),
         itemCount: courses.length,
@@ -186,7 +192,10 @@ class _CatalogPageState extends State<CatalogPage> {
       return const Center(
         child: Padding(
           padding: EdgeInsets.all(24),
-          child: Text('No hay cursos disponibles.', textAlign: TextAlign.center),
+          child: Text(
+            'No hay cursos disponibles.',
+            textAlign: TextAlign.center,
+          ),
         ),
       );
     }
@@ -194,27 +203,24 @@ class _CatalogPageState extends State<CatalogPage> {
     return RefreshIndicator(
       onRefresh: _loadCourses,
       child: CustomScrollView(
+        keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
         physics: const AlwaysScrollableScrollPhysics(),
         slivers: <Widget>[
-          for (final category in _categoryOrder)
-            ...<Widget>[
-              _CategoryHeader(title: category),
-              SliverPadding(
-                padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-                sliver: SliverList(
-                  delegate: SliverChildBuilderDelegate(
-                    (context, index) {
-                      final courses = _grouped[category]!;
-                      return Padding(
-                        padding: const EdgeInsets.only(bottom: 12),
-                        child: _CatalogCard(course: courses[index]),
-                      );
-                    },
-                    childCount: _grouped[category]!.length,
-                  ),
-                ),
+          for (final category in _categoryOrder) ...<Widget>[
+            _CategoryHeader(title: category),
+            SliverPadding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+              sliver: SliverList(
+                delegate: SliverChildBuilderDelegate((context, index) {
+                  final courses = _grouped[category]!;
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 12),
+                    child: _CatalogCard(course: courses[index]),
+                  );
+                }, childCount: _grouped[category]!.length),
               ),
-            ],
+            ),
+          ],
           const SliverPadding(padding: EdgeInsets.only(bottom: 18)),
         ],
       ),
@@ -308,8 +314,9 @@ class _CatalogCard extends StatelessWidget {
                         course.name,
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
-                        style: Theme.of(context).textTheme.titleMedium
-                            ?.copyWith(fontSize: 20),
+                        style: Theme.of(
+                          context,
+                        ).textTheme.titleMedium?.copyWith(fontSize: 20),
                       ),
                       if (course.subtitle.isNotEmpty) ...<Widget>[
                         const SizedBox(height: 2),
@@ -368,7 +375,7 @@ class _CatalogCard extends StatelessWidget {
   }
 
   Future<void> _openWeb(BuildContext context) async {
-    final uri = Uri.parse('https://circulo-dorado.org');
+    final uri = _resolveCourseUri();
     if (!await launchUrl(uri, mode: LaunchMode.externalApplication)) {
       if (!context.mounted) {
         return;
@@ -377,6 +384,16 @@ class _CatalogCard extends StatelessWidget {
         const SnackBar(content: Text('No se pudo abrir el navegador.')),
       );
     }
+  }
+
+  Uri _resolveCourseUri() {
+    final direct = Uri.tryParse(course.webUrl);
+    if (direct != null && direct.hasScheme) {
+      return direct;
+    }
+    return Uri.https('circulo-dorado.org', '/', <String, String>{
+      's': course.name,
+    });
   }
 }
 

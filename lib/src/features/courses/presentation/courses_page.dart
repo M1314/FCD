@@ -1,3 +1,4 @@
+import 'package:fcd_app/src/core/errors/error_ui.dart';
 import 'package:fcd_app/src/core/theme/app_theme.dart';
 import 'package:fcd_app/src/core/widgets/network_image_tile.dart';
 import 'package:fcd_app/src/features/courses/data/models/course.dart';
@@ -103,6 +104,7 @@ class _CoursesPageState extends State<CoursesPage> {
           child: TextField(
             controller: _searchController,
             textInputAction: TextInputAction.search,
+            onTapOutside: (_) => FocusScope.of(context).unfocus(),
             decoration: InputDecoration(
               hintText: 'Buscar mis cursos...',
               prefixIcon: const Icon(Icons.search_rounded),
@@ -135,6 +137,7 @@ class _CoursesPageState extends State<CoursesPage> {
     return RefreshIndicator(
       onRefresh: _loadCourses,
       child: ListView.separated(
+        keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
         physics: const AlwaysScrollableScrollPhysics(),
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 30),
         itemCount: _filtered.length,
@@ -151,6 +154,7 @@ class _CoursesPageState extends State<CoursesPage> {
     return RefreshIndicator(
       onRefresh: _loadCourses,
       child: CustomScrollView(
+        keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
         physics: const AlwaysScrollableScrollPhysics(),
         slivers: <Widget>[
           for (final category in _categoryOrder) ...<Widget>[
@@ -234,7 +238,10 @@ class _CoursesPageState extends State<CoursesPage> {
       if (!mounted) return;
       setState(() {
         _loading = false;
-        _error = error.toString();
+        _error = userMessageFromError(
+          error,
+          fallbackMessage: 'No se pudieron cargar tus cursos.',
+        );
       });
     }
   }
@@ -256,6 +263,14 @@ class _CoursesPageState extends State<CoursesPage> {
       if (!mounted) return;
 
       Navigator.of(context, rootNavigator: true).pop();
+      if (lessons.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Este curso aun no tiene lecciones disponibles.'),
+          ),
+        );
+        return;
+      }
       await Navigator.of(context).push(
         MaterialPageRoute<void>(
           builder: (_) => CourseSummaryPage(course: course, lessons: lessons),
@@ -265,7 +280,14 @@ class _CoursesPageState extends State<CoursesPage> {
       if (!mounted) return;
       Navigator.of(context, rootNavigator: true).pop();
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('No se pudo abrir el curso: $error')),
+        SnackBar(
+          content: Text(
+            userMessageFromError(
+              error,
+              fallbackMessage: 'No se pudo abrir el curso.',
+            ),
+          ),
+        ),
       );
     }
   }
