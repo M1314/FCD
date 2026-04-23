@@ -48,13 +48,23 @@ void main() {
       ).toRawJson(),
     ]);
 
+    var alreadyDownloadedCalled = false;
+    var progressCallCount = 0;
+
     final file = await repository.downloadResource(
       resource,
-      onProgress: (received, total) {},
+      onProgress: (received, total) {
+        progressCallCount++;
+      },
+      onAlreadyDownloaded: () {
+        alreadyDownloadedCalled = true;
+      },
     );
 
     expect(file.path, existingPath);
     expect(apiClient.downloadCalls, 0);
+    expect(alreadyDownloadedCalled, isTrue);
+    expect(progressCallCount, 0);
   });
 
   test('downloadResource downloads and records history when missing', () async {
