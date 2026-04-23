@@ -19,6 +19,7 @@ class _CatalogPageState extends State<CatalogPage> {
   String? _error;
   List<Course> _allCourses = <Course>[];
   List<Course> _filtered = <Course>[];
+  Map<int, int> _lessonCounts = <int, int>{};
   final TextEditingController _searchController = TextEditingController();
 
   /// Ordered list of category names (preserves insertion / API order).
@@ -69,6 +70,11 @@ class _CatalogPageState extends State<CatalogPage> {
         return;
       }
 
+      final lessonCounts = await _loadLessonCounts(courses);
+      if (!mounted) {
+        return;
+      }
+
       final categoryOrder = <String>[];
       final grouped = <String, List<Course>>{};
       for (final course in courses) {
@@ -85,6 +91,7 @@ class _CatalogPageState extends State<CatalogPage> {
         _filtered = courses;
         _categoryOrder = categoryOrder;
         _grouped = grouped;
+        _lessonCounts = lessonCounts;
         _loading = false;
       });
       _applyFilter();
@@ -100,6 +107,27 @@ class _CatalogPageState extends State<CatalogPage> {
         _loading = false;
       });
     }
+  }
+
+  Future<Map<int, int>> _loadLessonCounts(List<Course> courses) async {
+    final session = context.read<SessionController>();
+    final futures = courses.map((course) async {
+      try {
+        final lessons = await session.courseRepository.getAllLessonsByCourse(
+          courseId: course.id,
+        );
+        return MapEntry(course.id, lessons.length);
+      } catch (_) {
+        return MapEntry(course.id, course.lessonsCount);
+      }
+    }).toList();
+
+    final results = await Future.wait(futures);
+    return Map<int, int>.fromEntries(results);
+  }
+
+  int _lessonCountFor(Course course) {
+    return _lessonCounts[course.id] ?? course.lessonsCount;
   }
 
   @override
@@ -180,7 +208,10 @@ class _CatalogPageState extends State<CatalogPage> {
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 30),
         itemCount: courses.length,
         separatorBuilder: (_, index) => const SizedBox(height: 12),
-        itemBuilder: (_, index) => _CatalogCard(course: courses[index]),
+        itemBuilder: (_, index) => _CatalogCard(
+          course: courses[index],
+          lessonsCount: _lessonCountFor(courses[index]),
+        ),
       ),
     );
   }
@@ -214,7 +245,10 @@ class _CatalogPageState extends State<CatalogPage> {
                   final courses = _grouped[category]!;
                   return Padding(
                     padding: const EdgeInsets.only(bottom: 12),
-                    child: _CatalogCard(course: courses[index]),
+                    child: _CatalogCard(
+                      course: courses[index],
+                      lessonsCount: _lessonCountFor(courses[index]),
+                    ),
                   );
                 }, childCount: _grouped[category]!.length),
               ),
@@ -265,9 +299,10 @@ class _CategoryHeader extends StatelessWidget {
 }
 
 class _CatalogCard extends StatelessWidget {
-  const _CatalogCard({required this.course});
+  const _CatalogCard({required this.course, required this.lessonsCount});
 
   final Course course;
+  final int lessonsCount;
 
   @override
   Widget build(BuildContext context) {
@@ -327,7 +362,7 @@ class _CatalogCard extends StatelessWidget {
                         children: <Widget>[
                           _Chip(
                             icon: Icons.menu_book_rounded,
-                            text: '${course.lessonsCount} lecciones',
+                            text: '$lessonsCount lecciones',
                           ),
                         ],
                       ),
