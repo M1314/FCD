@@ -174,7 +174,7 @@ int? _inferLessonCount(Map<String, dynamic> json) {
     if (!lower.contains('leccion') && !lower.contains('lesson')) {
       continue;
     }
-    if (lower.contains('id')) {
+    if (_isIdLikeKey(lower)) {
       continue;
     }
     final parsed = _parseLessonCountValue(entry.value);
@@ -207,4 +207,20 @@ int? _priorityForKey(String key, List<String> tokens) {
     }
   }
   return null;
+}
+
+bool _isIdLikeKey(String key) {
+  if (key == 'idleccion' || key == 'lesson_id' || key == 'idlesson') {
+    return true;
+  }
+  if (key.endsWith('_id') || key.startsWith('id_')) {
+    return true;
+  }
+  if (key.startsWith('id')) {
+    return !key.contains('total') &&
+        !key.contains('cantidad') &&
+        !key.contains('numero') &&
+        !key.contains('count');
+  }
+  return false;
 }
