@@ -66,16 +66,14 @@ class _FavoritesPageState extends State<FavoritesPage> {
       final entries = <_FavoriteEntry>[];
       for (final course in courses) {
         if (!mounted) return;
-        final maxLessons = course.maxLessons <= 0
-            ? (course.lessonsCount <= 0 ? 12 : course.lessonsCount)
-            : course.maxLessons;
-        final lessons = await session.courseRepository.getLessonsByCourse(
+        final lessons = await session.courseRepository.getAllLessonsByCourse(
           courseId: course.id,
-          maxLessons: maxLessons,
         );
         for (final lesson in lessons) {
           if (favoriteIds.contains(lesson.id)) {
-            entries.add(_FavoriteEntry(course: course, lessons: lessons, lesson: lesson));
+            entries.add(
+              _FavoriteEntry(course: course, lessons: lessons, lesson: lesson),
+            );
           }
         }
       }
@@ -150,9 +148,9 @@ class _FavoritesPageState extends State<FavoritesPage> {
               child: Text(
                 item.course.name,
                 style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      color: AppTheme.deepBrown,
-                      fontWeight: FontWeight.w700,
-                    ),
+                  color: AppTheme.deepBrown,
+                  fontWeight: FontWeight.w700,
+                ),
               ),
             );
           }
@@ -249,7 +247,10 @@ class _FavoriteCard extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 8),
-              const Icon(Icons.chevron_right_rounded, color: AppTheme.mutedText),
+              const Icon(
+                Icons.chevron_right_rounded,
+                color: AppTheme.mutedText,
+              ),
             ],
           ),
         ),

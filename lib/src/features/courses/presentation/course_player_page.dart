@@ -215,6 +215,7 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
     }
 
     return Scaffold(
+      drawer: _buildLessonsDrawer(context),
       body: SafeArea(
         child: Column(
           children: <Widget>[
@@ -272,6 +273,13 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
               ],
             ),
           ),
+          Builder(
+            builder: (drawerContext) => IconButton(
+              onPressed: () => Scaffold.of(drawerContext).openDrawer(),
+              icon: const Icon(Icons.menu_book_rounded),
+              tooltip: 'Temario',
+            ),
+          ),
           IconButton(
             onPressed: _hasPreviousLesson ? _previousLesson : null,
             icon: const Icon(Icons.skip_previous_rounded),
@@ -281,6 +289,60 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
             icon: const Icon(Icons.skip_next_rounded),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildLessonsDrawer(BuildContext context) {
+    return Drawer(
+      child: SafeArea(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: <Widget>[
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+              child: Text(
+                'Temario',
+                style: Theme.of(context).textTheme.titleLarge,
+              ),
+            ),
+            Expanded(
+              child: ListView.builder(
+                itemCount: widget.lessons.length,
+                itemBuilder: (context, index) {
+                  final lesson = widget.lessons[index];
+                  final selected = index == _lessonIndex;
+                  final resourcesCount = lesson.resources.length;
+                  final resourcesLabel = resourcesCount == 1
+                      ? '1 recurso'
+                      : '$resourcesCount recursos';
+                  return ListTile(
+                    selected: selected,
+                    leading: CircleAvatar(
+                      radius: 14,
+                      child: Text('${index + 1}'),
+                    ),
+                    title: Text(
+                      lesson.name,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    subtitle: Text(resourcesLabel),
+                    trailing: selected
+                        ? const Icon(Icons.check_circle_rounded)
+                        : null,
+                    onTap: selected
+                        ? null
+                        : () async {
+                            Navigator.of(context).pop();
+                            await _goToLesson(index);
+                          },
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -654,29 +716,26 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
     if (!_hasNextLesson) {
       return;
     }
-
-    setState(() {
-      _lessonIndex += 1;
-      _resourceIndex = 0;
-      _isCompleted = _completedLessonIds.contains(currentLesson.id);
-      _isCurrentFavorite = _favoriteIds.contains(currentLesson.id);
-    });
-    _savedMediaPositionMs = 0;
-
-    await _saveProgress();
-    await _prepareCurrentResource();
-    if (mounted) {
-      setState(() {});
-    }
+    await _switchToLesson(_lessonIndex + 1);
   }
 
   Future<void> _previousLesson() async {
     if (!_hasPreviousLesson) {
       return;
     }
+    await _switchToLesson(_lessonIndex - 1);
+  }
 
+  Future<void> _goToLesson(int index) async {
+    if (index < 0 || index >= widget.lessons.length || index == _lessonIndex) {
+      return;
+    }
+    await _switchToLesson(index);
+  }
+
+  Future<void> _switchToLesson(int index) async {
     setState(() {
-      _lessonIndex -= 1;
+      _lessonIndex = index;
       _resourceIndex = 0;
       _isCompleted = _completedLessonIds.contains(currentLesson.id);
       _isCurrentFavorite = _favoriteIds.contains(currentLesson.id);
