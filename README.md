@@ -65,6 +65,7 @@ Comportamiento adaptativo:
 - Favoritos de lecciones persistidos localmente por usuario (`FavoritesStorage`).
 - Descarga de recursos al dispositivo (`DownloadRepository`).
 - Historial local de descargas con limpieza de archivos faltantes.
+- Agrupación del historial por curso/lección cuando se dispone de metadata.
 
 ## Backend
 
@@ -124,6 +125,7 @@ flutter test --no-test-assets
 ## Documentación adicional
 
 - `docs/fcd_flutter_code_walkthrough.md`: guía detallada del código (actualizada).
+- `docs/fcd_flutter_code_walkthrough.pdf`: versión PDF de la guía detallada.
 
 ## Limitaciones actuales
 
