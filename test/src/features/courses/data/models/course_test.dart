@@ -45,7 +45,9 @@ void main() {
     expect(course.lessonsCount, 2);
   });
 
-  test('Course.fromJson keeps explicit zero lesson count', () {
+  test(
+    'Course.fromJson prioritizes explicit zero count over lesson list length',
+    () {
     final course = Course.fromJson(<String, dynamic>{
       'id': 10,
       'name': 'Curso sin lecciones',
@@ -56,7 +58,8 @@ void main() {
     });
 
     expect(course.lessonsCount, 0);
-  });
+    },
+  );
 
   test(
     'categoryName falls back to mapped categoryId when category is empty',
