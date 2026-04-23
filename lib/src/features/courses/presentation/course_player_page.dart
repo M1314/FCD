@@ -695,7 +695,7 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
         return 0;
       }
       final position = await controller.position;
-      return position.inMilliseconds;
+      return position?.inMilliseconds ?? 0;
     }
 
     return 0;
@@ -812,7 +812,7 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
       ),
     );
 
-    _videoController = BetterPlayerController(
+    final videoController = BetterPlayerController(
       const BetterPlayerConfiguration(
         autoPlay: false,
         fit: BoxFit.contain,
@@ -829,14 +829,15 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
       ),
       betterPlayerDataSource: dataSource,
     );
+    _videoController = videoController;
 
     if (restorePositionMs > 0) {
       // Better Player may ignore immediate seeks until the first frame is ready.
       Future<void>.delayed(_videoRestoreDelay, () {
-        if (!mounted) {
+        if (!mounted || _videoController != videoController) {
           return;
         }
-        _videoController?.seekTo(Duration(milliseconds: restorePositionMs));
+        videoController.seekTo(Duration(milliseconds: restorePositionMs));
       });
     }
   }
