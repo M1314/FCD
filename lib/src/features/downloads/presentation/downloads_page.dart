@@ -9,6 +9,7 @@ import 'package:intl/intl.dart';
 import 'package:open_filex/open_filex.dart';
 import 'package:provider/provider.dart';
 
+@visibleForTesting
 String downloadsGroupHeadingFor(DownloadedFile file) {
   final course = file.courseName.trim();
   final lesson = file.lessonName.trim();
@@ -282,16 +283,18 @@ class _DownloadCard extends StatelessWidget {
 
 }
 
-class _DownloadListItem {}
+abstract class _DownloadListItem {
+  const _DownloadListItem();
+}
 
 class _DownloadHeadingItem extends _DownloadListItem {
-  _DownloadHeadingItem(this.title);
+  const _DownloadHeadingItem(this.title);
 
   final String title;
 }
 
 class _DownloadEntryItem extends _DownloadListItem {
-  _DownloadEntryItem(this.file);
+  const _DownloadEntryItem(this.file);
 
   final DownloadedFile file;
 }
