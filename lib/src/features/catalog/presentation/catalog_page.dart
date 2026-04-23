@@ -96,7 +96,7 @@ class _CatalogPageState extends State<CatalogPage> {
       setState(() {
         _error = userMessageFromError(
           error,
-          fallbackMessage: 'No se pudo cargar el catalogo en este momento.',
+          fallbackMessage: 'No se pudo cargar el catálogo en este momento.',
         );
         _loading = false;
       });
@@ -111,7 +111,7 @@ class _CatalogPageState extends State<CatalogPage> {
 
     if (_error != null) {
       return _CatalogMessageView(
-        title: 'No se pudo cargar el catalogo',
+        title: 'No se pudo cargar el catálogo',
         message: _error!,
         actionLabel: 'Reintentar',
         onAction: _loadCourses,
