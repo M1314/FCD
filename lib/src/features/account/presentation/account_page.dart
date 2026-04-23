@@ -127,6 +127,29 @@ class _AccountPageState extends State<AccountPage> {
             ),
           ],
         ),
+        const SizedBox(height: 16),
+        _Section(
+          title: 'Redes sociales',
+          children: <Widget>[
+            _LinkRow(
+              icon: Icons.facebook_rounded,
+              label: 'Facebook',
+              onTap: () =>
+                  _openWeb('https://www.facebook.com/FraternidadDelCirculoDorado'),
+            ),
+            _LinkRow(
+              icon: Icons.camera_alt_rounded,
+              label: 'Instagram',
+              onTap: () => _openWeb('https://www.instagram.com/fratercirculo_dorado'),
+            ),
+            _LinkRow(
+              icon: Icons.play_circle_fill_rounded,
+              label: 'TikTok',
+              onTap: () =>
+                  _openWeb('https://www.tiktok.com/@fraternidadcirculodorado'),
+            ),
+          ],
+        ),
         const SizedBox(height: 28),
         OutlinedButton.icon(
           onPressed: () => context.read<SessionController>().logout(),
