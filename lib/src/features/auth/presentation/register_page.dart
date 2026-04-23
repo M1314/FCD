@@ -66,7 +66,7 @@ class _RegisterPageState extends State<RegisterPage> {
                 'Contraseña',
                 _obscurePassword,
                 () => setState(() => _obscurePassword = !_obscurePassword),
-                helper: 'Minimo 8 caracteres',
+                helper: 'Mínimo 8 caracteres',
                 validator: _validatePassword,
               ),
               const SizedBox(height: 20),
@@ -147,7 +147,7 @@ class _RegisterPageState extends State<RegisterPage> {
   String? _required(String? value, {int? minLength}) {
     final text = value?.trim() ?? '';
     if (text.isEmpty) return 'Requerido';
-    if (minLength != null && text.length < minLength) return 'Minimo $minLength caracteres';
+    if (minLength != null && text.length < minLength) return 'Mínimo $minLength caracteres';
     return null;
   }
 
@@ -155,13 +155,13 @@ class _RegisterPageState extends State<RegisterPage> {
     final text = value?.trim() ?? '';
     if (text.isEmpty) return 'Requerido';
     final ok = RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(text);
-    return ok ? null : 'Correo invalido';
+    return ok ? null : 'Correo inválido';
   }
 
   String? _validatePassword(String? value) {
     final text = value ?? '';
     if (text.isEmpty) return 'Requerido';
-    if (text.length < 8) return 'Minimo 8 caracteres';
+    if (text.length < 8) return 'Mínimo 8 caracteres';
     return null;
   }
 
