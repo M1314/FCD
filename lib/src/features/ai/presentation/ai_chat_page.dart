@@ -1,3 +1,4 @@
+import 'package:fcd_app/src/core/errors/error_ui.dart';
 import 'package:fcd_app/src/core/theme/app_theme.dart';
 import 'package:fcd_app/src/features/ai/data/models/chat_message.dart';
 import 'package:fcd_app/src/state/session_controller.dart';
@@ -34,9 +35,11 @@ class _AiChatPageState extends State<AiChatPage> {
   bool _loading = true;
   bool _checkingAccess = true;
   bool _hasAccess = false;
+  bool _accessCheckFailed = false;
   bool _sending = false;
   String _activeChat = _chatTabs.first;
   String? _error;
+  String? _accessError;
 
   List<ChatMessage> _messages = <ChatMessage>[];
   Map<String, String> _prompts = <String, String>{};
@@ -58,6 +61,15 @@ class _AiChatPageState extends State<AiChatPage> {
   Widget build(BuildContext context) {
     if (_checkingAccess) {
       return const Center(child: CircularProgressIndicator());
+    }
+
+    if (_accessCheckFailed) {
+      return _AccessErrorView(
+        message:
+            _accessError ??
+            'No pudimos validar tu acceso a IA en este momento.',
+        onRetry: _bootstrap,
+      );
     }
 
     if (!_hasAccess) {
@@ -202,11 +214,19 @@ class _AiChatPageState extends State<AiChatPage> {
     final user = session.user;
 
     if (user == null) {
+      setState(() {
+        _checkingAccess = false;
+        _hasAccess = false;
+        _accessCheckFailed = true;
+        _accessError = 'Sesion no valida. Vuelve a iniciar sesion.';
+      });
       return;
     }
 
     setState(() {
       _checkingAccess = true;
+      _accessCheckFailed = false;
+      _accessError = null;
       _error = null;
     });
 
@@ -219,6 +239,7 @@ class _AiChatPageState extends State<AiChatPage> {
       setState(() {
         _hasAccess = hasAccess;
         _checkingAccess = false;
+        _accessCheckFailed = false;
       });
 
       if (!hasAccess) {
@@ -234,7 +255,12 @@ class _AiChatPageState extends State<AiChatPage> {
       setState(() {
         _checkingAccess = false;
         _hasAccess = false;
-        _error = error.toString();
+        _accessCheckFailed = true;
+        _accessError = userMessageFromError(
+          error,
+          fallbackMessage:
+              'No pudimos validar tu acceso a IA. Verifica tu conexion e intenta de nuevo.',
+        );
       });
     }
   }
@@ -293,7 +319,10 @@ class _AiChatPageState extends State<AiChatPage> {
       }
       setState(() {
         _loading = false;
-        _error = error.toString();
+        _error = userMessageFromError(
+          error,
+          fallbackMessage: 'No se pudo cargar el historial del chat.',
+        );
       });
     }
   }
@@ -384,7 +413,10 @@ class _AiChatPageState extends State<AiChatPage> {
             content: 'No pude procesar tu solicitud en este momento.',
           ),
         );
-        _error = error.toString();
+        _error = userMessageFromError(
+          error,
+          fallbackMessage: 'No se pudo completar tu mensaje en este momento.',
+        );
       });
     } finally {
       if (mounted) {
@@ -407,6 +439,46 @@ class _AiChatPageState extends State<AiChatPage> {
         curve: Curves.easeOut,
       );
     });
+  }
+}
+
+class _AccessErrorView extends StatelessWidget {
+  const _AccessErrorView({required this.message, required this.onRetry});
+
+  final String message;
+  final Future<void> Function() onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: <Widget>[
+            const Icon(
+              Icons.wifi_off_rounded,
+              size: 54,
+              color: AppTheme.deepBrown,
+            ),
+            const SizedBox(height: 12),
+            Text(
+              'No pudimos validar tu acceso',
+              style: Theme.of(context).textTheme.titleMedium,
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              message,
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.bodyMedium,
+            ),
+            const SizedBox(height: 16),
+            ElevatedButton(onPressed: onRetry, child: const Text('Reintentar')),
+          ],
+        ),
+      ),
+    );
   }
 }
 

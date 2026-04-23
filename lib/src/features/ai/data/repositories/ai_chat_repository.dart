@@ -71,7 +71,7 @@ class AiChatRepository {
     required String sender,
     required String message,
   }) async {
-    await _apiClient.post(
+    final payload = await _apiClient.post(
       '/chats/$chatId/messages',
       authenticated: true,
       data: <String, dynamic>{
@@ -80,6 +80,15 @@ class AiChatRepository {
         'message': message,
       },
     );
+
+    final status = payload['intResponse'] as int? ?? 500;
+    if (status != 200) {
+      throw AppException(
+        payload['strAnswer']?.toString() ??
+            'No se pudo guardar el mensaje del chat.',
+        statusCode: status,
+      );
+    }
   }
 
   Future<String> askAi({

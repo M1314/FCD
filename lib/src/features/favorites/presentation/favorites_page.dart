@@ -1,3 +1,4 @@
+import 'package:fcd_app/src/core/errors/error_ui.dart';
 import 'package:fcd_app/src/core/storage/favorites_storage.dart';
 import 'package:fcd_app/src/core/theme/app_theme.dart';
 import 'package:fcd_app/src/features/courses/data/models/course.dart';
@@ -19,6 +20,7 @@ class _FavoritesPageState extends State<FavoritesPage> {
 
   bool _loading = true;
   String? _error;
+  String? _notice;
 
   /// Each entry pairs the lesson with its parent course (needed to open player).
   List<_FavoriteEntry> _favorites = <_FavoriteEntry>[];
@@ -44,6 +46,7 @@ class _FavoritesPageState extends State<FavoritesPage> {
     setState(() {
       _loading = true;
       _error = null;
+      _notice = null;
     });
 
     try {
@@ -62,17 +65,41 @@ class _FavoritesPageState extends State<FavoritesPage> {
       // 2. Fetch all user courses.
       final courses = await session.courseRepository.getMyCourses(user.id);
 
-      // 3. For each course, fetch lessons and find favorited ones.
+      final results = await Future.wait(
+        courses.map((course) async {
+          try {
+            final lessons = await session.courseRepository
+                .getAllLessonsByCourse(courseId: course.id);
+            return _CourseLessonsResult(
+              course: course,
+              lessons: lessons,
+              failed: false,
+            );
+          } catch (_) {
+            return _CourseLessonsResult(
+              course: course,
+              lessons: const <CourseLesson>[],
+              failed: true,
+            );
+          }
+        }),
+      );
+
       final entries = <_FavoriteEntry>[];
-      for (final course in courses) {
-        if (!mounted) return;
-        final lessons = await session.courseRepository.getAllLessonsByCourse(
-          courseId: course.id,
-        );
-        for (final lesson in lessons) {
+      var failedCount = 0;
+      for (final result in results) {
+        if (result.failed) {
+          failedCount++;
+          continue;
+        }
+        for (final lesson in result.lessons) {
           if (favoriteIds.contains(lesson.id)) {
             entries.add(
-              _FavoriteEntry(course: course, lessons: lessons, lesson: lesson),
+              _FavoriteEntry(
+                course: result.course,
+                lessons: result.lessons,
+                lesson: lesson,
+              ),
             );
           }
         }
@@ -82,12 +109,21 @@ class _FavoritesPageState extends State<FavoritesPage> {
       setState(() {
         _favorites = entries;
         _loading = false;
+        _error = entries.isEmpty && failedCount == courses.length
+            ? 'No se pudieron cargar tus cursos favoritos. Intenta nuevamente.'
+            : null;
+        _notice = failedCount > 0
+            ? 'No se pudieron cargar $failedCount curso(s). Intenta actualizar.'
+            : null;
       });
     } catch (e) {
       if (!mounted) return;
       setState(() {
         _loading = false;
-        _error = e.toString();
+        _error = userMessageFromError(
+          e,
+          fallbackMessage: 'No se pudieron cargar los favoritos.',
+        );
       });
     }
   }
@@ -139,9 +175,28 @@ class _FavoritesPageState extends State<FavoritesPage> {
       child: ListView.builder(
         physics: const AlwaysScrollableScrollPhysics(),
         padding: const EdgeInsets.fromLTRB(16, 12, 16, 30),
-        itemCount: items.length,
+        itemCount: items.length + (_notice != null ? 1 : 0),
         itemBuilder: (context, index) {
-          final item = items[index];
+          if (_notice != null && index == 0) {
+            return Container(
+              margin: const EdgeInsets.only(bottom: 10),
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFFF5E8),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: const Color(0xFFE8DACA)),
+              ),
+              child: Text(
+                _notice!,
+                style: Theme.of(
+                  context,
+                ).textTheme.bodySmall?.copyWith(color: AppTheme.deepBrown),
+              ),
+            );
+          }
+
+          final adjustedIndex = _notice == null ? index : index - 1;
+          final item = items[adjustedIndex];
           if (item is _HeadingItem) {
             return Padding(
               padding: const EdgeInsets.only(top: 16, bottom: 8),
@@ -168,6 +223,17 @@ class _FavoritesPageState extends State<FavoritesPage> {
   }
 
   Future<void> _openLesson(_FavoriteEntry entry) async {
+    if (entry.lessons.isEmpty) {
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Esta leccion ya no tiene contenido disponible.'),
+        ),
+      );
+      return;
+    }
     final lessonIndex = entry.lessons.indexOf(entry.lesson);
     await Navigator.of(context).push(
       MaterialPageRoute<void>(
@@ -181,6 +247,18 @@ class _FavoritesPageState extends State<FavoritesPage> {
     // Refresh in case the user removed the favorite while in the player.
     _loadFavorites();
   }
+}
+
+class _CourseLessonsResult {
+  const _CourseLessonsResult({
+    required this.course,
+    required this.lessons,
+    required this.failed,
+  });
+
+  final Course course;
+  final List<CourseLesson> lessons;
+  final bool failed;
 }
 
 class _ListItem {}

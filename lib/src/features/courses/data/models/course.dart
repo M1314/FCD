@@ -24,6 +24,7 @@ class Course {
     required this.maxLessons,
     this.categoryId = 0,
     this.category = '',
+    this.webUrl = '',
   });
 
   final int id;
@@ -38,6 +39,7 @@ class Course {
   final int maxLessons;
   final int categoryId;
   final String category;
+  final String webUrl;
 
   /// Returns the resolved category name, preferring the API string if present,
   /// falling back to the hardcoded map, then a generic label.
@@ -85,6 +87,13 @@ class Course {
         'categoria',
         'strCategoria',
         'category',
+      ]),
+      webUrl: readString(json, const <String>[
+        'url',
+        'strUrl',
+        'link',
+        'enlace',
+        'courseUrl',
       ]),
     );
   }

@@ -53,6 +53,7 @@ class _CourseSummaryPageState extends State<CourseSummaryPage> {
         hasSavedProgress && _savedProgress!.lessonIndex < widget.lessons.length
         ? widget.lessons[_savedProgress!.lessonIndex].name
         : null;
+    final hasLessons = widget.lessons.isNotEmpty;
 
     return Scaffold(
       appBar: AppBar(title: const Text('Resumen del curso')),
@@ -137,6 +138,7 @@ class _CourseSummaryPageState extends State<CourseSummaryPage> {
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: <Widget>[
                     if (hasSavedProgress &&
+                        hasLessons &&
                         resumeLessonName != null) ...<Widget>[
                       ElevatedButton.icon(
                         onPressed: _startCourse,
@@ -154,9 +156,13 @@ class _CourseSummaryPageState extends State<CourseSummaryPage> {
                       ),
                     ] else
                       ElevatedButton.icon(
-                        onPressed: _startCourse,
+                        onPressed: hasLessons ? _startCourse : null,
                         icon: const Icon(Icons.play_arrow_rounded),
-                        label: const Text('Comenzar curso'),
+                        label: Text(
+                          hasLessons
+                              ? 'Comenzar curso'
+                              : 'Sin lecciones disponibles',
+                        ),
                       ),
                   ],
                 ),
