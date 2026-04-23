@@ -49,6 +49,7 @@ void main() {
     final course = Course.fromJson(<String, dynamic>{
       'id': 11,
       'name': 'Curso inferido',
+      'lesson_id': 99,
       'lecciones_totales': '14',
     });
 

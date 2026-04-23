@@ -155,19 +155,42 @@ int? _parseLessonCountValue(dynamic raw) {
 }
 
 int? _inferLessonCount(Map<String, dynamic> json) {
-  int? best;
+  int? preferred;
+  int? fallback;
   json.forEach((key, value) {
     final lower = key.toLowerCase();
     if (!lower.contains('leccion') && !lower.contains('lesson')) {
+      return;
+    }
+    if (lower.contains('id')) {
       return;
     }
     final parsed = _parseLessonCountValue(value);
     if (parsed == null) {
       return;
     }
-    if (best == null || parsed > best!) {
-      best = parsed;
+    final isPreferred =
+        lower.contains('total') ||
+        lower.contains('cantidad') ||
+        lower.contains('numero') ||
+        lower.contains('count') ||
+        lower.contains('cant') ||
+        lower.contains('num');
+    if (isPreferred) {
+      final currentPreferred = preferred;
+      if (currentPreferred == null) {
+        preferred = parsed;
+      } else if (parsed > currentPreferred) {
+        preferred = parsed;
+      }
+      return;
+    }
+    final currentFallback = fallback;
+    if (currentFallback == null) {
+      fallback = parsed;
+    } else if (parsed > currentFallback) {
+      fallback = parsed;
     }
   });
-  return best;
+  return preferred ?? fallback;
 }
