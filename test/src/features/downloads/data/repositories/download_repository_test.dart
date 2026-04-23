@@ -43,10 +43,13 @@ void main() {
 
       final repository = DownloadRepository(apiClient: FakeApiClient());
 
-      final removed = await repository.removeMissingDownloads();
-      final current = await repository.getDownloads();
+      final cleanup = await repository.removeMissingDownloads();
 
-      expect(removed, 1);
+      expect(cleanup.removed, 1);
+      expect(cleanup.files, hasLength(1));
+      expect(cleanup.files.single.id, '1');
+
+      final current = await repository.getDownloads();
       expect(current, hasLength(1));
       expect(current.single.id, '1');
 
@@ -75,10 +78,13 @@ void main() {
 
       final repository = DownloadRepository(apiClient: FakeApiClient());
 
-      final removed = await repository.removeMissingDownloads();
-      final current = await repository.getDownloads();
+      final cleanup = await repository.removeMissingDownloads();
 
-      expect(removed, 0);
+      expect(cleanup.removed, 0);
+      expect(cleanup.files, hasLength(1));
+      expect(cleanup.files.single.id, '1');
+
+      final current = await repository.getDownloads();
       expect(current, hasLength(1));
       expect(current.single.id, '1');
 
