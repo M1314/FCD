@@ -1,6 +1,6 @@
 # FCD App (Flutter)
 
-Aplicación mobile-first en Flutter para Fraternidad del Círculo Dorado.
+Aplicación mobile-first en Flutter para Fraternidad del Círculo Dorado, con soporte para iPhone y iPad.
 
 ## Estado actual
 
