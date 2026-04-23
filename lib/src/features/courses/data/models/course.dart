@@ -163,8 +163,12 @@ int? _parseLessonCountValue(dynamic raw) {
     }
     if (trimmed.startsWith('[')) {
       // Some API responses return a JSON-encoded list string for lessons.
-      final decoded = decodeJsonArray(trimmed);
-      return decoded.length;
+      try {
+        final decoded = decodeJsonArray(trimmed);
+        return decoded.length;
+      } catch (_) {
+        return null;
+      }
     }
   }
   return null;
@@ -243,7 +247,7 @@ bool _startsWithIdPrefix(String key) {
   }
   if (key.length > 2) {
     final code = key.codeUnitAt(2);
-    return code >= 48 && code <= 57;
+    return code >= '0'.codeUnitAt(0) && code <= '9'.codeUnitAt(0);
   }
   return false;
 }
