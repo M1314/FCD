@@ -95,7 +95,7 @@ class _SplashPageState extends State<SplashPage>
                             ),
                           ],
                         ),
-                          child: ClipOval(
+                        child: ClipOval(
                           child: Image.asset(
                             'assets/images/logo.jpg',
                             width: 134,
@@ -117,7 +117,7 @@ class _SplashPageState extends State<SplashPage>
                       ),
                       const SizedBox(height: 8),
                       Text(
-                        'Sigue la luz, no la lámpara',
+                        '"Sigue la luz, no la lámpara"',
                         textAlign: TextAlign.center,
                         style: GoogleFonts.montserrat(
                           fontSize: 13,
