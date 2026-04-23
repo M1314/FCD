@@ -49,6 +49,7 @@ class Course {
   }
 
   factory Course.fromJson(Map<String, dynamic> json) {
+    final lessonsCount = _readLessonsCount(json);
     return Course(
       id: readInt(json, const <String>['idcurso', 'intId', 'id']),
       name: readString(json, const <String>['nombre', 'strNombre', 'name']),
@@ -70,12 +71,7 @@ class Course {
       ]),
       price: readDouble(json, const <String>['doublePrecio', 'precio']),
       priceUsd: readDouble(json, const <String>['doublePrecioDolar']),
-      lessonsCount: readInt(json, const <String>[
-        'total_lecciones_curso',
-        'intNumberOfLessons',
-        'lessonsCount',
-        'totalLessons',
-      ]),
+      lessonsCount: lessonsCount,
       maxLessons: readInt(json, const <String>[
         'lecciones_por_mes',
         'intCantidadMeses',
@@ -97,4 +93,27 @@ class Course {
       ]),
     );
   }
+}
+
+int _readLessonsCount(Map<String, dynamic> json) {
+  final count = readInt(json, const <String>[
+    'total_lecciones_curso',
+    'total_lecciones',
+    'intTotalLecciones',
+    'intCantidadLecciones',
+    'intNumeroLecciones',
+    'intNumberOfLessons',
+    'lessonsCount',
+    'totalLessons',
+  ]);
+  if (count != 0) {
+    return count;
+  }
+
+  final lessons = readFirst(json, const <String>['lecciones', 'lessons']);
+  if (lessons is List) {
+    return lessons.length;
+  }
+
+  return count;
 }

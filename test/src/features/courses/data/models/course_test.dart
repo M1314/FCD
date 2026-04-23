@@ -32,6 +32,19 @@ void main() {
     expect(course.webUrl, 'https://circulo-dorado.org/curso/7');
   });
 
+  test('Course.fromJson falls back to lesson list length', () {
+    final course = Course.fromJson(<String, dynamic>{
+      'id': 9,
+      'name': 'Curso con lista',
+      'lecciones': <Map<String, dynamic>>[
+        <String, dynamic>{'idleccion': 1},
+        <String, dynamic>{'idleccion': 2},
+      ],
+    });
+
+    expect(course.lessonsCount, 2);
+  });
+
   test(
     'categoryName falls back to mapped categoryId when category is empty',
     () {
