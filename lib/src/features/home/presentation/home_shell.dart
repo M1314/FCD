@@ -95,7 +95,7 @@ class _HomeShellState extends State<HomeShell> {
 
   @override
   Widget build(BuildContext context) {
-    final isTablet = MediaQuery.sizeOf(context).width >= 900;
+    final isTablet = MediaQuery.sizeOf(context).shortestSide >= 600;
 
     final content = IndexedStack(index: _selectedIndex, children: _pages);
 
