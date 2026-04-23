@@ -1,418 +1,633 @@
-# FCD Flutter App — Master Class (Book-Style Guide)
+# FCD Flutter App — Master Class Exhaustiva (modo libro)
 
-> A deep, engineering-first guide to Flutter **and** how this codebase applies it in production.
+> **Propósito**: este documento es una guía **TOTAL y exhaustiva** del repositorio. Está escrito
+> como un libro de onboarding para una persona ingeniera nueva en Flutter **y** nueva en este
+> proyecto. Cada archivo del repo se explica con intención, razón de existir y relación con el resto.
 >
-> If you are new to Flutter, read from top to bottom. If you are onboarding to FCD, jump to the
-> “Architecture” and “Feature Walkthrough” chapters and keep the Flutter fundamentals as reference.
+> **Cobertura TOTAL**: todos los archivos del repo están listados y descritos en el índice de
+> archivos y en las secciones de detalle.
 
 ---
 
-## Table of Contents
+## Cómo leer este libro
 
-1. **Why Flutter, and what problem this app solves**
-2. **The Flutter mental model (widgets, elements, render objects)**
-3. **Dart essentials for Flutter engineers**
-4. **Project architecture in FCD**
-5. **App startup and session bootstrap**
-6. **Navigation and adaptive layout**
-7. **State management and data flow**
-8. **Networking, authentication, and error discipline**
-9. **Persistence and local storage**
-10. **Feature modules (courses, catalog, AI, downloads, favorites)**
-11. **Media playback and file downloads**
-12. **UI composition, layout rules, and theming**
-13. **Testing philosophy and commands**
-14. **Performance and reliability strategies**
-15. **UML appendix (architecture, sequence, class diagrams)**
+- Si eres nuevo en Flutter, **lee en orden** desde “Fundamentos” hasta “Repositorio”.
+- Si ya dominas Flutter y solo quieres el mapa de código, ve directo a **“Mapa completo del repo”**.
+- Si vas a tocar una feature, busca su sección y luego ve al **índice de archivos** para entender
+  todas las piezas relacionadas.
 
 ---
 
-## 1) Why Flutter, and what problem this app solves
+# PARTE I — Fundamentos profundos de Flutter
 
-FCD is a **mobile-first learning platform**: users authenticate, browse courses, consume lessons
-(video/audio/documents), track progress, save favorites, download content, and access AI assistance.
+## 1) Flutter como runtime, no solo UI
 
-Flutter was chosen because it:
+Flutter no es un “framework de UI”; es **un runtime completo**:
 
-- **Unifies UI and logic across platforms** (Android/iOS) with a single codebase.
-- Provides **predictable rendering** (Skia) and consistent UI across devices.
-- Encourages **composable UI** that maps cleanly to product features.
-- Has **fast iteration** (Hot Reload) which improves UI and feature velocity.
+- Renderiza con su propio motor (Skia).
+- Controla el árbol de widgets, el layout y la pintura.
+- Maneja navegación, inputs, animaciones, gráficos y estado.
 
-In other words: Flutter is not just “cross-platform UI”; it’s **a full application runtime** designed
-for consistent behavior, performance, and maintainability.
+Esto significa que tu app es **un programa que pinta sus propios píxeles**. Por eso el diseño
+es consistente entre Android e iOS y la arquitectura se centra en estado + UI declarativa.
 
 ---
 
-## 2) The Flutter mental model (widgets, elements, render objects)
+## 2) Las tres capas fundamentales (Widget → Element → RenderObject)
 
-Flutter is built around three layers. Understanding them is the difference between “using Flutter”
-and **engineering in Flutter**.
-
-### 2.1 Widgets — Immutable configuration
-A `Widget` is a **declarative configuration object**. It does not render itself. It describes what
-*should* appear.
+### 2.1 Widget (configuración inmutable)
+Un widget es **configuración declarativa**. No vive en memoria como “estado”; describe qué debería
+existir en pantalla.
 
 ```dart
-class CourseCard extends StatelessWidget {
-  const CourseCard({super.key, required this.title});
-
+class CourseTitle extends StatelessWidget {
+  const CourseTitle({super.key, required this.title});
   final String title;
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Text(title, style: Theme.of(context).textTheme.titleMedium),
-      ),
-    );
+    return Text(title, style: Theme.of(context).textTheme.titleMedium);
   }
 }
 ```
 
-### 2.2 Elements — The live widget instances
-An `Element` is the runtime “bridge” that stores widget state and participates in the tree.
-When a widget rebuilds, Flutter **diffs widget types and keys** to decide which elements are reused.
+### 2.2 Element (instancia viva)
+Los elementos viven en el árbol runtime. Flutter reutiliza elementos si:
 
-**Why it matters:** If you keep widget identity stable, you keep its state stable.
+- el tipo de widget es el mismo
+- la key coincide
 
-### 2.3 Render objects — Layout and paint
-Render objects do the heavy lifting: **layout** (constraints) and **paint** (pixels).
-Widgets create elements, elements create render objects.
+**Esto es crítico**: si cambias keys o tipos, Flutter destruye y crea nuevo estado.
 
-**Rule of thumb:** You write widgets. Flutter handles elements and render objects unless you’re
-building custom layout primitives.
+### 2.3 RenderObject (layout y pintura)
+Los render objects hacen el trabajo pesado: medir y pintar. Flutter gestiona esto por ti, excepto
+si escribes widgets de layout personalizados.
 
 ---
 
-## 3) Dart essentials for Flutter engineers
+## 3) Ciclo de vida y reconstrucciones
 
-### 3.1 Futures and async/await
-Flutter UI runs on a single main isolate. **Non-blocking async** is mandatory.
+### 3.1 StatelessWidget
+Se reconstruye cuando su padre se reconstruye. No guarda estado interno.
+
+### 3.2 StatefulWidget + State
+- `initState()` se ejecuta una sola vez.
+- `setState()` dispara un rebuild.
+- `dispose()` libera recursos (controllers, streams, listeners).
+
+**En FCD** esto se ve claramente en `CoursePlayerPage`, donde se liberan controladores
+multimedia y tokens de descarga.
+
+---
+
+## 4) Sistema de layout: “constraints go down, sizes go up”
+
+Regla de oro:
+
+1. El padre impone constraints (mínimos/máximos).
+2. El hijo elige tamaño dentro de esas constraints.
+3. El padre posiciona al hijo.
+
+Cuando aparece un “overflow” casi siempre falta una constraint adecuada arriba.
+
+---
+
+## 5) State management en Flutter
+
+Flutter no impone una arquitectura única. En este repo se usa:
+
+- **ChangeNotifier + Provider** para estado global.
+- Estado local en widgets para UI efímera.
+
+La clave es separar **estado de aplicación** (sesión, repositorios) de **estado visual** (inputs,
+loading flags, selección local).
+
+---
+
+## 6) Asincronía: Futures y Streams
+
+Flutter corre en un solo isolate principal. Toda operación de red o IO debe ser async.
 
 ```dart
-Future<AuthSession> login(String email, String password) async {
-  final response = await _apiClient.post('/login', data: {
-    'email': email,
-    'password': password,
-  });
-  return AuthSession.fromJson(response.data);
+Future<void> loadCourses() async {
+  final data = await repository.getCourses();
+  setState(() => _courses = data);
 }
 ```
 
-### 3.2 Streams (continuous data)
-Use Streams for **progress, playback, and reactive updates**.
-
-### 3.3 Null safety
-All Dart code in this repo uses **sound null safety**. Avoid `!` unless you’re certain.
-
-### 3.4 Immutability and data models
-Keep models immutable. Parse defensively to handle backend drift.
+Los `Stream`s se usan donde el estado cambia continuamente (reproducción de audio, progreso, etc.).
 
 ---
 
-## 4) Project architecture in FCD
+## 7) Navegación y rutas en Flutter (cómo se usa aquí)
 
-FCD uses a **feature-first architecture** with a shared core.
+Flutter usa `Navigator` y `MaterialPageRoute`. En este repo:
+
+- El **gate inicial** decide si mostrar login o home.
+- Las transiciones de cursos usan `Navigator.push`.
+- `CourseSummaryPage` usa `pushReplacement` para mantener flujo lineal.
+
+---
+
+# PARTE II — Dart esencial para este repo
+
+## 8) Null safety
+Todo el repo está en null-safety estricto. El patrón más común es:
+
+- **`?`** para valores opcionales
+- **`late`** para inicialización diferida
+- **`!`** solo cuando se garantiza no-null
+
+## 9) Inmutabilidad y parseo defensivo
+Los modelos del backend se parsean con helpers (`json_utils.dart`) que toleran claves alternativas
+y tipos inconsistentes. Esto **reduce fragilidad frente a APIs reales**.
+
+---
+
+# PARTE III — Dependencias (por qué están aquí)
+
+El `pubspec.yaml` define las librerías clave:
+
+- `dio`: HTTP client robusto (timeouts, interceptors, downloads).
+- `provider`: inyección y estado global.
+- `shared_preferences`: persistencia liviana local.
+- `better_player_plus`: reproducción de video avanzada + caché.
+- `just_audio`: reproducción de audio con streams de estado.
+- `webview_flutter`: visualización de documentos (Google Docs Viewer).
+- `path_provider`: rutas seguras por plataforma.
+- `open_filex`: abrir archivos locales descargados.
+- `google_fonts` / `intl` / `url_launcher`: tipografía, formato de fechas y enlaces externos.
+
+---
+
+# PARTE IV — Arquitectura general de FCD
+
+## 10) Diseño general (visión de componentes)
+
+```mermaid
+flowchart LR
+  UI[Widgets UI] -->|eventos| Controllers
+  Controllers -->|casos de uso| Repositories
+  Repositories -->|HTTP| ApiClient
+  ApiClient --> Backend[(Backend FCD)]
+  Controllers --> Storage[(SharedPreferences)]
+  Storage --> Controllers
+```
+
+**Principio**: UI solo habla con controladores/repositorios. Nunca con el backend directo.
+
+---
+
+## 11) Mapa de carpetas principal
 
 ```
 lib/
   main.dart
   src/
     app.dart
-    core/        // shared infrastructure (http, errors, config, storage, theme)
-    state/       // global session state
-    features/    // vertical modules (auth, courses, ai, downloads, etc.)
+    core/
+    state/
+    features/
 ```
 
-### Why this structure?
-- **Clear boundaries**: feature code stays localized.
-- **Reusable infrastructure** in `core`.
-- **Minimal global state**: only the session is global.
+- `core`: infraestructura y utilidades compartidas.
+- `state`: sesión global.
+- `features`: módulos funcionales (auth, courses, ai, etc.).
 
 ---
 
-## 5) App startup and session bootstrap
+# PARTE V — Bootstrap y sesión global (con detalle)
 
-Startup is where most apps lose consistency. FCD makes it explicit:
+## 12) main.dart — arranque real
 
-1. Ensure Flutter bindings are ready.
-2. Build the `SessionController`.
-3. Bootstrap session (restore + refresh tokens).
-4. Render the app only when state is stable.
-
-### Key flow (simplified)
+**Qué hace**:
+1. Inicializa bindings.
+2. Crea `SessionController`.
+3. Ejecuta `bootstrap()`.
+4. Monta `Provider` y `FcdApp`.
 
 ```dart
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   final sessionController = SessionController();
   await sessionController.bootstrap();
-
-  runApp(
-    ChangeNotifierProvider.value(
-      value: sessionController,
-      child: const FcdApp(),
-    ),
-  );
+  runApp(ChangeNotifierProvider.value(
+    value: sessionController,
+    child: const FcdApp(),
+  ));
 }
 ```
 
-### Why this design?
-- Prevents **login/home flicker** during session check.
-- Centralizes token refresh logic.
-- Guarantees UI only sees valid session states.
+**Por qué**: evita que el usuario vea UI inconsistente mientras se restaura sesión.
 
 ---
 
-## 6) Navigation and adaptive layout
+## 13) app.dart — Bootstrap Gate
 
-### 6.1 Gate-based routing
-`app.dart` uses a Bootstrap Gate: it selects **Splash**, **Login**, or **Home** based on session state.
-This avoids complex route guards and keeps startup deterministic.
+**Responsabilidad**: decidir qué pantalla mostrar (Splash/Login/Home).
 
-### 6.2 Adaptive shell
-`HomeShell` adapts to screen size:
-
-- **Phone** → `NavigationBar` (bottom tabs)
-- **Tablet** → `NavigationRail`
-
-Why? To respect platform conventions and improve reachability.
+- `_splashFinished` se activa tras 2200ms.
+- `SessionController` define si está autenticado.
+- `AnimatedSwitcher` suaviza transiciones.
 
 ---
 
-## 7) State management and data flow
+## 14) session_controller.dart — sesión global TOTAL
 
-FCD uses **ChangeNotifier + Provider** for global session state, and **local state** within widgets.
+Campos clave:
 
-### 7.1 Global session state
-`SessionController` owns:
+- `_status`: estado (checking/unauthenticated/authenticated)
+- `_user`: usuario
+- `_errorMessage`: error visible en login
+- `_apiClient`: cliente HTTP con callbacks
+- `courseRepository`, `aiChatRepository`: repos compartidos
 
-- current session state (`checking`, `authenticated`, `unauthenticated`)
-- current user
-- shared repositories
+Métodos:
 
-Why a single controller?
-
-- It eliminates duplicated logic in screens.
-- It centralizes token refresh and logout.
-- It makes the authentication boundary explicit.
-
-### 7.2 UI state vs app state
-Keep **UI state** (e.g., text fields, toggles) inside widgets. Keep **app state** (auth, repositories)
-in controllers.
+- `bootstrap()`: restaura sesión desde storage.
+- `login()`: autentica y aplica sesión.
+- `logout()`: limpia storage y estado.
+- `_handleUnauthorized()`: fuerza logout si refresh falla.
+- `_handleTokenRefreshed()`: persiste nuevos tokens.
 
 ---
 
-## 8) Networking, authentication, and error discipline
+# PARTE VI — CORE (infraestructura base)
 
-### 8.1 API client and token refresh
-`ApiClient` wraps Dio and handles:
+## 15) ApiConfig
 
-- base URL and headers
-- authentication tokens
-- refresh flows on 401/403
-- retrying original requests
+- `defaultBaseUrl`: endpoint productivo.
+- `baseUrl`: configurable vía `--dart-define=FCD_API_BASE_URL`.
+- `googleViewerUrlPrefix`: prefijo para documentos.
 
-```dart
-final response = await _dio.get(
-  '/courses',
-  options: Options(headers: {'Authorization': 'Bearer $token'}),
-);
-```
+## 16) ApiClient — HTTP y refresh
 
-### 8.2 Error strategy
-UI never shows raw exceptions. Instead it maps them to human messages:
+Capas internas:
 
-```dart
-final message = userMessageFromError(error, fallbackMessage: 'Unable to load courses');
-```
+- `Dio` con baseUrl, timeouts y headers.
+- Interceptor: si 401/403 → intenta refresh.
+- `_refreshingFuture`: evita refresh duplicados.
+- `_retry()` reintenta request original con token nuevo.
 
-Why?
-- Users want **actionable feedback**, not stack traces.
-- It limits information leakage in production.
+Métodos públicos:
 
----
+- `get/post/put/delete`: JSON estándar.
+- `postWithHeaders`: usado para refresh.
+- `download`: descarga binaria.
 
-## 9) Persistence and local storage
+## 17) AppException + error_ui
 
-Storage is separated by responsibility:
+- `AppException`: mensaje + statusCode.
+- `userMessageFromError`: transforma errores a texto humano.
 
-- `AppStorage` → auth/session tokens
-- `FavoritesStorage` → per-user favorites
-- Download history → `SharedPreferences`
+## 18) Storage
 
-Why this split?
-- Testing becomes easier.
-- Storage lifecycles are explicit.
-- Minimizes cross-feature coupling.
+- `AppStorage`: guarda tokens + user metadata.
+- `FavoritesStorage`: set de IDs por usuario (JSON en SharedPreferences).
+- `ProgressStorage`: lessonIndex/resourceIndex/position.
 
----
+## 19) Theme
 
-## 10) Feature modules (courses, catalog, AI, downloads, favorites)
+`AppTheme.light()` define colores, tipografías, inputs y botones.
 
-Each feature follows the same pattern:
+## 20) Utils
 
-1. **Models** (defensive parsing)
-2. **Repository** (network IO)
-3. **Presentation** (widgets)
+`json_utils.dart` permite parseo tolerante a estructuras inconsistentes del backend.
 
-### Example: Course repository
+## 21) Widgets comunes
 
-```dart
-Future<List<CourseLesson>> getAllLessonsByCourse(String courseId) async {
-  const maxLessons = 999; // avoid backend truncation
-  final response = await _apiClient.get('/courses/$courseId/lessons', query: {
-    'maxLessons': maxLessons,
-  });
-  return CourseLesson.listFromJson(response.data);
-}
-```
-
-Why defensive parsing? Because real backends evolve. The app must be resilient.
+`NetworkImageTile` carga imagen remota o muestra fallback.
 
 ---
 
-## 11) Media playback and file downloads
+# PARTE VII — Features con explicación TOTAL
 
-`CoursePlayerPage` is the most complex screen. It manages:
+## 22) Auth (login y refresh)
 
-- resource selection
-- media lifecycle (video/audio)
-- progress persistence
-- lesson completion
-- downloads
+### Archivos
+- `auth_user.dart`: parsea admin vs user con múltiples claves.
+- `auth_session.dart`: user + tokens.
+- `auth_repository.dart`: login, refresh, logout.
+- `login_page.dart`: UI y validaciones.
 
-This is why changes must be **small and carefully tested**: media lifecycle bugs are subtle.
+### Detalles clave
 
-`DownloadRepository` uses Dio for resumable downloads and writes a local download history.
-
----
-
-## 12) UI composition, layout rules, and theming
-
-### 12.1 Constraints-based layout
-Flutter layout follows **constraints down, sizes up, parents position children**.
-If a widget overflows, **a parent constraint is missing**.
-
-### 12.2 Theming
-FCD centralizes theme in `core/theme`. This guarantees visual consistency and makes future
-rebranding simple.
-
-### 12.3 Composition over inheritance
-Flutter encourages **small, reusable widgets** instead of large inheritance trees.
+- `AuthUser.fromLoginResponse` y `.fromRefreshResponse` manejan dos formatos distintos.
+- `AuthRepository.login` valida statusCode y tokens.
+- `AuthRepository.restoreSession` evita sesiones inválidas y limpia storage si falla.
 
 ---
 
-## 13) Testing philosophy and commands
+## 23) HomeShell (navegación principal)
 
-The repo currently uses unit tests to validate:
-
-- JSON parsing
-- repository behavior
-- error mapping
-- download cleanup
-
-Commands:
-
-```bash
-flutter analyze
-flutter test --no-test-assets
-```
-
-Why tests here?
-- Data and IO logic are the **highest-risk parts** of the system.
-- UI behavior is easier to inspect manually during iteration.
+- 6 tabs: Cursos, Catálogo, IA, Favoritos, Descargas, Cuenta.
+- `IndexedStack` preserva estado de cada tab.
+- `NavigationRail` en tablet (shortestSide >= 600).
 
 ---
 
-## 14) Performance and reliability strategies
+## 24) Courses (núcleo productivo)
 
-- Use `const` widgets where possible to reduce rebuild cost.
-- Avoid rebuilding large subtrees for small changes.
-- Dispose controllers (video, audio, animations) promptly.
-- Prefer `IndexedStack` for tab shells to preserve state and avoid reloads.
-- Separate IO from UI to keep rendering smooth.
+### Modelos
+
+- `Course`: id, nombre, precios, categoryName derivado.
+- `CourseLesson`: recursos + evaluación.
+- `LessonResource`: tipo (audio/video/document) + orden.
+
+### Repository
+
+- `getMyCourses` y `getCourses` retornan listas parseadas.
+- `getAllLessonsByCourse` usa `allLessonsRequestLimit=999`.
+- `markLessonAsCompleted` actualiza progreso.
+
+### UI
+
+**CoursesPage**
+- Búsqueda local.
+- Agrupación por categoría.
+- Carga de temario al entrar.
+
+**CourseSummaryPage**
+- Resume progreso con `ProgressStorage`.
+- Ofrece “Continuar” o “Empezar desde el principio”.
+
+**CoursePlayerPage**
+
+- Mantiene `_lessonIndex` y `_resourceIndex`.
+- Guarda progreso y posición multimedia.
+- Maneja video (BetterPlayer), audio (just_audio) y documentos (WebView).
+- Descarga recursos con `DownloadRepository`.
+- Favoritos con `FavoritesStorage`.
+
+Detalles críticos:
+
+- `_resourcePreparationRequestId` evita carreras entre recursos.
+- `_activeMediaResourceKey` asegura que el progreso se guarde para el recurso correcto.
+- `_saveProgressOnDispose` hace best-effort en `dispose()`.
 
 ---
 
-## 15) UML appendix (architecture, sequence, class diagrams)
+## 25) Catalog
 
-### 15.1 Architecture overview (component diagram)
+`CatalogPage` replica la experiencia de cursos pero sobre el catálogo completo:
 
-```mermaid
-flowchart LR
-  UI[Presentation Widgets] -->|events| Controllers
-  Controllers -->|calls| Repositories
-  Repositories -->|HTTP| ApiClient
-  ApiClient --> Backend[(Backend API)]
-  Controllers --> Storage[(Local Storage)]
-  Storage --> Controllers
-```
+- Agrupación por categoría.
+- Búsqueda local.
+- `RefreshIndicator`.
 
-### 15.2 Session bootstrap (sequence diagram)
+---
+
+## 26) AI
+
+**Repository**
+
+- `getPrompts()` filtra categorías válidas.
+- `getChatMessages()` selecciona chat por título.
+- `saveChatMessage()` persiste mensajes.
+- `askAi()` llama `/chatAI/chatBot`.
+- `hasAiAccess()` usa plan o trial.
+
+**UI**
+
+- Tabs de categorías.
+- Carga de prompts y mensajes.
+- Envío de mensajes y actualización del historial.
+
+---
+
+## 27) Favorites
+
+- `FavoritesStorage` guarda IDs por usuario.
+- `FavoritesPage` reconstruye el contexto completo
+  (curso + lecciones) para cada favorito.
+
+---
+
+## 28) Downloads
+
+- `DownloadRepository` descarga, guarda historial y limpia faltantes.
+- `DownloadsPage` muestra historial y permite abrir archivos.
+
+---
+
+## 29) Account
+
+- Muestra datos del usuario.
+- Verifica acceso a IA.
+- Logout.
+
+---
+
+## 30) Splash
+
+Animación de entrada con `AnimationController` y logo.
+
+---
+
+# PARTE VIII — Diagramas UML (flujos clave)
+
+## 31) Login y bootstrap
 
 ```mermaid
 sequenceDiagram
-  participant App as main.dart
+  participant UI as LoginPage
   participant Session as SessionController
-  participant Storage as AppStorage
+  participant Auth as AuthRepository
   participant API as ApiClient
-  participant UI as FcdApp
+  participant Storage as AppStorage
 
-  App->>Session: bootstrap()
-  Session->>Storage: readTokens()
-  alt tokens exist
-    Session->>API: refresh()
-    API-->>Session: new tokens
-  end
-  Session-->>UI: notifyListeners()
-  App->>UI: runApp()
+  UI->>Session: login(email, password)
+  Session->>Auth: login()
+  Auth->>API: POST /login
+  API-->>Auth: tokens + user
+  Auth->>Storage: saveSession()
+  Auth->>API: setTokens()
+  Auth-->>Session: AuthSession
+  Session-->>UI: authenticated
 ```
 
-### 15.3 Core domain classes (class diagram)
+## 32) Descarga de recurso
 
 ```mermaid
-classDiagram
-  class SessionController {
-    +SessionState state
-    +AuthUser? user
-    +bootstrap()
-    +login()
-    +logout()
-  }
+sequenceDiagram
+  participant UI as CoursePlayerPage
+  participant Repo as DownloadRepository
+  participant API as ApiClient
+  participant FS as FileSystem
+  participant Prefs as SharedPreferences
 
-  class ApiClient {
-    +get()
-    +post()
-    +refreshToken()
-  }
+  UI->>Repo: downloadResource()
+  Repo->>Repo: getExistingDownloadedFile()
+  Repo->>API: download(url)
+  API->>FS: write file
+  Repo->>Prefs: save history
+  Repo-->>UI: File
+```
 
-  class CourseRepository {
-    +getMyCourses()
-    +getCourses()
-    +getCourse()
-    +getAllLessonsByCourse()
-  }
+## 33) Acceso a IA
 
-  SessionController --> ApiClient
-  SessionController --> CourseRepository
+```mermaid
+sequenceDiagram
+  participant UI as AiChatPage
+  participant Repo as AiChatRepository
+  participant API as ApiClient
+
+  UI->>Repo: hasAiAccess(userId)
+  Repo->>API: GET /ai-plan/user-check
+  alt suscripción válida
+    API-->>Repo: 200
+    Repo-->>UI: true
+  else
+    Repo->>API: POST /ai-trial/check
+    API-->>Repo: 200/403
+    Repo-->>UI: true/false
+  end
 ```
 
 ---
 
-## Final note
+# PARTE IX — Mapa completo del repo (archivo por archivo)
 
-Flutter is not “just UI”; it is a **full application runtime** with its own rendering engine,
-async model, and architectural conventions. The FCD codebase applies those conventions to deliver
-stable authentication, rich media playback, downloads, and AI-assisted learning — all while keeping
-state explicit and errors humane.
+> Esta sección cubre **TODOS** los archivos en el repositorio.
 
-If you are new to Flutter, focus on three truths:
+## 34) Raíz del repo
 
-1. **Everything is a widget** (immutable config).
-2. **State lives in elements and controllers**, not in widgets themselves.
-3. **The UI is a function of state** — clarity comes from where that state lives.
+- `README.md`: documentación operativa, comandos y arquitectura resumida.
+- `pubspec.yaml`: dependencias, assets y configuración Flutter.
+- `analysis_options.yaml`: lints y reglas de análisis.
+- `devtools_options.yaml`: configuración de DevTools.
+- `.metadata`: metadata de Flutter (proyecto).
+- `.gitignore`: exclusión de artefactos.
+- `LICENSE`: licencia del proyecto.
+- `fcd_app.iml`: metadata de IDE (JetBrains).
 
-That is the foundation. Everything else is engineering discipline.
+## 35) .github
+
+- `.github/workflows/copilot-setup-steps.yml`: workflow para preparar Flutter en CI.
+
+## 36) docs
+
+- `docs/fcd_flutter_code_walkthrough.md`: este libro.
+- `docs/fcd_flutter_code_walkthrough.pdf`: versión PDF sincronizada.
+
+## 37) assets
+
+- `assets/images/logo.jpg` / `.png` / `.ico`: logo principal usado en Splash y launcher icon.
+
+## 38) lib (código productivo)
+
+### 38.1 Entradas y estado
+
+- `lib/main.dart`: bootstrap + Provider raíz.
+- `lib/src/app.dart`: MaterialApp + BootstrapGate.
+- `lib/src/state/session_controller.dart`: estado de sesión + repositorios.
+
+### 38.2 Core
+
+- `lib/src/core/config/api_config.dart`: baseUrl + Google Viewer prefix.
+- `lib/src/core/errors/app_exception.dart`: excepción de negocio.
+- `lib/src/core/errors/error_ui.dart`: map de errores a mensajes.
+- `lib/src/core/http/api_client.dart`: Dio wrapper + refresh logic.
+- `lib/src/core/storage/app_storage.dart`: persistencia de tokens y usuario.
+- `lib/src/core/storage/favorites_storage.dart`: favoritos por usuario.
+- `lib/src/core/storage/progress_storage.dart`: progreso de cursos.
+- `lib/src/core/theme/app_theme.dart`: tema y tipografías.
+- `lib/src/core/utils/json_utils.dart`: parseo defensivo.
+- `lib/src/core/widgets/network_image_tile.dart`: imagen de red con fallback.
+
+### 38.3 Features
+
+**Account**
+- `lib/src/features/account/presentation/account_page.dart`: UI de cuenta y logout.
+
+**AI**
+- `lib/src/features/ai/data/models/chat_message.dart`: modelo de mensaje.
+- `lib/src/features/ai/data/repositories/ai_chat_repository.dart`: API AI.
+- `lib/src/features/ai/presentation/ai_chat_page.dart`: UI chat.
+
+**Auth**
+- `lib/src/features/auth/data/models/auth_session.dart`: modelo sesión.
+- `lib/src/features/auth/data/models/auth_user.dart`: parseo user/admin.
+- `lib/src/features/auth/data/repositories/auth_repository.dart`: login/refresh/logout.
+- `lib/src/features/auth/presentation/login_page.dart`: pantalla login.
+
+**Catalog**
+- `lib/src/features/catalog/presentation/catalog_page.dart`: catálogo completo.
+
+**Courses**
+- `lib/src/features/courses/data/models/course.dart`: modelo Course + categorías.
+- `lib/src/features/courses/data/models/course_lesson.dart`: lecciones + recursos.
+- `lib/src/features/courses/data/models/lesson_resource.dart`: recurso individual.
+- `lib/src/features/courses/data/repositories/course_repository.dart`: endpoints cursos.
+- `lib/src/features/courses/presentation/courses_page.dart`: lista de cursos del usuario.
+- `lib/src/features/courses/presentation/course_summary_page.dart`: resumen y temario.
+- `lib/src/features/courses/presentation/course_player_page.dart`: reproducción y progreso.
+
+**Downloads**
+- `lib/src/features/downloads/data/models/downloaded_file.dart`: modelo historial.
+- `lib/src/features/downloads/data/repositories/download_repository.dart`: descargas.
+- `lib/src/features/downloads/presentation/downloads_page.dart`: UI historial.
+
+**Favorites**
+- `lib/src/features/favorites/presentation/favorites_page.dart`: UI favoritos.
+
+**Home**
+- `lib/src/features/home/presentation/home_shell.dart`: shell de navegación.
+
+**Splash**
+- `lib/src/features/splash/presentation/splash_page.dart`: splash animado.
+
+## 39) tests (cobertura total)
+
+- `test/widget_test.dart`: prueba de parseo Course básica.
+- `test/src/core/errors/error_ui_test.dart`: errores → mensajes.
+- `test/src/core/utils/json_utils_test.dart`: parseo defensivo.
+- `test/src/test_helpers/fake_api_client.dart`: API fake para repositorios.
+- `test/src/features/ai/data/repositories/ai_chat_repository_test.dart`: AI repo.
+- `test/src/features/courses/data/models/course_lesson_test.dart`: orden de recursos.
+- `test/src/features/courses/data/models/course_test.dart`: parseo Course.
+- `test/src/features/courses/data/repositories/course_repository_test.dart`: endpoints.
+- `test/src/features/downloads/data/repositories/download_repository_test.dart`: descargas.
+
+## 40) android (plataforma)
+
+- `android/app/src/main/AndroidManifest.xml`: manifest principal.
+- `android/app/src/debug/AndroidManifest.xml`: overrides debug.
+- `android/app/src/profile/AndroidManifest.xml`: overrides profile.
+- `android/app/src/main/kotlin/.../MainActivity.kt`: entry point nativo.
+- `android/app/build.gradle.kts`: config módulo app.
+- `android/build.gradle.kts`: config proyecto.
+- `android/gradle.properties`: flags de Gradle.
+- `android/settings.gradle.kts`: inclusión de módulos.
+- `android/gradle/wrapper/gradle-wrapper.properties`: versión Gradle.
+- `android/app/src/main/res/**`: iconos y launch background.
+- `android/app/src/main/java/.../GeneratedPluginRegistrant.java`: registro plugins.
+- `android/local.properties`: rutas locales (generado).
+
+## 41) ios (plataforma)
+
+- `ios/Runner/AppDelegate.swift`: entry point iOS.
+- `ios/Runner/SceneDelegate.swift`: scene lifecycle.
+- `ios/Runner/Info.plist`: config iOS.
+- `ios/Runner/Base.lproj/*.storyboard`: launch + main storyboards.
+- `ios/Runner/Assets.xcassets/**`: iconos y splash.
+- `ios/Runner.xcodeproj/*`: configuración Xcode.
+- `ios/Runner.xcworkspace/*`: workspace.
+- `ios/Flutter/*.xcconfig`: configuración de build.
+- `ios/Podfile`: dependencias CocoaPods.
+- `ios/RunnerTests/RunnerTests.swift`: tests nativos.
+
+---
+
+# PARTE X — Conclusión
+
+Este repo no es grande en número de archivos, pero **sí es completo** en funcionalidad:
+
+- autenticación real
+- cursos y multimedia
+- descargas y persistencia local
+- IA con control de acceso
+- UX adaptativa
+
+Este documento cubre **todo** lo existente en el repositorio. Si agregas un archivo nuevo,
+la regla del proyecto es simple: **documentarlo aquí**.
