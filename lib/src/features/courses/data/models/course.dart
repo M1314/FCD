@@ -99,32 +99,75 @@ int _readLessonsCount(Map<String, dynamic> json) {
   const keys = <String>[
     'total_lecciones_curso',
     'total_lecciones',
+    'totalLecciones',
     'intTotalLecciones',
     'intCantidadLecciones',
     'intNumeroLecciones',
     'intNumberOfLessons',
     'lessonsCount',
     'totalLessons',
+    'cantidad_lecciones',
+    'cantidadLecciones',
+    'numero_lecciones',
+    'numeroLecciones',
   ];
 
-  final raw = readFirst(json, keys);
-  if (raw != null) {
-    if (raw is int) {
-      return raw;
-    }
-    if (raw is num) {
-      return raw.toInt();
-    }
-    if (raw is String) {
-      return int.tryParse(raw.trim()) ?? 0;
-    }
-    return 0;
+  final explicit = _parseLessonCountValue(readFirst(json, keys));
+  if (explicit != null) {
+    return explicit;
   }
 
   final lessons = readFirst(json, const <String>['lecciones', 'lessons']);
-  if (lessons is List) {
-    return lessons.length;
+  final listCount = _parseLessonCountValue(lessons);
+  if (listCount != null) {
+    return listCount;
   }
 
-  return 0;
+  final inferred = _inferLessonCount(json);
+  return inferred ?? 0;
+}
+
+int? _parseLessonCountValue(dynamic raw) {
+  if (raw == null) {
+    return null;
+  }
+  if (raw is int) {
+    return raw;
+  }
+  if (raw is num) {
+    return raw.toInt();
+  }
+  if (raw is List) {
+    return raw.length;
+  }
+  if (raw is String) {
+    final trimmed = raw.trim();
+    final parsed = int.tryParse(trimmed);
+    if (parsed != null) {
+      return parsed;
+    }
+    final decoded = decodeJsonArray(trimmed);
+    if (decoded.isNotEmpty) {
+      return decoded.length;
+    }
+  }
+  return null;
+}
+
+int? _inferLessonCount(Map<String, dynamic> json) {
+  int? best;
+  json.forEach((key, value) {
+    final lower = key.toLowerCase();
+    if (!lower.contains('leccion') && !lower.contains('lesson')) {
+      return;
+    }
+    final parsed = _parseLessonCountValue(value);
+    if (parsed == null) {
+      return;
+    }
+    if (best == null || parsed > best!) {
+      best = parsed;
+    }
+  });
+  return best;
 }

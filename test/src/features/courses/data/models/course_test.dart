@@ -45,6 +45,16 @@ void main() {
     expect(course.lessonsCount, 2);
   });
 
+  test('Course.fromJson infers lesson count from leccion-like keys', () {
+    final course = Course.fromJson(<String, dynamic>{
+      'id': 11,
+      'name': 'Curso inferido',
+      'lecciones_totales': '14',
+    });
+
+    expect(course.lessonsCount, 14);
+  });
+
   test(
     'Course.fromJson prioritizes explicit zero count over lesson list length',
     () {
