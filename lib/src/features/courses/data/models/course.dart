@@ -1,5 +1,15 @@
 import 'package:fcd_app/src/core/utils/json_utils.dart';
 
+/// Maps the numeric idCategoria from the API to a human-readable category name.
+const Map<int, String> courseCategoryNames = <int, String>{
+  1: 'Formación Básica',
+  2: 'Cursos de Qabalah',
+  3: 'Curso Principal',
+  20: 'Cursos Varios',
+  22: 'Talleres y Conferencias',
+  23: 'Misterios Egipcios',
+};
+
 class Course {
   const Course({
     required this.id,
@@ -12,6 +22,7 @@ class Course {
     required this.priceUsd,
     required this.lessonsCount,
     required this.maxLessons,
+    this.categoryId = 0,
     this.category = '',
   });
 
@@ -25,7 +36,15 @@ class Course {
   final double priceUsd;
   final int lessonsCount;
   final int maxLessons;
+  final int categoryId;
   final String category;
+
+  /// Returns the resolved category name, preferring the API string if present,
+  /// falling back to the hardcoded map, then a generic label.
+  String get categoryName {
+    if (category.isNotEmpty) return category;
+    return courseCategoryNames[categoryId] ?? 'General';
+  }
 
   factory Course.fromJson(Map<String, dynamic> json) {
     return Course(
@@ -61,6 +80,7 @@ class Course {
         'maxLessons',
         'availableLessons',
       ]),
+      categoryId: readInt(json, const <String>['idCategoria', 'categoryId']),
       category: readString(json, const <String>[
         'categoria',
         'strCategoria',

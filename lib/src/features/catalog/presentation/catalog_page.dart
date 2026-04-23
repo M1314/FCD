@@ -72,7 +72,7 @@ class _CatalogPageState extends State<CatalogPage> {
       final categoryOrder = <String>[];
       final grouped = <String, List<Course>>{};
       for (final course in courses) {
-        final cat = course.category.isNotEmpty ? course.category : 'General';
+        final cat = course.categoryName;
         if (!grouped.containsKey(cat)) {
           categoryOrder.add(cat);
           grouped[cat] = <Course>[];
@@ -174,8 +174,8 @@ class _CatalogPageState extends State<CatalogPage> {
         physics: const AlwaysScrollableScrollPhysics(),
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 30),
         itemCount: courses.length,
-        separatorBuilder: (_, __) => const SizedBox(height: 12),
-        itemBuilder: (_, index) => _CatalogCard(course: courses[index]),
+        separatorBuilder: (context, index) => const SizedBox(height: 12),
+        itemBuilder: (context, index) => _CatalogCard(course: courses[index]),
       ),
     );
   }
