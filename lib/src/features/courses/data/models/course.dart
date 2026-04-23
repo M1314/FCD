@@ -146,51 +146,65 @@ int? _parseLessonCountValue(dynamic raw) {
     if (parsed != null) {
       return parsed;
     }
-    final decoded = decodeJsonArray(trimmed);
-    if (decoded.isNotEmpty) {
-      return decoded.length;
+    if (trimmed.startsWith('[')) {
+      final decoded = decodeJsonArray(trimmed);
+      if (decoded.isNotEmpty) {
+        return decoded.length;
+      }
     }
   }
   return null;
 }
 
 int? _inferLessonCount(Map<String, dynamic> json) {
+  const preferredTokens = <String>[
+    'total',
+    'cantidad',
+    'numero',
+    'count',
+    'cant',
+    'num',
+  ];
   int? preferred;
+  int? preferredPriority;
   int? fallback;
-  json.forEach((key, value) {
-    final lower = key.toLowerCase();
+
+  for (final entry in json.entries) {
+    final lower = entry.key.toLowerCase();
     if (!lower.contains('leccion') && !lower.contains('lesson')) {
-      return;
+      continue;
     }
     if (lower.contains('id')) {
-      return;
+      continue;
     }
-    final parsed = _parseLessonCountValue(value);
+    final parsed = _parseLessonCountValue(entry.value);
     if (parsed == null) {
-      return;
+      continue;
     }
-    final isPreferred =
-        lower.contains('total') ||
-        lower.contains('cantidad') ||
-        lower.contains('numero') ||
-        lower.contains('count') ||
-        lower.contains('cant') ||
-        lower.contains('num');
-    if (isPreferred) {
-      final currentPreferred = preferred;
-      if (currentPreferred == null) {
+
+    final priority = _priorityForKey(lower, preferredTokens);
+    if (priority != null) {
+      final currentPriority = preferredPriority;
+      if (currentPriority == null || priority < currentPriority) {
+        preferredPriority = priority;
         preferred = parsed;
-      } else if (parsed > currentPreferred) {
-        preferred = parsed;
+        if (priority == 0) {
+          return preferred;
+        }
       }
-      return;
+      continue;
     }
-    final currentFallback = fallback;
-    if (currentFallback == null) {
-      fallback = parsed;
-    } else if (parsed > currentFallback) {
-      fallback = parsed;
-    }
-  });
+
+    fallback ??= parsed;
+  }
   return preferred ?? fallback;
+}
+
+int? _priorityForKey(String key, List<String> tokens) {
+  for (var i = 0; i < tokens.length; i += 1) {
+    if (key.contains(tokens[i])) {
+      return i;
+    }
+  }
+  return null;
 }
