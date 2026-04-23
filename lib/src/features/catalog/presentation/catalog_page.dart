@@ -17,6 +17,8 @@ class CatalogPage extends StatefulWidget {
 class _CatalogPageState extends State<CatalogPage> {
   /// Keep concurrent lesson-count requests small to avoid API overload.
   static const int _lessonCountBatchSize = 6;
+  static const Duration _lessonCountBatchDelay =
+      Duration(milliseconds: 120);
 
   bool _loading = true;
   String? _error;
@@ -119,7 +121,8 @@ class _CatalogPageState extends State<CatalogPage> {
     final counts = <int, int>{};
     for (var i = 0; i < courses.length; i += _lessonCountBatchSize) {
       final batch = courses.skip(i).take(_lessonCountBatchSize);
-      final results = await Future.wait(batch.map((course) async {
+      final results = await Future.wait(
+        batch.map((course) async {
         try {
           final lessons = await session.courseRepository.getAllLessonsByCourse(
             courseId: course.id,
@@ -137,10 +140,12 @@ class _CatalogPageState extends State<CatalogPage> {
           );
           return MapEntry(course.id, course.lessonsCount);
         }
-      }));
+        }),
+        eagerError: false,
+      );
       counts.addEntries(results);
       if (i + _lessonCountBatchSize < courses.length) {
-        await Future.delayed(const Duration(milliseconds: 120));
+        await Future.delayed(_lessonCountBatchDelay);
       }
     }
     return counts;
