@@ -25,9 +25,11 @@ class DownloadRepository {
     LessonResource resource, {
     required ProgressCallback onProgress,
     CancelToken? cancelToken,
+    void Function()? onAlreadyDownloaded,
   }) async {
     final existingFile = await getExistingDownloadedFile(resource);
     if (existingFile != null) {
+      onAlreadyDownloaded?.call();
       return existingFile;
     }
 
@@ -75,6 +77,7 @@ class DownloadRepository {
 
       final file = File(existing.localPath);
       if (!await file.exists()) {
+        await _removeFromHistoryById(existing.id);
         return null;
       }
       return file;
@@ -124,6 +127,27 @@ class DownloadRepository {
     parsed.removeWhere((entry) => entry.id == file.id);
     parsed.insert(0, file);
 
+    await prefs.setStringList(
+      _downloadHistoryKey,
+      parsed.map((entry) => entry.toRawJson()).toList(),
+    );
+  }
+
+  Future<void> _removeFromHistoryById(String id) async {
+    final prefs = await SharedPreferences.getInstance();
+    final current = prefs.getStringList(_downloadHistoryKey) ?? <String>[];
+    final parsed = current
+        .map((entry) {
+          try {
+            return DownloadedFile.fromRawJson(entry);
+          } catch (_) {
+            return null;
+          }
+        })
+        .whereType<DownloadedFile>()
+        .toList();
+
+    parsed.removeWhere((entry) => entry.id == id);
     await prefs.setStringList(
       _downloadHistoryKey,
       parsed.map((entry) => entry.toRawJson()).toList(),

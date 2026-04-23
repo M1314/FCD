@@ -71,6 +71,28 @@ void main() {
     expect(downloads, hasLength(1));
     expect(downloads.first.url, resource.url);
   });
+
+  test('getExistingDownloadedFile removes stale history entries', () async {
+    final resource = _resource();
+    final stalePath = '${tempDir.path}/downloads/missing.pdf';
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setStringList('download_history_v1', <String>[
+      DownloadedFile(
+        id: '${resource.type.name}:${resource.url.hashCode}',
+        url: resource.url,
+        name: resource.name,
+        type: resource.type.name,
+        localPath: stalePath,
+        downloadedAt: DateTime.now(),
+      ).toRawJson(),
+    ]);
+
+    final existing = await repository.getExistingDownloadedFile(resource);
+    final downloads = await repository.getDownloads();
+
+    expect(existing, isNull);
+    expect(downloads, isEmpty);
+  });
 }
 
 LessonResource _resource() {
