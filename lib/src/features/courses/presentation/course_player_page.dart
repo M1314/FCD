@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:better_player_plus/better_player_plus.dart';
 import 'package:dio/dio.dart';
 import 'package:fcd_app/src/core/config/api_config.dart';
@@ -81,6 +83,7 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _saveProgressOnDispose();
     _videoController?.dispose();
     _audioPlayer?.dispose();
     _downloadCancelToken?.cancel();
@@ -240,7 +243,13 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
       child: Row(
         children: <Widget>[
           IconButton(
-            onPressed: () => Navigator.of(context).pop(),
+            onPressed: () async {
+              await _saveProgress();
+              if (!context.mounted) {
+                return;
+              }
+              Navigator.of(context).pop();
+            },
             icon: const Icon(Icons.arrow_back_rounded),
           ),
           Expanded(
@@ -692,6 +701,32 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
         mediaPositionMs: mediaPositionMs,
       );
     } catch (_) {}
+  }
+
+  void _saveProgressOnDispose() {
+    var mediaPositionMs = _savedMediaPositionMs;
+    if (_currentMediaResourceKey == _activeMediaResourceKey) {
+      final resource = currentResource;
+      if (resource != null) {
+        if (resource.isAudio && _audioPlayer != null) {
+          mediaPositionMs = _audioPlayer!.position.inMilliseconds;
+        } else if (resource.isVideo && _videoController != null) {
+          final controller = _videoController!.videoPlayerController;
+          if (controller != null) {
+            mediaPositionMs = controller.value.position.inMilliseconds;
+          }
+        }
+      }
+    }
+    _savedMediaPositionMs = mediaPositionMs;
+    unawaited(
+      _progressStorage.saveProgress(
+        courseId: widget.course.id,
+        lessonIndex: _lessonIndex,
+        resourceIndex: _resourceIndex,
+        mediaPositionMs: mediaPositionMs,
+      ),
+    );
   }
 
   Future<int> _readCurrentMediaPositionMs() async {
