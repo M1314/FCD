@@ -74,7 +74,7 @@ class _ScrollableTestPage extends StatelessWidget {
         itemBuilder: (context, itemIndex) {
           return SizedBox(
             height: 60,
-            child: Text('Pagina $index - item $itemIndex'),
+            child: Text('Página $index - item $itemIndex'),
           );
         },
       ),
