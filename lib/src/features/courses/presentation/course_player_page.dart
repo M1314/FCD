@@ -56,6 +56,7 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
   bool _isCompleted = false;
   bool _isCurrentFavorite = false;
   int _savedMediaPositionMs = 0;
+  int _resourcePreparationRequestId = 0;
 
   BetterPlayerController? _videoController;
   AudioPlayer? _audioPlayer;
@@ -759,6 +760,7 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
   }
 
   Future<void> _prepareCurrentResource() async {
+    final requestId = ++_resourcePreparationRequestId;
     final previousVideoController = _videoController;
     final previousAudioPlayer = _audioPlayer;
 
@@ -772,19 +774,50 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
       await previousAudioPlayer.dispose();
     }
 
+    if (!mounted || requestId != _resourcePreparationRequestId) {
+      return;
+    }
+
     final resource = currentResource;
     if (resource == null) {
       return;
     }
 
     if (resource.isVideo) {
-      _setupVideo(resource.url);
+      final videoController = _buildVideoController(
+        resource.url,
+        requestId: requestId,
+      );
+      if (!mounted || requestId != _resourcePreparationRequestId) {
+        videoController.dispose();
+        return;
+      }
+      _videoController = videoController;
       return;
     }
     if (resource.isAudio) {
-      await _setupAudio(resource.url);
+      final audioPlayer = AudioPlayer();
+      await audioPlayer.setUrl(resource.url);
+      if (!mounted || requestId != _resourcePreparationRequestId) {
+        await audioPlayer.dispose();
+        return;
+      }
+      _audioPlayer = audioPlayer;
       if (_savedMediaPositionMs > 0) {
-        await _audioPlayer?.seek(Duration(milliseconds: _savedMediaPositionMs));
+        try {
+          await audioPlayer.seek(Duration(milliseconds: _savedMediaPositionMs));
+        } catch (_) {
+          if (requestId == _resourcePreparationRequestId) {
+            rethrow;
+          }
+        }
+      }
+      if (!mounted || requestId != _resourcePreparationRequestId) {
+        if (_audioPlayer == audioPlayer) {
+          _audioPlayer = null;
+        }
+        await audioPlayer.stop();
+        await audioPlayer.dispose();
       }
       return;
     }
@@ -792,7 +825,10 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
     _setupDocument(resource.url);
   }
 
-  void _setupVideo(String url) {
+  BetterPlayerController _buildVideoController(
+    String url, {
+    required int requestId,
+  }) {
     final restorePositionMs = _savedMediaPositionMs;
     final dataSource = BetterPlayerDataSource(
       BetterPlayerDataSourceType.network,
@@ -829,23 +865,19 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
       ),
       betterPlayerDataSource: dataSource,
     );
-    _videoController = videoController;
 
     if (restorePositionMs > 0) {
       // Better Player may ignore immediate seeks until the first frame is ready.
       Future<void>.delayed(_videoRestoreDelay, () {
-        if (!mounted || _videoController != videoController) {
+        if (!mounted ||
+            requestId != _resourcePreparationRequestId ||
+            _videoController != videoController) {
           return;
         }
         videoController.seekTo(Duration(milliseconds: restorePositionMs));
       });
     }
-  }
-
-  Future<void> _setupAudio(String url) async {
-    final player = AudioPlayer();
-    await player.setUrl(url);
-    _audioPlayer = player;
+    return videoController;
   }
 
   void _setupDocument(String url) {
