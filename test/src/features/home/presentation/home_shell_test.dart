@@ -1,6 +1,11 @@
+import 'package:fcd_app/src/features/downloads/data/repositories/download_repository.dart';
+import 'package:fcd_app/src/features/downloads/presentation/download_task_controller.dart';
 import 'package:fcd_app/src/features/home/presentation/home_shell.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:provider/provider.dart';
+
+import '../../../test_helpers/fake_api_client.dart';
 
 void main() {
   testWidgets(
@@ -11,11 +16,16 @@ void main() {
       addTearDown(tester.view.reset);
 
       await tester.pumpWidget(
-        MaterialApp(
-          home: HomeShell(
-            pages: List<Widget>.generate(
-              6,
-              (index) => _ScrollableTestPage(index: index),
+        ChangeNotifierProvider<DownloadTaskController>(
+          create: (_) => DownloadTaskController(
+            downloadRepository: DownloadRepository(apiClient: FakeApiClient()),
+          ),
+          child: MaterialApp(
+            home: HomeShell(
+              pages: List<Widget>.generate(
+                6,
+                (index) => _ScrollableTestPage(index: index),
+              ),
             ),
           ),
         ),
