@@ -19,10 +19,10 @@ void main() {
   group('downloadsGroupHeadingFor', () {
     test('combines course and lesson when both are present', () {
       final heading = downloadsGroupHeadingFor(
-        buildFile(courseName: 'Curso A', lessonName: 'Leccion 1'),
+        buildFile(courseName: 'Curso A', lessonName: 'Lección 1'),
       );
 
-      expect(heading, 'Curso A · Leccion 1');
+      expect(heading, 'Curso A · Lección 1');
     });
 
     test('returns course when lesson is empty', () {
