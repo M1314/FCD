@@ -1,4 +1,5 @@
 import 'package:fcd_app/src/core/theme/app_theme.dart';
+import 'package:fcd_app/src/features/auth/presentation/biometric_authenticator.dart';
 import 'package:fcd_app/src/state/session_controller.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -6,7 +7,9 @@ import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 class LoginPage extends StatefulWidget {
-  const LoginPage({super.key});
+  const LoginPage({super.key, this.biometricAuthenticator});
+
+  final BiometricAuthenticator? biometricAuthenticator;
 
   @override
   State<LoginPage> createState() => _LoginPageState();
@@ -19,12 +22,32 @@ class _LoginPageState extends State<LoginPage> {
 
   bool _obscurePassword = true;
   bool _isSubmitting = false;
+  bool _isBiometricAvailable = false;
+  late final BiometricAuthenticator _biometricAuthenticator;
+
+  @override
+  void initState() {
+    super.initState();
+    _biometricAuthenticator =
+        widget.biometricAuthenticator ?? LocalBiometricAuthenticator();
+    _loadBiometricAvailability();
+  }
 
   @override
   void dispose() {
     _emailController.dispose();
     _passwordController.dispose();
     super.dispose();
+  }
+
+  Future<void> _loadBiometricAvailability() async {
+    final isAvailable = await _biometricAuthenticator.isAvailable();
+    if (!mounted) {
+      return;
+    }
+    setState(() {
+      _isBiometricAvailable = isAvailable;
+    });
   }
 
   @override
@@ -210,6 +233,14 @@ class _LoginPageState extends State<LoginPage> {
                       )
                     : const Text('Ingresar'),
               ),
+              if (_isBiometricAvailable) ...<Widget>[
+                const SizedBox(height: 8),
+                OutlinedButton.icon(
+                  onPressed: _isSubmitting ? null : _submitWithBiometrics,
+                  icon: const Icon(Icons.face_6_outlined),
+                  label: const Text('Ingresar con Face ID'),
+                ),
+              ],
               const SizedBox(height: 8),
               Text(
                 'Si no recuerdas tu clave, puedes recuperarla desde la web.',
@@ -267,6 +298,14 @@ class _LoginPageState extends State<LoginPage> {
   }
 
   Future<void> _submit() async {
+    await _submitInternal();
+  }
+
+  Future<void> _submitWithBiometrics() async {
+    await _submitInternal(requireBiometric: true);
+  }
+
+  Future<void> _submitInternal({bool requireBiometric = false}) async {
     if (_isSubmitting) {
       return;
     }
@@ -281,6 +320,24 @@ class _LoginPageState extends State<LoginPage> {
     setState(() {
       _isSubmitting = true;
     });
+
+    if (requireBiometric) {
+      final authenticated = await _biometricAuthenticator.authenticate();
+      if (!mounted) {
+        return;
+      }
+      if (!authenticated) {
+        setState(() {
+          _isSubmitting = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('No se pudo completar la autenticacion Face ID.'),
+          ),
+        );
+        return;
+      }
+    }
 
     final success = await context.read<SessionController>().login(
       email: _emailController.text.trim(),
