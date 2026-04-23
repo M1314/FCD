@@ -178,11 +178,14 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
   }
 
   String? get _currentMediaResourceKey {
-    final resource = currentResource;
-    if (resource == null) {
+    if (currentResources.isEmpty) {
       return null;
     }
-    return '$_lessonIndex:$_resourceIndex:${resource.url}';
+    final clampedResourceIndex = _resourceIndex.clamp(
+      0,
+      currentResources.length - 1,
+    );
+    return '$_lessonIndex:$clampedResourceIndex';
   }
 
   bool get _hasPreviousLesson => _lessonIndex > 0;
@@ -694,6 +697,8 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
     if (resource == null) {
       return 0;
     }
+    // Only persist position when the currently selected resource is the same
+    // resource that actually owns the active player instance.
     if (_currentMediaResourceKey != _activeMediaResourceKey) {
       return 0;
     }
@@ -797,7 +802,6 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
     }
 
     if (resource.isVideo) {
-      final resourceKey = _currentMediaResourceKey;
       final videoController = _buildVideoController(
         resource.url,
         requestId: requestId,
@@ -807,11 +811,10 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
         return;
       }
       _videoController = videoController;
-      _activeMediaResourceKey = resourceKey;
+      _activeMediaResourceKey = _currentMediaResourceKey;
       return;
     }
     if (resource.isAudio) {
-      final resourceKey = _currentMediaResourceKey;
       final audioPlayer = AudioPlayer();
       await audioPlayer.setUrl(resource.url);
       if (!mounted || requestId != _resourcePreparationRequestId) {
@@ -819,7 +822,7 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
         return;
       }
       _audioPlayer = audioPlayer;
-      _activeMediaResourceKey = resourceKey;
+      _activeMediaResourceKey = _currentMediaResourceKey;
       if (_savedMediaPositionMs > 0) {
         try {
           await audioPlayer.seek(Duration(milliseconds: _savedMediaPositionMs));
@@ -836,9 +839,7 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
       if (_audioPlayer == audioPlayer) {
         _audioPlayer = null;
       }
-      if (_activeMediaResourceKey == resourceKey) {
-        _activeMediaResourceKey = null;
-      }
+      _activeMediaResourceKey = null;
       await audioPlayer.stop();
       await audioPlayer.dispose();
       return;
