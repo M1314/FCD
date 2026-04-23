@@ -690,8 +690,12 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
     }
 
     if (resource.isVideo && _videoController != null) {
-      final position = await _videoController!.videoPlayerController?.position;
-      return position?.inMilliseconds ?? 0;
+      final controller = _videoController!.videoPlayerController;
+      if (controller == null) {
+        return 0;
+      }
+      final position = await controller.position;
+      return position.inMilliseconds;
     }
 
     return 0;
