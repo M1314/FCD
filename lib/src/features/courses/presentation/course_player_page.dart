@@ -692,22 +692,25 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Ya hay una descarga en progreso.')),
         );
+        return;
       case DownloadTaskStatus.alreadyDownloaded:
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Este recurso ya fue descargado previamente.'),
           ),
         );
+        return;
       case DownloadTaskStatus.failed:
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('No se pudo descargar.')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('No se pudo descargar.')));
+        return;
       case DownloadTaskStatus.completed:
         final file = result.file;
         if (file == null) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Archivo descargado.')),
-          );
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(const SnackBar(content: Text('Archivo descargado.')));
           return;
         }
         final openResult = await OpenFilex.open(file.path);
@@ -723,6 +726,7 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
             ),
           ),
         );
+        return;
     }
   }
 

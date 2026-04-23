@@ -13,8 +13,10 @@ Future<void> main() async {
 
   runApp(
     MultiProvider(
-      providers: <SingleChildWidget>[
-        ChangeNotifierProvider<SessionController>.value(value: sessionController),
+      providers: [
+        ChangeNotifierProvider<SessionController>.value(
+          value: sessionController,
+        ),
         ChangeNotifierProvider<DownloadTaskController>(
           create: (_) => DownloadTaskController(
             downloadRepository: DownloadRepository(

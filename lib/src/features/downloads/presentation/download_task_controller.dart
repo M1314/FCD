@@ -7,11 +7,7 @@ import 'package:flutter/foundation.dart';
 enum DownloadTaskStatus { completed, alreadyDownloaded, failed, busy }
 
 class DownloadTaskResult {
-  const DownloadTaskResult({
-    required this.status,
-    this.file,
-    this.error,
-  });
+  const DownloadTaskResult({required this.status, this.file, this.error});
 
   final DownloadTaskStatus status;
   final File? file;

@@ -120,12 +120,15 @@ class _FavoritesPageState extends State<FavoritesPage> {
         await _favoritesCacheStorage.save(user.id, syncedCourses);
       }
 
-      final sourceCourses = syncedCourses.isNotEmpty ? syncedCourses : cachedCourses;
+      final sourceCourses = syncedCourses.isNotEmpty
+          ? syncedCourses
+          : cachedCourses;
       final entries = _buildEntries(
         favoriteIds: favoriteIds,
         courses: sourceCourses,
       );
-      final usingCacheFallback = syncedCourses.isEmpty && cachedEntries.isNotEmpty;
+      final usingCacheFallback =
+          syncedCourses.isEmpty && cachedEntries.isNotEmpty;
 
       if (!mounted) return;
       setState(() {
@@ -147,7 +150,8 @@ class _FavoritesPageState extends State<FavoritesPage> {
         _loading = false;
         _isRefreshing = false;
         if (_favorites.isNotEmpty) {
-          _notice = 'Mostrando copia local. Revisa tu conexion e intenta actualizar.';
+          _notice =
+              'Mostrando copia local. Revisa tu conexion e intenta actualizar.';
         } else {
           _error = userMessageFromError(
             e,
@@ -255,7 +259,8 @@ class _FavoritesPageState extends State<FavoritesPage> {
             );
           }
 
-          final adjustedIndex = index - (_isRefreshing ? 1 : 0) - (_notice != null ? 1 : 0);
+          final adjustedIndex =
+              index - (_isRefreshing ? 1 : 0) - (_notice != null ? 1 : 0);
           final item = items[adjustedIndex];
           if (item is _HeadingItem) {
             return Padding(
