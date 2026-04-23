@@ -1,7 +1,6 @@
 import 'dart:async';
 
 import 'package:better_player_plus/better_player_plus.dart';
-import 'package:dio/dio.dart';
 import 'package:fcd_app/src/core/config/api_config.dart';
 import 'package:fcd_app/src/core/storage/favorites_storage.dart';
 import 'package:fcd_app/src/core/storage/progress_storage.dart';
@@ -9,7 +8,7 @@ import 'package:fcd_app/src/core/theme/app_theme.dart';
 import 'package:fcd_app/src/features/courses/data/models/course.dart';
 import 'package:fcd_app/src/features/courses/data/models/course_lesson.dart';
 import 'package:fcd_app/src/features/courses/data/models/lesson_resource.dart';
-import 'package:fcd_app/src/features/downloads/data/repositories/download_repository.dart';
+import 'package:fcd_app/src/features/downloads/presentation/download_task_controller.dart';
 import 'package:fcd_app/src/state/session_controller.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
@@ -46,15 +45,12 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
   // Delay needed so Better Player is ready to accept seek operations.
   static const Duration _videoRestoreDelay = Duration(milliseconds: 350);
 
-  late final DownloadRepository _downloadRepository;
   final ProgressStorage _progressStorage = ProgressStorage();
   final FavoritesStorage _favoritesStorage = FavoritesStorage();
 
   int _lessonIndex = 0;
   int _resourceIndex = 0;
   bool _isLoading = true;
-  bool _isDownloading = false;
-  double _downloadProgress = 0;
   bool _isCompleted = false;
   bool _isCurrentFavorite = false;
   String? _initializationError;
@@ -65,7 +61,6 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
   BetterPlayerController? _videoController;
   AudioPlayer? _audioPlayer;
   WebViewController? _webViewController;
-  CancelToken? _downloadCancelToken;
 
   final Set<int> _completedLessonIds = <int>{};
   Set<int> _favoriteIds = <int>{};
@@ -74,10 +69,6 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    _downloadRepository = DownloadRepository(
-      apiClient: context.read<SessionController>().apiClient,
-    );
-
     _initializeProgress();
   }
 
@@ -87,7 +78,6 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
     _saveProgressOnDispose();
     _videoController?.dispose();
     _audioPlayer?.dispose();
-    _downloadCancelToken?.cancel();
     super.dispose();
   }
 
@@ -453,6 +443,8 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
   }
 
   Widget _buildBottomPanel(BuildContext context) {
+    final downloadController = context.watch<DownloadTaskController>();
+
     return Container(
       padding: const EdgeInsets.fromLTRB(14, 12, 14, 24),
       decoration: const BoxDecoration(
@@ -499,8 +491,10 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
           ),
           const SizedBox(height: 12),
           ElevatedButton.icon(
-            onPressed: _isDownloading ? null : _downloadCurrentResource,
-            icon: _isDownloading
+            onPressed: downloadController.isDownloading
+                ? null
+                : _downloadCurrentResource,
+            icon: downloadController.isDownloading
                 ? const SizedBox(
                     width: 18,
                     height: 18,
@@ -511,8 +505,8 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
                   )
                 : const Icon(Icons.download_rounded),
             label: Text(
-              _isDownloading
-                  ? 'Descargando ${(_downloadProgress * 100).toStringAsFixed(0)}%'
+              downloadController.isDownloading
+                  ? 'Descargando ${(downloadController.progress * 100).toStringAsFixed(0)}%'
                   : 'Descargar al telefono',
             ),
           ),
@@ -686,75 +680,49 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
       return;
     }
 
-    setState(() {
-      _isDownloading = true;
-      _downloadProgress = 0;
-      _downloadCancelToken = CancelToken();
-    });
+    final downloadController = context.read<DownloadTaskController>();
+    final result = await downloadController.downloadResource(resource);
 
-    try {
-      var alreadyDownloaded = false;
-      final file = await _downloadRepository.downloadResource(
-        resource,
-        cancelToken: _downloadCancelToken,
-        onAlreadyDownloaded: () {
-          alreadyDownloaded = true;
-        },
-        onProgress: (received, total) {
-          if (!mounted || total <= 0) {
-            return;
-          }
-          final raw = received / total;
-          if (!raw.isFinite) {
-            return;
-          }
-          setState(() {
-            _downloadProgress = raw.clamp(0.0, 1.0);
-          });
-        },
-      );
+    if (!mounted) {
+      return;
+    }
 
-      if (!mounted) {
-        return;
-      }
-
-      if (alreadyDownloaded) {
+    switch (result.status) {
+      case DownloadTaskStatus.busy:
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Ya hay una descarga en progreso.')),
+        );
+      case DownloadTaskStatus.alreadyDownloaded:
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Este recurso ya fue descargado previamente.'),
           ),
         );
-        return;
-      }
-
-      final result = await OpenFilex.open(file.path);
-      if (!mounted) {
-        return;
-      }
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            result.type == ResultType.done
-                ? 'Archivo descargado y abierto.'
-                : 'Archivo descargado: ${file.path}',
+      case DownloadTaskStatus.failed:
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('No se pudo descargar.')),
+        );
+      case DownloadTaskStatus.completed:
+        final file = result.file;
+        if (file == null) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Archivo descargado.')),
+          );
+          return;
+        }
+        final openResult = await OpenFilex.open(file.path);
+        if (!mounted) {
+          return;
+        }
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              openResult.type == ResultType.done
+                  ? 'Archivo descargado y abierto.'
+                  : 'Archivo descargado: ${file.path}',
+            ),
           ),
-        ),
-      );
-    } catch (error) {
-      if (!mounted) {
-        return;
-      }
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('No se pudo descargar.')));
-    } finally {
-      if (mounted) {
-        setState(() {
-          _isDownloading = false;
-          _downloadProgress = 0;
-          _downloadCancelToken = null;
-        });
-      }
+        );
     }
   }
 
