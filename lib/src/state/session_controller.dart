@@ -83,21 +83,6 @@ class SessionController extends ChangeNotifier {
     required String lastName,
     required String email,
     required String password,
-    required String phone,
-    required String profession,
-    required String maritalStatus,
-    required String address,
-    required String city,
-    required String zipCode,
-    required String question1,
-    required String question2,
-    required bool question3,
-    required bool question4,
-    required String question5,
-    required bool question6,
-    required bool question7,
-    required String question8,
-    required DateTime dateOfBirth,
   }) async {
     _errorMessage = null;
     _status = SessionStatus.checking;
@@ -109,21 +94,6 @@ class SessionController extends ChangeNotifier {
         lastName: lastName,
         email: email,
         password: password,
-        phone: phone,
-        profession: profession,
-        maritalStatus: maritalStatus,
-        address: address,
-        city: city,
-        zipCode: zipCode,
-        question1: question1,
-        question2: question2,
-        question3: question3,
-        question4: question4,
-        question5: question5,
-        question6: question6,
-        question7: question7,
-        question8: question8,
-        dateOfBirth: dateOfBirth,
       );
       _status = SessionStatus.unauthenticated;
       _errorMessage = null;

@@ -174,21 +174,6 @@ class _RegisterPageState extends State<RegisterPage> {
       lastName: _lastName.text.trim(),
       email: _email.text.trim(),
       password: _password.text,
-      phone: '',
-      profession: '',
-      maritalStatus: '',
-      address: '',
-      city: '',
-      zipCode: '',
-      question1: '',
-      question2: '',
-      question3: false,
-      question4: false,
-      question5: '',
-      question6: false,
-      question7: false,
-      question8: '',
-      dateOfBirth: DateTime(2011, 4, 24, 1, 45),
     );
     if (!mounted) return;
     setState(() => _submitting = false);
@@ -199,7 +184,7 @@ class _RegisterPageState extends State<RegisterPage> {
         setState(() => _successMessage = null);
       }
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(message.contains('Error registerUser') ? 'El servidor rechazó el registro. Revisa los campos requeridos.' : message)),
+        SnackBar(content: Text(message)),
       );
       return;
     }
