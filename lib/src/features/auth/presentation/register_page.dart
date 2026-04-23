@@ -218,7 +218,17 @@ class _RegisterPageState extends State<RegisterPage> {
 
   Future<void> _openPrivacy() async {
     final uri = Uri.parse('https://circulo-dorado.org/aviso-de-privacidad');
-    await launchUrl(uri, mode: LaunchMode.externalApplication);
+    final launched = await launchUrl(
+      uri,
+      mode: LaunchMode.externalApplication,
+    );
+    if (!launched && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('No se pudo abrir el aviso de privacidad.'),
+        ),
+      );
+    }
   }
 
 }
