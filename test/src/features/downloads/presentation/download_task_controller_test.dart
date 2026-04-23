@@ -84,6 +84,8 @@ class _FakeDownloadRepository extends DownloadRepository {
     required ProgressCallback onProgress,
     CancelToken? cancelToken,
     void Function()? onAlreadyDownloaded,
+    String courseName = '',
+    String lessonName = '',
   }) async {
     if (completeWithDelay) {
       _pendingCompleter = Completer<void>();

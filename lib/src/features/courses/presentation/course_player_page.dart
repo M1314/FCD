@@ -681,31 +681,14 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
     }
 
     final downloadController = context.read<DownloadTaskController>();
-    final result = await downloadController.downloadResource(resource);
-
-    try {
-      var alreadyDownloaded = false;
-      final file = await _downloadRepository.downloadResource(
-        resource,
-        courseName: widget.course.name,
-        lessonName: currentLesson.name,
-        cancelToken: _downloadCancelToken,
-        onAlreadyDownloaded: () {
-          alreadyDownloaded = true;
-        },
-        onProgress: (received, total) {
-          if (!mounted || total <= 0) {
-            return;
-          }
-          final raw = received / total;
-          if (!raw.isFinite) {
-            return;
-          }
-          setState(() {
-            _downloadProgress = raw.clamp(0.0, 1.0);
-          });
-        },
-      );
+    final result = await downloadController.downloadResource(
+      resource,
+      courseName: widget.course.name,
+      lessonName: currentLesson.name,
+    );
+    if (!mounted) {
+      return;
+    }
 
     switch (result.status) {
       case DownloadTaskStatus.busy:

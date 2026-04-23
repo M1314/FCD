@@ -30,7 +30,11 @@ class DownloadTaskController extends ChangeNotifier {
   double get progress => _progress;
   String get resourceName => _resourceName;
 
-  Future<DownloadTaskResult> downloadResource(LessonResource resource) async {
+  Future<DownloadTaskResult> downloadResource(
+    LessonResource resource, {
+    String courseName = '',
+    String lessonName = '',
+  }) async {
     if (_isDownloading) {
       return const DownloadTaskResult(status: DownloadTaskStatus.busy);
     }
@@ -46,6 +50,8 @@ class DownloadTaskController extends ChangeNotifier {
       var alreadyDownloaded = false;
       final file = await _downloadRepository.downloadResource(
         resource,
+        courseName: courseName,
+        lessonName: lessonName,
         onAlreadyDownloaded: () {
           alreadyDownloaded = true;
         },
