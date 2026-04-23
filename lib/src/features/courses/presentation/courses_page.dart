@@ -20,6 +20,12 @@ class _CoursesPageState extends State<CoursesPage> {
   List<Course> _filtered = <Course>[];
   final TextEditingController _searchController = TextEditingController();
 
+  /// Ordered list of category names (preserves API order).
+  List<String> _categoryOrder = <String>[];
+
+  /// Map from category name → courses in that category.
+  Map<String, List<Course>> _grouped = <String, List<Course>>{};
+
   @override
   void initState() {
     super.initState();
@@ -48,6 +54,21 @@ class _CoursesPageState extends State<CoursesPage> {
     });
   }
 
+  void _buildGrouping(List<Course> courses) {
+    final categoryOrder = <String>[];
+    final grouped = <String, List<Course>>{};
+    for (final course in courses) {
+      final cat = course.categoryName;
+      if (!grouped.containsKey(cat)) {
+        categoryOrder.add(cat);
+        grouped[cat] = <Course>[];
+      }
+      grouped[cat]!.add(course);
+    }
+    _categoryOrder = categoryOrder;
+    _grouped = grouped;
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_loading) {
@@ -73,6 +94,8 @@ class _CoursesPageState extends State<CoursesPage> {
       );
     }
 
+    final isSearching = _searchController.text.trim().isNotEmpty;
+
     return Column(
       children: <Widget>[
         Padding(
@@ -93,35 +116,95 @@ class _CoursesPageState extends State<CoursesPage> {
           ),
         ),
         Expanded(
-          child: _filtered.isEmpty
-              ? const Center(
-                  child: Padding(
-                    padding: EdgeInsets.all(24),
-                    child: Text(
-                      'No se encontraron cursos con ese criterio.',
-                      textAlign: TextAlign.center,
-                    ),
-                  ),
-                )
-              : RefreshIndicator(
-                  onRefresh: _loadCourses,
-                  child: ListView.separated(
-                    physics: const AlwaysScrollableScrollPhysics(),
-                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 30),
-                    itemBuilder: (context, index) {
-                      final course = _filtered[index];
-                      return _CourseCard(
-                        course: course,
-                        onTap: () => _openCourse(course),
-                      );
-                    },
-                    separatorBuilder: (context, index) =>
-                        const SizedBox(height: 12),
-                    itemCount: _filtered.length,
-                  ),
-                ),
+          child: isSearching ? _buildFlatList() : _buildGroupedList(),
         ),
       ],
+    );
+  }
+
+  Widget _buildFlatList() {
+    if (_filtered.isEmpty) {
+      return const Center(
+        child: Padding(
+          padding: EdgeInsets.all(24),
+          child: Text(
+            'No se encontraron cursos con ese criterio.',
+            textAlign: TextAlign.center,
+          ),
+        ),
+      );
+    }
+    return RefreshIndicator(
+      onRefresh: _loadCourses,
+      child: ListView.separated(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 30),
+        itemCount: _filtered.length,
+        separatorBuilder: (context, index) => const SizedBox(height: 12),
+        itemBuilder: (context, index) {
+          final course = _filtered[index];
+          return _CourseCard(course: course, onTap: () => _openCourse(course));
+        },
+      ),
+    );
+  }
+
+  Widget _buildGroupedList() {
+    return RefreshIndicator(
+      onRefresh: _loadCourses,
+      child: CustomScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        slivers: <Widget>[
+          for (final category in _categoryOrder) ...<Widget>[
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 20, 16, 8),
+                child: Row(
+                  children: <Widget>[
+                    Container(
+                      width: 4,
+                      height: 22,
+                      decoration: BoxDecoration(
+                        color: AppTheme.deepBrown,
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        category,
+                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                              color: AppTheme.deepBrown,
+                              fontWeight: FontWeight.bold,
+                            ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            SliverPadding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+              sliver: SliverList(
+                delegate: SliverChildBuilderDelegate(
+                  (context, index) {
+                    final course = _grouped[category]![index];
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 12),
+                      child: _CourseCard(
+                        course: course,
+                        onTap: () => _openCourse(course),
+                      ),
+                    );
+                  },
+                  childCount: _grouped[category]!.length,
+                ),
+              ),
+            ),
+          ],
+          const SliverPadding(padding: EdgeInsets.only(bottom: 18)),
+        ],
+      ),
     );
   }
 
@@ -144,18 +227,15 @@ class _CoursesPageState extends State<CoursesPage> {
 
     try {
       final courses = await session.courseRepository.getMyCourses(user.id);
-      if (!mounted) {
-        return;
-      }
+      if (!mounted) return;
+      _buildGrouping(courses);
       setState(() {
         _courses = courses;
         _loading = false;
       });
       _applyFilter();
     } catch (error) {
-      if (!mounted) {
-        return;
-      }
+      if (!mounted) return;
       setState(() {
         _loading = false;
         _error = error.toString();
@@ -182,9 +262,7 @@ class _CoursesPageState extends State<CoursesPage> {
         maxLessons: maxLessons,
       );
 
-      if (!mounted) {
-        return;
-      }
+      if (!mounted) return;
 
       Navigator.of(context, rootNavigator: true).pop();
       await Navigator.of(context).push(
@@ -193,9 +271,7 @@ class _CoursesPageState extends State<CoursesPage> {
         ),
       );
     } catch (error) {
-      if (!mounted) {
-        return;
-      }
+      if (!mounted) return;
       Navigator.of(context, rootNavigator: true).pop();
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('No se pudo abrir el curso: $error')),

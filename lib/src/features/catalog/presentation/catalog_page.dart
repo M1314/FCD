@@ -72,7 +72,7 @@ class _CatalogPageState extends State<CatalogPage> {
       final categoryOrder = <String>[];
       final grouped = <String, List<Course>>{};
       for (final course in courses) {
-        final cat = course.category.isNotEmpty ? course.category : 'General';
+        final cat = course.categoryName;
         if (!grouped.containsKey(cat)) {
           categoryOrder.add(cat);
           grouped[cat] = <Course>[];
