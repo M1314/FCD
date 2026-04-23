@@ -96,7 +96,6 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
     if (state == AppLifecycleState.paused) {
       _saveProgress();
       _videoController?.pause();
-      _audioPlayer?.pause();
     }
   }
 
