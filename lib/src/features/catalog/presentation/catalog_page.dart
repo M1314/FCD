@@ -4,7 +4,6 @@ import 'package:fcd_app/src/core/widgets/network_image_tile.dart';
 import 'package:fcd_app/src/features/courses/data/models/course.dart';
 import 'package:fcd_app/src/state/session_controller.dart';
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -272,13 +271,6 @@ class _CatalogCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final priceFormatter = NumberFormat.currency(
-      symbol: '\$',
-      decimalDigits: 0,
-    );
-
-    final hasPrice = course.price > 0;
-
     return Ink(
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(18),
@@ -316,7 +308,7 @@ class _CatalogCard extends StatelessWidget {
                         overflow: TextOverflow.ellipsis,
                         style: Theme.of(
                           context,
-                        ).textTheme.titleMedium?.copyWith(fontSize: 20),
+                        ).textTheme.titleMedium?.copyWith(fontSize: 25),
                       ),
                       if (course.subtitle.isNotEmpty) ...<Widget>[
                         const SizedBox(height: 2),
@@ -333,16 +325,10 @@ class _CatalogCard extends StatelessWidget {
                         spacing: 8,
                         runSpacing: 6,
                         children: <Widget>[
-                          if (course.lessonsCount > 0)
-                            _Chip(
-                              icon: Icons.menu_book_rounded,
-                              text: '${course.lessonsCount} lecciones',
-                            ),
-                          if (hasPrice)
-                            _Chip(
-                              icon: Icons.sell_rounded,
-                              text: priceFormatter.format(course.price),
-                            ),
+                          _Chip(
+                            icon: Icons.menu_book_rounded,
+                            text: '${course.lessonsCount} lecciones',
+                          ),
                         ],
                       ),
                     ],

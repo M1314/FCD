@@ -26,6 +26,8 @@ class DownloadRepository {
     required ProgressCallback onProgress,
     CancelToken? cancelToken,
     void Function()? onAlreadyDownloaded,
+    String courseName = '',
+    String lessonName = '',
   }) async {
     final existingFile = await getExistingDownloadedFile(resource);
     if (existingFile != null) {
@@ -62,6 +64,8 @@ class DownloadRepository {
         type: resource.type.name,
         localPath: file.path,
         downloadedAt: DateTime.now(),
+        courseName: courseName,
+        lessonName: lessonName,
       ),
     );
 

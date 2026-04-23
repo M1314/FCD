@@ -89,7 +89,7 @@ class _CoursesPageState extends State<CoursesPage> {
       return _CoursesMessageView(
         title: 'Aún no tienes cursos activos',
         message:
-            'Cuando adquieras un curso en circulo-dorado.org aparecerá aquí.',
+            'Cuando adquieras un curso en círculo-dorado.org aparecerá aquí.',
         actionLabel: 'Actualizar',
         onAction: _loadCourses,
       );
