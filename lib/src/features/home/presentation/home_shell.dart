@@ -7,7 +7,9 @@ import 'package:fcd_app/src/features/favorites/presentation/favorites_page.dart'
 import 'package:flutter/material.dart';
 
 class HomeShell extends StatefulWidget {
-  const HomeShell({super.key});
+  const HomeShell({super.key, this.pages});
+
+  final List<Widget>? pages;
 
   @override
   State<HomeShell> createState() => _HomeShellState();
@@ -15,8 +17,9 @@ class HomeShell extends StatefulWidget {
 
 class _HomeShellState extends State<HomeShell> {
   int _selectedIndex = 0;
+  late final List<ScrollController> _tabScrollControllers;
 
-  static const List<Widget> _pages = <Widget>[
+  static const List<Widget> _defaultPages = <Widget>[
     CoursesPage(),
     CatalogPage(),
     AiChatPage(),
@@ -59,6 +62,30 @@ class _HomeShellState extends State<HomeShell> {
         ),
       ];
 
+  List<Widget> get _pages => widget.pages ?? _defaultPages;
+
+  @override
+  void initState() {
+    super.initState();
+    assert(
+      _pages.length == _bottomDestinations.length,
+      'HomeShell pages length must match navigation destinations length.',
+    );
+    final pageCount = _pages.length;
+    _tabScrollControllers = List<ScrollController>.generate(
+      pageCount,
+      (_) => ScrollController(),
+    );
+  }
+
+  @override
+  void dispose() {
+    for (final controller in _tabScrollControllers) {
+      controller.dispose();
+    }
+    super.dispose();
+  }
+
   static const List<NavigationRailDestination> _railDestinations =
       <NavigationRailDestination>[
         NavigationRailDestination(
@@ -96,8 +123,14 @@ class _HomeShellState extends State<HomeShell> {
   @override
   Widget build(BuildContext context) {
     final isTablet = MediaQuery.sizeOf(context).shortestSide >= 600;
+    final wrappedPages = List<Widget>.generate(_pages.length, (index) {
+      return PrimaryScrollController(
+        controller: _tabScrollControllers[index],
+        child: _pages[index],
+      );
+    });
 
-    final content = IndexedStack(index: _selectedIndex, children: _pages);
+    final content = IndexedStack(index: _selectedIndex, children: wrappedPages);
 
     return Scaffold(
       appBar: AppBar(
@@ -128,11 +161,7 @@ class _HomeShellState extends State<HomeShell> {
                   child: NavigationRail(
                     selectedIndex: _selectedIndex,
                     labelType: NavigationRailLabelType.all,
-                    onDestinationSelected: (index) {
-                      setState(() {
-                        _selectedIndex = index;
-                      });
-                    },
+                    onDestinationSelected: _onDestinationSelected,
                     destinations: _railDestinations,
                   ),
                 ),
@@ -157,11 +186,7 @@ class _HomeShellState extends State<HomeShell> {
               child: NavigationBar(
                 selectedIndex: _selectedIndex,
                 indicatorColor: const Color(0xFFE7C89C),
-                onDestinationSelected: (index) {
-                  setState(() {
-                    _selectedIndex = index;
-                  });
-                },
+                onDestinationSelected: _onDestinationSelected,
                 destinations: _bottomDestinations,
               ),
             ),
@@ -200,5 +225,30 @@ class _HomeShellState extends State<HomeShell> {
       default:
         return 'Retoma tu práctica donde la dejaste';
     }
+  }
+
+  void _onDestinationSelected(int index) {
+    if (index == _selectedIndex) {
+      _scrollTabToTop(index);
+      return;
+    }
+    setState(() {
+      _selectedIndex = index;
+    });
+  }
+
+  void _scrollTabToTop(int index) {
+    if (index < 0 || index >= _tabScrollControllers.length) {
+      return;
+    }
+    final controller = _tabScrollControllers[index];
+    if (!controller.hasClients) {
+      return;
+    }
+    controller.animateTo(
+      0,
+      duration: const Duration(milliseconds: 250),
+      curve: Curves.easeOutCubic,
+    );
   }
 }
