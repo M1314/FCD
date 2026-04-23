@@ -43,10 +43,13 @@ class _LoginPageState extends State<LoginPage> {
         child: SafeArea(
           child: LayoutBuilder(
             builder: (context, constraints) {
+              final viewInsets = MediaQuery.viewInsetsOf(context);
               return SingleChildScrollView(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 20,
-                  vertical: 24,
+                padding: EdgeInsets.fromLTRB(
+                  20,
+                  24,
+                  20,
+                  24 + viewInsets.bottom,
                 ),
                 child: ConstrainedBox(
                   constraints: BoxConstraints(
