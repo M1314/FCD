@@ -8,6 +8,8 @@ class DownloadedFile {
     required this.type,
     required this.localPath,
     required this.downloadedAt,
+    this.courseName = '',
+    this.lessonName = '',
   });
 
   final String id;
@@ -16,6 +18,8 @@ class DownloadedFile {
   final String type;
   final String localPath;
   final DateTime downloadedAt;
+  final String courseName;
+  final String lessonName;
 
   Map<String, dynamic> toJson() {
     return <String, dynamic>{
@@ -25,6 +29,8 @@ class DownloadedFile {
       'type': type,
       'localPath': localPath,
       'downloadedAt': downloadedAt.toIso8601String(),
+      'courseName': courseName,
+      'lessonName': lessonName,
     };
   }
 
@@ -40,6 +46,8 @@ class DownloadedFile {
       downloadedAt:
           DateTime.tryParse(json['downloadedAt']?.toString() ?? '') ??
           DateTime.now(),
+      courseName: json['courseName']?.toString() ?? '',
+      lessonName: json['lessonName']?.toString() ?? '',
     );
   }
 

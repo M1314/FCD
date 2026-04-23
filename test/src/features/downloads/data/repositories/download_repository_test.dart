@@ -151,9 +151,13 @@ void main() {
 
     test('downloadResource downloads and records history when missing', () async {
       final resource = _resource();
+      const courseName = 'Curso de Ventas';
+      const lessonName = 'Leccion 1';
 
       final file = await repository.downloadResource(
         resource,
+        courseName: courseName,
+        lessonName: lessonName,
         onProgress: (received, total) {},
       );
       final downloads = await repository.getDownloads();
@@ -163,6 +167,8 @@ void main() {
       expect(downloads, hasLength(1));
       expect(downloads.first.url, resource.url);
       expect(downloads.first.id, _stableResourceId(resource));
+      expect(downloads.first.courseName, courseName);
+      expect(downloads.first.lessonName, lessonName);
     });
 
     test('downloadResource accepts legacy hash-based ids for existing files', () async {

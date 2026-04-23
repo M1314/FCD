@@ -696,6 +696,8 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
       var alreadyDownloaded = false;
       final file = await _downloadRepository.downloadResource(
         resource,
+        courseName: widget.course.name,
+        lessonName: currentLesson.name,
         cancelToken: _downloadCancelToken,
         onAlreadyDownloaded: () {
           alreadyDownloaded = true;
