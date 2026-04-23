@@ -299,10 +299,12 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
                     trailing: selected
                         ? const Icon(Icons.check_circle_rounded)
                         : null,
-                    onTap: () async {
-                      Navigator.of(context).pop();
-                      await _goToLesson(index);
-                    },
+                    onTap: selected
+                        ? null
+                        : () async {
+                            Navigator.of(context).pop();
+                            await _goToLesson(index);
+                          },
                   );
                 },
               ),
@@ -681,45 +683,24 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
     if (!_hasNextLesson) {
       return;
     }
-
-    setState(() {
-      _lessonIndex += 1;
-      _resourceIndex = 0;
-      _isCompleted = _completedLessonIds.contains(currentLesson.id);
-      _isCurrentFavorite = _favoriteIds.contains(currentLesson.id);
-    });
-
-    await _saveProgress();
-    await _prepareCurrentResource();
-    if (mounted) {
-      setState(() {});
-    }
+    await _switchToLesson(_lessonIndex + 1);
   }
 
   Future<void> _previousLesson() async {
     if (!_hasPreviousLesson) {
       return;
     }
-
-    setState(() {
-      _lessonIndex -= 1;
-      _resourceIndex = 0;
-      _isCompleted = _completedLessonIds.contains(currentLesson.id);
-      _isCurrentFavorite = _favoriteIds.contains(currentLesson.id);
-    });
-
-    await _saveProgress();
-    await _prepareCurrentResource();
-    if (mounted) {
-      setState(() {});
-    }
+    await _switchToLesson(_lessonIndex - 1);
   }
 
   Future<void> _goToLesson(int index) async {
     if (index < 0 || index >= widget.lessons.length || index == _lessonIndex) {
       return;
     }
+    await _switchToLesson(index);
+  }
 
+  Future<void> _switchToLesson(int index) async {
     setState(() {
       _lessonIndex = index;
       _resourceIndex = 0;

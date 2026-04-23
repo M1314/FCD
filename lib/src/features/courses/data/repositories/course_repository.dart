@@ -7,6 +7,9 @@ import 'package:fcd_app/src/features/courses/data/models/course_lesson.dart';
 class CourseRepository {
   CourseRepository({required ApiClient apiClient}) : _apiClient = apiClient;
 
+  /// Backend endpoint requires a max amount and has no pagination support.
+  /// We request a practical upper bound so Temario is not truncated.
+  /// If a course ever exceeds this cap, backend pagination will be required.
   static const int allLessonsRequestLimit = 999;
 
   final ApiClient _apiClient;
