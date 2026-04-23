@@ -13,6 +13,8 @@ class LoginPage extends StatefulWidget {
 }
 
 class _LoginPageState extends State<LoginPage> {
+  static const double _horizontalPadding = 20;
+  static const double _verticalPadding = 24;
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _formKey = GlobalKey<FormState>();
@@ -46,14 +48,14 @@ class _LoginPageState extends State<LoginPage> {
               final viewInsets = MediaQuery.viewInsetsOf(context);
               return SingleChildScrollView(
                 padding: EdgeInsets.fromLTRB(
-                  20,
-                  24,
-                  20,
-                  24 + viewInsets.bottom,
+                  _horizontalPadding,
+                  _verticalPadding,
+                  _horizontalPadding,
+                  _verticalPadding + viewInsets.bottom,
                 ),
                 child: ConstrainedBox(
                   constraints: BoxConstraints(
-                    minHeight: constraints.maxHeight - 48,
+                    minHeight: constraints.maxHeight - (_verticalPadding * 2),
                   ),
                   child: IntrinsicHeight(
                     child: Column(
