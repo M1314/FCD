@@ -132,6 +132,7 @@ class _CatalogPageState extends State<CatalogPage> {
       child: TextField(
         controller: _searchController,
         textInputAction: TextInputAction.search,
+        onTapOutside: (_) => FocusScope.of(context).unfocus(),
         decoration: InputDecoration(
           hintText: 'Buscar cursos...',
           prefixIcon: const Icon(Icons.search_rounded),
@@ -175,6 +176,7 @@ class _CatalogPageState extends State<CatalogPage> {
     return RefreshIndicator(
       onRefresh: _loadCourses,
       child: ListView.separated(
+        keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
         physics: const AlwaysScrollableScrollPhysics(),
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 30),
         itemCount: courses.length,
@@ -201,6 +203,7 @@ class _CatalogPageState extends State<CatalogPage> {
     return RefreshIndicator(
       onRefresh: _loadCourses,
       child: CustomScrollView(
+        keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
         physics: const AlwaysScrollableScrollPhysics(),
         slivers: <Widget>[
           for (final category in _categoryOrder) ...<Widget>[
