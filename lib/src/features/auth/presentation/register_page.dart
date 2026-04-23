@@ -17,27 +17,9 @@ class _RegisterPageState extends State<RegisterPage> {
   final _lastName = TextEditingController();
   final _email = TextEditingController();
   final _password = TextEditingController();
-  final _confirmPassword = TextEditingController();
-  final _address = TextEditingController();
-  final _location = TextEditingController();
-  final _zipCode = TextEditingController();
-  final _phone = TextEditingController();
-  final _profession = TextEditingController();
-  final _maritalStatus = TextEditingController();
-  final _question1 = TextEditingController();
-  final _question2 = TextEditingController();
-  final _question5 = TextEditingController();
-  final _question8 = TextEditingController();
-
-  DateTime _dateOfBirth = DateTime.now().subtract(const Duration(days: 365 * 15));
-  TimeOfDay _dateOfBirthTime = const TimeOfDay(hour: 1, minute: 45);
-  bool _q3 = false;
-  bool _q4 = false;
-  bool _q6 = false;
-  bool _q7 = false;
   bool _submitting = false;
   bool _obscurePassword = true;
-  bool _obscureConfirm = true;
+  String? _successMessage;
 
   @override
   void dispose() {
@@ -45,17 +27,6 @@ class _RegisterPageState extends State<RegisterPage> {
     _lastName.dispose();
     _email.dispose();
     _password.dispose();
-    _confirmPassword.dispose();
-    _address.dispose();
-    _location.dispose();
-    _zipCode.dispose();
-    _phone.dispose();
-    _profession.dispose();
-    _maritalStatus.dispose();
-    _question1.dispose();
-    _question2.dispose();
-    _question5.dispose();
-    _question8.dispose();
     super.dispose();
   }
 
@@ -98,54 +69,6 @@ class _RegisterPageState extends State<RegisterPage> {
                 helper: 'Minimo 8 caracteres',
                 validator: _validatePassword,
               ),
-              _passwordField(
-                _confirmPassword,
-                'Repetir contraseña',
-                _obscureConfirm,
-                () => setState(() => _obscureConfirm = !_obscureConfirm),
-                helper: 'Debe coincidir con la contraseña',
-                validator: _validateConfirmPassword,
-              ),
-              const SizedBox(height: 20),
-              Text('Dirección', style: Theme.of(context).textTheme.titleMedium),
-              const SizedBox(height: 12),
-              _textField(_address, 'Dirección', helper: 'Opcional'),
-              _textField(_location, 'Ciudad', helper: 'Opcional'),
-              _textField(_zipCode, 'Código postal', keyboardType: TextInputType.number, helper: 'Opcional'),
-              _textField(_phone, 'Teléfono', keyboardType: TextInputType.phone, helper: 'Opcional'),
-              const SizedBox(height: 20),
-              Text('Datos personales', style: Theme.of(context).textTheme.titleMedium),
-              const SizedBox(height: 12),
-              _textField(_profession, 'Profesión', helper: 'Opcional'),
-              _textField(_maritalStatus, 'Estado civil', helper: 'Opcional'),
-              Row(
-                children: <Widget>[
-                  Expanded(
-                    child: OutlinedButton(
-                      onPressed: _pickDate,
-                      child: Text('Nacimiento: ${_formatDate(_dateOfBirth)}'),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: OutlinedButton(
-                      onPressed: _pickTime,
-                      child: Text('Hora: ${_formatTime(_dateOfBirthTime)}'),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 20),
-              Text('Cuestionario', style: Theme.of(context).textTheme.titleMedium),
-              const SizedBox(height: 12),
-              _textField(_question1, 'Pregunta 1', helper: 'Opcional'),
-              _textField(_question2, 'Pregunta 2', helper: 'Opcional'),
-              SwitchListTile(value: _q3, onChanged: (value) => setState(() => _q3 = value), title: const Text('Pregunta 3')),
-              SwitchListTile(value: _q4, onChanged: (value) => setState(() => _q4 = value), title: const Text('Pregunta 4')),
-              _textField(_question5, 'Pregunta 5', helper: 'Opcional'),
-              SwitchListTile(value: _q6, onChanged: (value) => setState(() => _q6 = value), title: const Text('Pregunta 6')),
-              SwitchListTile(value: _q7, onChanged: (value) => setState(() => _q7 = value), title: const Text('Pregunta 7')),
-              _textField(_question8, 'Pregunta 8', helper: 'Opcional'),
               const SizedBox(height: 20),
               ElevatedButton(
                 onPressed: _submitting ? null : () => _submit(session),
@@ -158,6 +81,9 @@ class _RegisterPageState extends State<RegisterPage> {
                     : const Text('Crear cuenta'),
               ),
               const SizedBox(height: 12),
+              if (_successMessage != null)
+                _SuccessBanner(message: _successMessage!),
+              if (_successMessage != null) const SizedBox(height: 12),
               if (session.errorMessage != null)
                 _ErrorBanner(message: session.errorMessage!),
               const SizedBox(height: 8),
@@ -239,28 +165,6 @@ class _RegisterPageState extends State<RegisterPage> {
     return null;
   }
 
-  Future<void> _pickDate() async {
-    final picked = await showDatePicker(
-      context: context,
-      firstDate: DateTime(1900),
-      lastDate: DateTime.now(),
-      initialDate: _dateOfBirth,
-    );
-    if (picked != null) {
-      setState(() => _dateOfBirth = picked);
-    }
-  }
-
-  Future<void> _pickTime() async {
-    final picked = await showTimePicker(
-      context: context,
-      initialTime: _dateOfBirthTime,
-    );
-    if (picked != null) {
-      setState(() => _dateOfBirthTime = picked);
-    }
-  }
-
   Future<void> _submit(SessionController session) async {
     if (!(_formKey.currentState?.validate() ?? false)) return;
 
@@ -270,39 +174,45 @@ class _RegisterPageState extends State<RegisterPage> {
       lastName: _lastName.text.trim(),
       email: _email.text.trim(),
       password: _password.text,
-      phone: _phone.text.trim(),
-      profession: _profession.text.trim(),
-      maritalStatus: _maritalStatus.text.trim(),
-      address: _address.text.trim(),
-      city: _location.text.trim(),
-      zipCode: _zipCode.text.trim().isEmpty ? '' : _zipCode.text.trim(),
-      question1: _question1.text.trim(),
-      question2: _question2.text.trim(),
-      question3: _q3,
-      question4: _q4,
-      question5: _question5.text.trim(),
-      question6: _q6,
-      question7: _q7,
-      question8: _question8.text.trim(),
-      dateOfBirth: DateTime(
-        _dateOfBirth.year,
-        _dateOfBirth.month,
-        _dateOfBirth.day,
-        _dateOfBirthTime.hour,
-        _dateOfBirthTime.minute,
-      ),
+      phone: '',
+      profession: '',
+      maritalStatus: '',
+      address: '',
+      city: '',
+      zipCode: '',
+      question1: '',
+      question2: '',
+      question3: false,
+      question4: false,
+      question5: '',
+      question6: false,
+      question7: false,
+      question8: '',
+      dateOfBirth: DateTime(2011, 4, 24, 1, 45),
     );
     if (!mounted) return;
     setState(() => _submitting = false);
 
     if (!ok) {
       final message = session.errorMessage ?? 'No se pudo registrar.';
+      if (mounted) {
+        setState(() => _successMessage = null);
+      }
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(message.contains('Error registerUser') ? 'El servidor rechazó el registro. Revisa los campos requeridos.' : message)),
       );
       return;
     }
 
+    if (!mounted) return;
+    setState(() {
+      _successMessage = session.errorMessage ?? 'Correo enviado';
+    });
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Correo enviado')),
+    );
+    await Future<void>.delayed(const Duration(seconds: 2));
+    if (!mounted) return;
     Navigator.of(context).pop();
   }
 
@@ -311,15 +221,6 @@ class _RegisterPageState extends State<RegisterPage> {
     await launchUrl(uri, mode: LaunchMode.externalApplication);
   }
 
-  String _formatDate(DateTime value) {
-    return '${value.year.toString().padLeft(4, '0')}-${value.month.toString().padLeft(2, '0')}-${value.day.toString().padLeft(2, '0')}';
-  }
-
-  String _formatTime(TimeOfDay value) {
-    final hour = value.hour.toString().padLeft(2, '0');
-    final minute = value.minute.toString().padLeft(2, '0');
-    return '$hour:$minute';
-  }
 }
 
 class _ErrorBanner extends StatelessWidget {
@@ -337,6 +238,25 @@ class _ErrorBanner extends StatelessWidget {
         border: Border.all(color: Colors.red.shade200),
       ),
       child: Text(message, style: TextStyle(color: Colors.red.shade700)),
+    );
+  }
+}
+
+class _SuccessBanner extends StatelessWidget {
+  const _SuccessBanner({required this.message});
+
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.green.shade50,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.green.shade200),
+      ),
+      child: Text(message, style: TextStyle(color: Colors.green.shade700)),
     );
   }
 }
