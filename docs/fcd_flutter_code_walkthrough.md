@@ -1,479 +1,258 @@
-# FCD Flutter App: Beginner-Friendly Code Walkthrough
+# FCD Flutter App: guía detallada del código (con claridad y criterio)
 
-This document explains the current Flutter codebase step by step for someone who is new to Flutter.
+Este documento explica **cómo está construido hoy** el proyecto y, más importante, **por qué está organizado así**.
 
-If you are just starting, read this in order from top to bottom.
-
----
-
-## 1) What this app is
-
-This is a mobile-first Flutter app for Circulo Dorado.
-
-Main features implemented:
-
-- Login with backend authentication.
-- Session persistence (user stays logged in after reopening app).
-- Token refresh flow when access token expires.
-- Course browsing and opening a course.
-- Course summary page and lesson player page.
-- Lesson media playback:
-  - Video with Better Player Plus.
-  - Audio with just_audio.
-  - Documents using WebView + Google Docs viewer URL.
-- Download lesson files to the phone.
-- In-app list of downloaded files.
-- AI chat section with categories and backend integration.
-- Custom splash screen and visual theme.
+La idea no es solo leer archivos: es entender decisiones, flujos y límites reales del sistema.
 
 ---
 
-## 2) Flutter concepts used in this project
+## 1) Qué resuelve esta app
 
-Before looking at files, know these concepts:
+FCD es una app Flutter mobile-first para consumo de contenido formativo.
 
-### Widgets
+Capacidades productivas actuales:
 
-In Flutter, everything on screen is a widget.
-
-- `StatelessWidget`: UI that does not hold mutable state.
-- `StatefulWidget`: UI with mutable state (`setState`).
-
-### Build method
-
-Every widget has a `build(BuildContext context)` method where UI is described.
-
-### State management with Provider
-
-This app uses `provider` + `ChangeNotifier`:
-
-- `SessionController` stores authentication/session state.
-- Widgets listen to it with `context.watch<SessionController>()`.
-- Widgets call actions with `context.read<SessionController>()`.
-
-### Async programming
-
-A lot of code uses `Future`, `async`, `await` for network and disk operations.
+- autenticación real contra backend
+- restauración de sesión con refresh token
+- cursos del usuario y catálogo general
+- reproductor de lecciones (video, audio, documentos)
+- progreso de aprendizaje y marcado de lecciones
+- favoritos por usuario (persistencia local)
+- descargas locales con historial
+- asistente IA con historial por categoría y control de acceso
+- cuenta y cierre de sesión
 
 ---
 
-## 3) High-level architecture
+## 2) Mapa mental rápido del repositorio
 
-The app follows a layered structure:
+- `lib/main.dart`: arranque de app + inyección de `SessionController`.
+- `lib/src/app.dart`: `MaterialApp` y gate de navegación inicial.
+- `lib/src/state/session_controller.dart`: estado global de autenticación/sesión.
+- `lib/src/core`: infraestructura transversal (HTTP, errores, tema, storage, utilidades).
+- `lib/src/features/*`: verticales de negocio (auth, courses, catalog, ai, favorites, downloads, account, home, splash).
 
-- `core/`: shared infrastructure (HTTP client, theme, storage, utilities).
-- `features/`: business features (auth, courses, AI, downloads).
-- `state/`: app-level state controller (`SessionController`).
+Una forma simple de entender el diseño:
 
-Inside each feature, you will mostly see:
-
-- `data/models`: typed objects for API data.
-- `data/repositories`: classes that call APIs and return models.
-- `presentation`: UI pages/widgets.
-
-Data flow example:
-
-1. UI page asks repository for data.
-2. Repository calls `ApiClient`.
-3. API response is parsed into models.
-4. UI shows models.
+- **core** = reglas comunes
+- **features** = casos de uso visibles para el usuario
+- **state** = pegamento global de sesión
 
 ---
 
-## 4) App startup flow
+## 3) Flujo de arranque (startup)
 
-### File: `lib/main.dart`
+### `lib/main.dart`
 
-What it does:
+Secuencia real:
 
-1. Calls `WidgetsFlutterBinding.ensureInitialized()`.
-2. Creates `SessionController`.
-3. Calls `sessionController.bootstrap()` to restore existing session.
-4. Wraps app with `ChangeNotifierProvider`.
-5. Runs `FcdApp`.
+1. `WidgetsFlutterBinding.ensureInitialized()`
+2. crear `SessionController`
+3. ejecutar `await sessionController.bootstrap()`
+4. inyectar `SessionController` con `ChangeNotifierProvider`
+5. renderizar `FcdApp`
 
-Why this matters:
+### `lib/src/app.dart`
 
-- Session is checked before user reaches main screens.
+`_BootstrapGate` decide la pantalla activa con dos condiciones:
 
-### File: `lib/src/app.dart`
+- splash no terminado (`~2200ms`)
+- sesión aún en estado `checking`
 
-Contains:
+Resultado:
 
-- `FcdApp`: root `MaterialApp` with theme.
-- `_BootstrapGate`: decides which screen to show:
-  - Splash (`SplashPage`) while startup is running.
-  - Home (`HomeShell`) when authenticated.
-  - Login (`LoginPage`) when not authenticated.
+- si alguna se cumple: `SplashPage`
+- si no y hay sesión autenticada: `HomeShell`
+- en otro caso: `LoginPage`
 
-It also uses `AnimatedSwitcher` for smooth page transitions.
+Además usa `AnimatedSwitcher` para transición limpia entre estados.
 
----
-
-## 5) Global session state
-
-### File: `lib/src/state/session_controller.dart`
-
-This is the core app state object.
-
-Key responsibilities:
-
-- Track session status with enum:
-  - `checking`
-  - `unauthenticated`
-  - `authenticated`
-- Hold current `AuthUser`.
-- Expose repositories:
-  - `courseRepository`
-  - `aiChatRepository`
-- Handle login/logout/bootstrap.
-
-Important methods:
-
-- `bootstrap()`
-  - Called at startup.
-  - Tries to restore session via `AuthRepository.restoreSession()`.
-- `login(email, password)`
-  - Calls `AuthRepository.login`.
-  - On success updates state.
-- `logout()`
-  - Clears storage and memory session.
-
-Token lifecycle hooks:
-
-- `onTokenRefreshed`: stores new access token.
-- `onUnauthorized`: forces logout when refresh fails.
+**Principio útil:** el usuario nunca ve parpadeos entre login/home durante bootstrap.
 
 ---
 
-## 6) Network layer
+## 4) Estado global de sesión
 
-### File: `lib/src/core/http/api_client.dart`
+### `lib/src/state/session_controller.dart`
 
-This wraps Dio and centralizes all HTTP behavior.
+`SessionController` gobierna:
 
-Base setup:
+- estado (`checking`, `unauthenticated`, `authenticated`)
+- usuario autenticado (`AuthUser?`)
+- mensaje de error de sesión
+- acceso a repositorios compartidos (`CourseRepository`, `AiChatRepository`)
 
-- Base URL from `ApiConfig.baseUrl`.
-- JSON content type.
-- Timeout configuration.
+Puntos clave:
 
-Main HTTP methods:
+- `bootstrap()` intenta restaurar sesión desde storage + refresh endpoint.
+- `login(...)` cambia a `checking`, intenta autenticar y luego aplica sesión.
+- `logout()` limpia estado local y persistido.
+- `ApiClient` se instancia con callbacks:
+  - `onTokenRefreshed` para persistir access token nuevo.
+  - `onUnauthorized` para forzar logout si refresh falla.
 
-- `get`
-- `post`
-- `postWithHeaders`
-- `put`
-- `delete`
-- `download`
-
-Authentication behavior:
-
-- Stores `_accessToken` and `_refreshToken` in memory.
-- Adds `Authorization: Bearer ...` header when `authenticated = true`.
-
-Auto refresh behavior (important):
-
-1. If request fails with 401/403, interceptor catches error.
-2. If it is not the refresh endpoint and not already retried:
-   - calls `_tryRefreshToken()`.
-3. If refresh works:
-   - retries original request once.
-4. If refresh fails:
-   - triggers `onUnauthorized` callback.
-
-Error mapping:
-
-- Converts Dio errors into `AppException` with user-friendly messages.
+**Sabiduría práctica:** centralizar el ciclo de sesión evita inconsistencias entre pantallas.
 
 ---
 
-## 7) App configuration and shared utilities
+## 5) Red, autenticación y errores
 
-### File: `lib/src/core/config/api_config.dart`
+### `lib/src/core/http/api_client.dart`
 
-- Default API URL: `https://circulo-dorado.org:6007/api`.
-- Can be overridden with Dart define: `FCD_API_BASE_URL`.
-- Also stores Google Docs viewer prefix.
+`ApiClient` encapsula Dio y estandariza:
 
-### File: `lib/src/core/storage/app_storage.dart`
+- base URL (`ApiConfig.baseUrl`)
+- headers, timeouts y métodos HTTP (`get/post/put/delete/download`)
+- inyección de token bearer en requests autenticados
+- interceptor de renovación de token y reintento único de request
 
-Handles SharedPreferences operations for session fields:
+Comportamiento crítico:
 
-- Access token, refresh token.
-- User id, user name, user email, user type.
+1. request autenticado falla con 401/403
+2. intenta refresh (si no era ya refresh y no se reintentó)
+3. si refresh funciona, reintenta request original
+4. si refresh falla, dispara `onUnauthorized`
 
-### File: `lib/src/core/utils/json_utils.dart`
+### Errores
 
-A helper toolbox for defensive parsing of backend data:
+- capa de datos lanza `AppException` para fallas de negocio/backend
+- UI convierte errores a mensajes de usuario con `userMessageFromError(...)`
 
-- `asMap`, `asList`
-- `readString`, `readInt`, `readDouble`, `readBool`
-- `decodeJsonArray`
-
-Why useful:
-
-- Backend payloads can be inconsistent in key names and types.
-- These functions reduce parsing crashes.
-
-### File: `lib/src/core/theme/app_theme.dart`
-
-Defines app design system:
-
-- Core colors (bronze/gold/deepBrown/etc).
-- Text styles with Google Fonts.
-- Input fields, buttons, cards, chip theme.
-
-### File: `lib/src/core/widgets/network_image_tile.dart`
-
-Reusable image component:
-
-- Displays network image with rounded corners.
-- Shows fallback icon/container when URL is empty or image fails.
+**Principio:** nunca exponer excepciones crudas al usuario final.
 
 ---
 
-## 8) Authentication feature
+## 6) Configuración y persistencia
 
-### Models
+### Config
 
-#### `lib/src/features/auth/data/models/auth_user.dart`
+`lib/src/core/config/api_config.dart` define:
 
-Represents authenticated user fields:
+- base URL por defecto: `https://circulo-dorado.org:6007/api`
+- override con `--dart-define=FCD_API_BASE_URL=...`
+- prefijo de Google Docs viewer para documentos
 
-- id, name, email, type
-- phone, lastName
-- membersChat, shipping addresses JSON
+### Storage
 
-Has two factories:
+- `AppStorage`: tokens y datos de sesión
+- `FavoritesStorage`: favoritos por usuario (`favorites_v1_user_{id}`)
+- historial de descargas: `download_history_v1` en `SharedPreferences`
 
-- `fromLoginResponse`
-- `fromRefreshResponse`
-
-These parse slightly different payload structures.
-
-#### `lib/src/features/auth/data/models/auth_session.dart`
-
-Small object that bundles:
-
-- `AuthUser`
-- `accessToken`
-- `refreshToken`
-
-### Repository
-
-#### `lib/src/features/auth/data/repositories/auth_repository.dart`
-
-Responsibilities:
-
-- `login`: POST `/login`, parse tokens and user, persist session.
-- `restoreSession`: POST `/refresh` with refresh token.
-- `logout`: clear tokens from memory and storage.
-
-### UI
-
-#### `lib/src/features/auth/presentation/login_page.dart`
-
-Beginner notes:
-
-- Uses `TextEditingController` for email/password fields.
-- Uses `Form` + validators.
-- Calls `SessionController.login()` on submit.
-- Shows loading spinner on button while submitting.
-- Shows session error text/snackbar on failure.
+**Criterio arquitectónico:** separar storage por responsabilidad reduce acoplamiento y hace pruebas más directas.
 
 ---
 
-## 9) Home shell/navigation
+## 7) Home y navegación adaptativa
 
-### File: `lib/src/features/home/presentation/home_shell.dart`
+### `lib/src/features/home/presentation/home_shell.dart`
 
-This is the logged-in container screen.
+`HomeShell` mantiene navegación autenticada con `IndexedStack`.
 
-It has a bottom navigation bar with 3 tabs:
+Secciones actuales:
 
-- Courses
-- IA
-- Downloads
+1. Mis Cursos
+2. Catálogo
+3. IA
+4. Favoritos
+5. Descargas
+6. Cuenta
 
-Important detail:
+Adaptación por tamaño:
 
-- Uses `IndexedStack` so each tab keeps its state when you switch tabs.
+- `shortestSide < 600`: `NavigationBar` inferior
+- `shortestSide >= 600`: `NavigationRail` lateral
 
-Also provides logout from app bar.
+**Detalle importante:** `IndexedStack` conserva estado por tab (scroll, filtros, etc.).
 
 ---
 
-## 10) Courses feature
+## 8) Auth feature
 
-### Data models
+### Modelos
 
-#### `lib/src/features/courses/data/models/course.dart`
+- `AuthUser`: parsea estructuras de login/refresh
+- `AuthSession`: agrupa usuario + access token + refresh token
 
-Represents a course card/details object:
+### Repositorio (`AuthRepository`)
 
-- id, name, subtitle, description
-- icon/banner URLs
-- pricing fields
-- lessons count and max lessons
+- login (`POST /login`)
+- restore session (`POST /refresh`)
+- logout (limpieza de memoria + storage)
 
-#### `lib/src/features/courses/data/models/lesson_resource.dart`
+### UI (`LoginPage`)
 
-Represents one lesson resource item:
+- formulario validado
+- bloqueo de submit durante request
+- feedback visible en fallo
 
-- type (`document`, `audio`, `video`)
-- url
-- name
-- order
+---
 
-#### `lib/src/features/courses/data/models/course_lesson.dart`
+## 9) Courses feature
 
-Represents one lesson and its resources.
+### Repositorio (`CourseRepository`)
 
-It parses resource JSON arrays and merges them into a sorted list.
-
-Convenience getters:
-
-- `documents`
-- `videos`
-- `audios`
-
-### Repository
-
-#### `lib/src/features/courses/data/repositories/course_repository.dart`
-
-Main API calls:
+Operaciones principales:
 
 - `getMyCourses(userId)`
+- `getCourses()`
 - `getCourse(courseId)`
 - `getLessonsByCourse(courseId, maxLessons)`
+- `getAllLessonsByCourse(courseId)`
 - `markLessonAsCompleted(...)`
 - `getCompletedLessonIds(...)`
 
-### Presentation pages
+Nota importante:
 
-#### `lib/src/features/courses/presentation/courses_page.dart`
-
-Shows list of user courses.
-
-Flow:
-
-1. On init, loads courses from backend.
-2. Handles loading/error/empty states.
-3. On tap course:
-   - fetches lessons
-   - opens `CourseSummaryPage`.
-
-#### `lib/src/features/courses/presentation/course_summary_page.dart`
-
-Shows summary before entering player:
-
-- banner/title/subtitle/description
-- counts (lessons/docs/videos/audios)
-- temario list
-- button “Comenzar curso”
-
-Then navigates to `CoursePlayerPage`.
-
-#### `lib/src/features/courses/presentation/course_player_page.dart`
-
-This is the most complex screen in the app.
-
-Key responsibilities:
-
-- Track current lesson and selected resource.
-- Show progress bar based on completed lessons.
-- Mark lesson as completed.
-- Move to previous/next lesson.
-- Render selected resource as:
-  - video player
-  - audio player
-  - document web viewer
-- Download current resource.
-
-Media setup details:
-
-- Video:
-  - `BetterPlayerController`
-  - buffer tuning
-  - cache enabled
-  - playback controls (speed/skips/pip)
-- Audio:
-  - `AudioPlayer` from just_audio
-  - custom widget with play/pause and seek slider
-- Document:
-  - `WebViewController`
-  - opens Google Docs embedded viewer URL
-
-Download flow:
-
-1. Calls `DownloadRepository.downloadResource(...)`.
-2. Updates progress UI during download.
-3. Opens file locally with `OpenFilex.open`.
-
----
-
-## 11) Downloads feature
-
-### Model
-
-#### `lib/src/features/downloads/data/models/downloaded_file.dart`
-
-Represents a downloaded file in local history:
-
-- id, url, name, type
-- localPath
-- downloadedAt
-
-Includes JSON serialize/deserialize helpers.
-
-### Repository
-
-#### `lib/src/features/downloads/data/repositories/download_repository.dart`
-
-Responsibilities:
-
-- Determine app download folder.
-- Download files using `ApiClient.download`.
-- Build safe local filename.
-- Save local download history in SharedPreferences.
-- Read and clear download history.
+- `getAllLessonsByCourse` usa `allLessonsRequestLimit = 999` para evitar truncar temario cuando backend exige límite en ruta.
 
 ### UI
 
-#### `lib/src/features/downloads/presentation/downloads_page.dart`
+- `CoursesPage`: lista de cursos del usuario y acceso a resumen
+- `CourseSummaryPage`: contexto del curso antes de iniciar
+- `CoursePlayerPage`: playback, progreso, favoritos, descargas y navegación de lecciones
 
-Shows local download history list.
+---
 
-User can:
+## 10) Course Player: la pantalla más crítica
 
-- pull to refresh
-- open file
-- clear history
+`CoursePlayerPage` concentra varios subsistemas:
 
-If local file was deleted externally, UI shows a warning message.
+- selección de lección/recurso
+- render por tipo (`video`, `audio`, `document`)
+- continuidad de reproducción
+- guardado de avance
+- marcado de completado
+- toggle de favorito
+- descarga de recurso activo
+
+Puntos de robustez implementados:
+
+- control de índices de recurso para evitar desbordes
+- invalidación por request-id en preparaciones asíncronas de media
+- persistencia de posición solo para el recurso activo correcto
+
+**Sabiduría práctica:** esta pantalla mezcla IO de red, IO local y ciclo de vida de reproductores; cualquier cambio debe probarse con flujo real de usuario.
+
+---
+
+## 11) Catálogo feature
+
+### `CatalogPage`
+
+Responsabilidades:
+
+- carga de cursos globales
+- búsqueda por texto
+- agrupación/filtro por categoría
+- acceso al flujo de resumen/reproducción
+
+Se apoya en `CourseRepository.getCourses()` y modelos defensivos de parseo.
 
 ---
 
 ## 12) AI feature
 
-### Model
-
-#### `lib/src/features/ai/data/models/chat_message.dart`
-
-Simple message entity:
-
-- sender
-- content
-- timestamp (optional)
-
-Convenience bools: `isUser`, `isBot`.
-
-### Repository
-
-#### `lib/src/features/ai/data/repositories/ai_chat_repository.dart`
-
-API operations:
+### Repositorio (`AiChatRepository`)
 
 - `getPrompts()`
 - `getChatMessages(userId, chatTitle)`
@@ -481,131 +260,126 @@ API operations:
 - `askAi(...)`
 - `hasAiAccess(userId)`
 
-Important access logic:
+Control de acceso:
 
-- checks active plan endpoint first
-- falls back to trial endpoint
+1. primero valida plan activo (`/ai-plan/user-check`)
+2. si no, prueba trial (`/ai-trial/check`)
 
-### UI
+### UI (`AiChatPage`)
 
-#### `lib/src/features/ai/presentation/ai_chat_page.dart`
-
-Main behavior:
-
-- category chips (Sabiduria, Meditacion, etc)
-- loads chat history by category
-- composer for user input
-- sends user message to backend
-- sends AI request with prompt + recent history
-- appends AI response to chat
-- handles no-access state with dedicated view
+- categorías como contexto de conversación
+- historial por categoría
+- envío de mensajes con persistencia
+- render de estados de acceso/no acceso
 
 ---
 
-## 13) Splash feature
+## 13) Favorites feature
 
-### File: `lib/src/features/splash/presentation/splash_page.dart`
+### `FavoritesPage`
 
-What happens:
+Flujo:
 
-- Animated background gradients and glowing orbs.
-- Rotating central emblem.
-- App title/subtitle and progress indicator.
+1. cargar IDs favoritos locales por usuario
+2. obtener cursos del usuario
+3. resolver lecciones por curso (`getAllLessonsByCourse`)
+4. construir vista agrupada por curso
+5. abrir `CoursePlayerPage` directamente en la lección seleccionada
 
-Technically:
-
-- `AnimationController`
-- `Tween` animations (`_glow`, `_rotation`)
-- `AnimatedBuilder`
+Esto asegura que un favorito no sea solo un ID suelto, sino una entrada navegable al contexto real del curso.
 
 ---
 
-## 14) Error handling strategy
+## 14) Downloads feature
 
-### File: `lib/src/core/errors/app_exception.dart`
+### `DownloadRepository`
 
-`AppException` is a custom exception type with:
+Hace:
 
-- message
-- optional statusCode
+- selección de carpeta base por plataforma
+- descarga con progreso y cancelación (Dio)
+- normalización de nombre de archivo
+- persistencia y lectura del historial local
+- limpieza de entradas que ya no existen físicamente
 
-Repositories throw this when backend says operation failed.
+### `DownloadsPage`
 
-UI catches errors and displays friendly messages.
-
----
-
-## 15) Why the code is organized this way
-
-This structure is good for growth because:
-
-- UI and network code are separated.
-- Parsing is centralized in model/repository layers.
-- Session state is global but controlled from one class.
-- New features can be added in new `features/...` folders.
+- refresca historial
+- abre archivo local
+- permite limpiar historial
+- notifica inconsistencias (archivo borrado fuera de la app)
 
 ---
 
-## 16) Suggested learning path for a new Flutter developer
+## 15) Cuenta y splash
 
-If you want to learn from this project effectively:
+- `AccountPage`: muestra datos de usuario y permite logout.
+- `SplashPage`: animación inicial y transición visual de carga.
 
-1. Start with `main.dart` and `app.dart`.
-2. Understand `SessionController` and Provider usage.
-3. Follow one feature end-to-end (e.g., courses):
-   - UI page -> repository -> api client -> model.
-4. Read `course_player_page.dart` slowly, because it combines many concepts.
-5. Practice by adding one small feature:
-   - e.g., “favorite course” local toggle.
+Estos módulos son pequeños, pero importantes para percepción de calidad y cierre seguro de sesión.
 
 ---
 
-## 17) Common beginner questions answered
+## 16) Estrategia de pruebas y calidad
 
-### Q: Why so many `if (!mounted) return;` checks?
+Comandos del repositorio:
 
-Because async calls can complete after widget is disposed. This avoids calling `setState` on an unmounted widget.
+```bash
+flutter analyze
+flutter test --no-test-assets
+```
 
-### Q: Why not call Dio directly from widgets?
+Actualmente hay pruebas unitarias para:
 
-Keeping network code in repositories makes UI cleaner and easier to test.
+- parseo defensivo de modelos/JSON
+- repositorios de cursos e IA (con fakes)
+- utilidades de errores
+- lógica de descargas y limpieza
 
-### Q: Why keep tokens both in memory and SharedPreferences?
-
-- Memory: fast access for every request.
-- SharedPreferences: persistence across app restarts.
-
-### Q: Why `IndexedStack` in home tabs?
-
-It preserves tab states (scroll positions/input state) instead of rebuilding every tab switch.
-
----
-
-## 18) End-to-end example: Login to course playback
-
-1. User opens app.
-2. `main.dart` creates `SessionController`, calls `bootstrap`.
-3. `_BootstrapGate` in `app.dart` shows splash, then login/home.
-4. User logs in from `LoginPage`.
-5. `SessionController.login` -> `AuthRepository.login` -> `/login`.
-6. Tokens/user saved, state becomes authenticated.
-7. `HomeShell` appears, default tab is courses.
-8. `CoursesPage` loads user courses.
-9. User taps a course, lessons are fetched.
-10. `CourseSummaryPage` opens.
-11. User taps “Comenzar curso”.
-12. `CoursePlayerPage` opens and renders first pending lesson resource.
+**Principio:** priorizar pruebas en capa de datos evita regresiones silenciosas en integraciones con backend.
 
 ---
 
-## 19) Final notes
+## 17) Convicciones de diseño ("claridad con sabiduría")
 
-You now have a production-style Flutter foundation with:
+1. **Estado de sesión único y explícito**
+   - evita condiciones ambiguas entre pantallas.
+2. **Repositorios como frontera de IO**
+   - la UI no negocia directamente con payloads crudos.
+3. **Parseo defensivo**
+   - el backend real puede variar; el cliente debe ser resiliente.
+4. **Mensajes de error humanos**
+   - fallar con contexto, no con ruido técnico.
+5. **Navegación que preserva contexto**
+   - usar `IndexedStack` para no castigar al usuario al cambiar de tab.
+6. **Cambios pequeños en pantallas críticas**
+   - especialmente en `CoursePlayerPage`, donde confluyen varios ciclos de vida.
 
-- clear separation of concerns
-- real backend integration
-- media playback and downloads
-- AI chat flow
-- mobile-first UX
+---
 
-If you are new to Flutter, this is an excellent codebase to study because it includes real-world concerns: auth, networking, persistence, async UI, and media.
+## 18) Ruta recomendada para onboarding técnico
+
+Si acabas de entrar al proyecto:
+
+1. `main.dart` y `app.dart`
+2. `SessionController`
+3. `ApiClient` + `AuthRepository`
+4. flujo completo de cursos (`CoursesPage -> Summary -> Player`)
+5. `AiChatRepository` y `AiChatPage`
+6. `DownloadRepository` y `FavoritesPage`
+
+Al terminar ese recorrido, ya entiendes la mayor parte del sistema productivo.
+
+---
+
+## 19) Cierre
+
+Este código ya cubre preocupaciones reales de una app de producción: autenticación, renovación de token, persistencia, multimedia, descargas, IA y UX adaptativa.
+
+El siguiente nivel de madurez no es “más código”, sino mantener tres hábitos:
+
+- precisión en contratos de datos,
+- pruebas en puntos de riesgo,
+- cambios incrementales en módulos críticos.
+
+Ahí está la claridad. Y también la sabiduría técnica.

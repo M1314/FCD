@@ -1,12 +1,14 @@
 # FCD App (Flutter)
 
-Aplicación mobile-first en Flutter para Fraternidad del Círculo Dorado, con soporte para iPhone, iPad y tablets Android.
+Aplicación mobile-first de **Fraternidad del Círculo Dorado**, construida en Flutter y orientada a iPhone, iPad y tablets Android.
 
-## Estado actual
+## Estado actual (abril 2026)
 
-La app ya integra autenticación real, consumo de backend productivo, reproductor multimedia de lecciones, descargas locales, catálogo de cursos, favoritos, asistente IA y sección de cuenta.
+El proyecto está en operación con autenticación real, consumo de backend productivo, cursos/lecciones, reproducción multimedia, descargas locales, favoritos por usuario, asistente IA y cuenta.
 
-### Navegación principal (tabs)
+## Navegación principal
+
+La app autenticada vive en `HomeShell` y expone 6 secciones:
 
 - Mis Cursos
 - Catálogo
@@ -15,52 +17,67 @@ La app ya integra autenticación real, consumo de backend productivo, reproducto
 - Descargas
 - Cuenta
 
+Comportamiento adaptativo:
+
+- **Móvil**: `NavigationBar` inferior.
+- **Tablet** (`shortestSide >= 600`): `NavigationRail` lateral.
+
 ## Funcionalidades implementadas
 
-- Login real contra backend (`/login`) y restauración de sesión con refresh token (`/refresh`).
-- Bootstrap de sesión + pantalla splash animada.
-- Listado de cursos del usuario y detalle del curso con resumen previo.
-- Catálogo general de cursos (`/course/All/0`) con búsqueda y agrupación por categoría.
-- Reproductor de lecciones con:
-  - Video (`better_player_plus`, buffer/cache, controles avanzados).
-  - Audio (`just_audio`).
-  - Documentos (WebView + visor de Google Docs).
-- Marcado de lecciones completadas y seguimiento de progreso.
-- Favoritos de lecciones persistidos por usuario en local.
-- Descarga de recursos al dispositivo + historial local de descargas.
-- Chat IA por categorías con historial y verificación de acceso a plan/trial.
-- Pantalla de cuenta con datos de usuario, estado de plan IA y cierre de sesión.
+### Sesión y autenticación
 
-## Backend y endpoints usados
+- Login real contra backend (`POST /login`).
+- Restauración de sesión con refresh token (`POST /refresh`).
+- Bootstrap de sesión al iniciar (`SessionController.bootstrap`).
+- Logout y limpieza de sesión persistida.
+- Manejo automático de refresh de token en `ApiClient` ante 401/403.
+
+### Cursos y aprendizaje
+
+- Listado de cursos del usuario (`GET /course/MyCourses/{userId}`).
+- Catálogo general (`GET /course/All/0`) con búsqueda por texto y filtros por categoría.
+- Detalle de curso (`GET /course/0/{courseId}`).
+- Carga de temario del curso con límite alto para evitar truncamientos (`GET /lesson/course-lessons/{courseId}/{maxLessons}`).
+- Marcado de lección completada y lectura de progreso:
+  - `POST /lesson/setLessonUserStatus`
+  - `GET /lesson/getCompletedLessonsByUser/{userId}/{courseId}`
+
+### Reproductor de lecciones
+
+- Video con `better_player_plus` (controles avanzados y caché).
+- Audio con `just_audio`.
+- Documentos con `WebView` + visor de Google Docs.
+- Navegación lección a lección y continuidad de progreso.
+- Persistencia de posición multimedia para retomar contenido.
+
+### IA
+
+- Carga de prompts por categoría (`GET /prompts`).
+- Historial de conversaciones (`GET /chats/{userId}`).
+- Persistencia de mensajes (`POST /chats/{chatId}/messages`).
+- Respuesta de asistente (`POST /chatAI/chatBot`).
+- Control de acceso por plan o trial:
+  - `GET /ai-plan/user-check?user_id=...`
+  - `POST /ai-trial/check`
+
+### Favoritos y descargas
+
+- Favoritos de lecciones persistidos localmente por usuario (`FavoritesStorage`).
+- Descarga de recursos al dispositivo (`DownloadRepository`).
+- Historial local de descargas con limpieza de archivos faltantes.
+
+## Backend
 
 Base URL por defecto:
 
 - `https://circulo-dorado.org:6007/api`
 
-Endpoints utilizados:
-
-- Auth:
-  - `POST /login`
-  - `POST /refresh`
-- Cursos y lecciones:
-  - `GET /course/MyCourses/{userId}`
-  - `GET /course/All/0`
-  - `GET /course/0/{courseId}`
-  - `GET /lesson/course-lessons/{courseId}/{maxLessons}`
-  - `POST /lesson/setLessonUserStatus`
-  - `GET /lesson/getCompletedLessonsByUser/{userId}/{courseId}`
-- IA:
-  - `GET /prompts`
-  - `GET /chats/{userId}`
-  - `POST /chats/{chatId}/messages`
-  - `POST /chatAI/chatBot`
-  - `GET /ai-plan/user-check?user_id=...`
-  - `POST /ai-trial/check`
+Se puede sobreescribir con `--dart-define` (ver sección Configuración).
 
 ## Requisitos
 
-- Flutter stable (3.41+)
-- Dart 3.11+
+- Flutter stable (compatible con `Dart ^3.11.4`)
+- Dart SDK `^3.11.4`
 
 ## Configuración
 
@@ -70,13 +87,13 @@ Instalar dependencias:
 flutter pub get
 ```
 
-Cambiar backend por entorno:
+Ejecutar contra un backend distinto:
 
 ```bash
 flutter run --dart-define=FCD_API_BASE_URL=https://tu-backend/api
 ```
 
-## Ejecutar
+## Ejecución
 
 ```bash
 flutter run
@@ -89,25 +106,24 @@ flutter analyze
 flutter test --no-test-assets
 ```
 
-Actualmente hay cobertura de pruebas para parseo defensivo de JSON y modelos clave de cursos/lecciones.
-
 ## Estructura principal
 
 - `lib/main.dart`: bootstrap inicial y provider raíz.
 - `lib/src/app.dart`: gate de splash/login/home.
-- `lib/src/core`: configuración, cliente HTTP, tema, storage y utilidades.
-- `lib/src/features/auth`: login y manejo de sesión.
-- `lib/src/features/courses`: cursos, resumen y reproductor de lecciones.
-- `lib/src/features/catalog`: catálogo completo de cursos.
-- `lib/src/features/ai`: chat IA y acceso a plan/trial.
-- `lib/src/features/favorites`: lecciones favoritas.
+- `lib/src/state/session_controller.dart`: estado global de sesión.
+- `lib/src/core`: cliente HTTP, configuración, storage, tema y utilidades.
+- `lib/src/features/auth`: login y ciclo de autenticación.
+- `lib/src/features/courses`: cursos, resumen y reproductor.
+- `lib/src/features/catalog`: catálogo completo y filtros.
+- `lib/src/features/ai`: chat IA y validación de acceso.
+- `lib/src/features/favorites`: vista y apertura de lecciones favoritas.
 - `lib/src/features/downloads`: descargas e historial local.
-- `lib/src/features/account`: información de cuenta y logout.
-- `lib/src/state/session_controller.dart`: estado global de sesión y repositorios.
+- `lib/src/features/account`: datos de usuario y cierre de sesión.
+- `lib/src/features/home`: shell de navegación adaptativa.
 
 ## Documentación adicional
 
-- `docs/fcd_flutter_code_walkthrough.md`: recorrido guiado del código para onboarding técnico.
+- `docs/fcd_flutter_code_walkthrough.md`: guía detallada del código (actualizada).
 
 ## Limitaciones actuales
 
