@@ -23,6 +23,8 @@ class _LoginPageState extends State<LoginPage> {
   bool _obscurePassword = true;
   bool _isSubmitting = false;
   bool _isBiometricAvailable = false;
+  bool _hasSavedCredentials = false;
+  bool _showManualLogin = false;
   late final BiometricAuthenticator _biometricAuthenticator;
 
   @override
@@ -31,6 +33,7 @@ class _LoginPageState extends State<LoginPage> {
     _biometricAuthenticator =
         widget.biometricAuthenticator ?? LocalBiometricAuthenticator();
     _loadBiometricAvailability();
+    _loadSavedCredentialsAvailability();
   }
 
   @override
@@ -47,6 +50,18 @@ class _LoginPageState extends State<LoginPage> {
     }
     setState(() {
       _isBiometricAvailable = isAvailable;
+    });
+  }
+
+  Future<void> _loadSavedCredentialsAvailability() async {
+    final hasSavedCredentials = await context
+        .read<SessionController>()
+        .hasSavedLoginCredentials();
+    if (!mounted) {
+      return;
+    }
+    setState(() {
+      _hasSavedCredentials = hasSavedCredentials;
     });
   }
 
@@ -175,54 +190,28 @@ class _LoginPageState extends State<LoginPage> {
   }
 
   Widget _buildCard(BuildContext context, SessionController session) {
+    final canUseBiometricLogin = _isBiometricAvailable && _hasSavedCredentials;
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(18),
-        child: Form(
-          key: _formKey,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: <Widget>[
-              Text('Acceso', style: Theme.of(context).textTheme.titleMedium),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: <Widget>[
+            Text('Acceso', style: Theme.of(context).textTheme.titleMedium),
+            const SizedBox(height: 14),
+            if (canUseBiometricLogin && !_showManualLogin) ...<Widget>[
+              Text(
+                'Usa biometría para entrar sin escribir tu correo y contraseña.',
+                textAlign: TextAlign.center,
+                style: Theme.of(
+                  context,
+                ).textTheme.bodySmall?.copyWith(color: AppTheme.mutedText),
+              ),
               const SizedBox(height: 14),
-              TextFormField(
-                controller: _emailController,
-                keyboardType: TextInputType.emailAddress,
-                textInputAction: TextInputAction.next,
-                decoration: const InputDecoration(
-                  labelText: 'Correo',
-                  prefixIcon: Icon(Icons.mail_outline),
-                ),
-                validator: _validateEmail,
-              ),
-              const SizedBox(height: 12),
-              TextFormField(
-                controller: _passwordController,
-                obscureText: _obscurePassword,
-                textInputAction: TextInputAction.done,
-                onFieldSubmitted: (_) => _submit(),
-                decoration: InputDecoration(
-                  labelText: 'Contrasena',
-                  prefixIcon: const Icon(Icons.lock_outline),
-                  suffixIcon: IconButton(
-                    onPressed: () {
-                      setState(() {
-                        _obscurePassword = !_obscurePassword;
-                      });
-                    },
-                    icon: Icon(
-                      _obscurePassword
-                          ? Icons.visibility_outlined
-                          : Icons.visibility_off_outlined,
-                    ),
-                  ),
-                ),
-                validator: _validatePassword,
-              ),
-              const SizedBox(height: 18),
-              ElevatedButton(
-                onPressed: _isSubmitting ? null : _submit,
-                child: _isSubmitting
+              ElevatedButton.icon(
+                onPressed: _isSubmitting ? null : _submitWithBiometrics,
+                icon: const Icon(Icons.face_6_outlined),
+                label: _isSubmitting
                     ? const SizedBox(
                         width: 20,
                         height: 20,
@@ -231,32 +220,105 @@ class _LoginPageState extends State<LoginPage> {
                           color: Colors.white,
                         ),
                       )
-                    : const Text('Ingresar'),
+                    : const Text('Ingresar con biometría'),
               ),
-              if (_isBiometricAvailable) ...<Widget>[
+              const SizedBox(height: 8),
+              TextButton(
+                onPressed: _isSubmitting
+                    ? null
+                    : () {
+                        setState(() {
+                          _showManualLogin = true;
+                        });
+                      },
+                child: const Text('Usar correo y contraseña'),
+              ),
+            ] else ...<Widget>[
+              Form(
+                key: _formKey,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: <Widget>[
+                    TextFormField(
+                      controller: _emailController,
+                      keyboardType: TextInputType.emailAddress,
+                      textInputAction: TextInputAction.next,
+                      decoration: const InputDecoration(
+                        labelText: 'Correo',
+                        prefixIcon: Icon(Icons.mail_outline),
+                      ),
+                      validator: _validateEmail,
+                    ),
+                    const SizedBox(height: 12),
+                    TextFormField(
+                      controller: _passwordController,
+                      obscureText: _obscurePassword,
+                      textInputAction: TextInputAction.done,
+                      onFieldSubmitted: (_) => _submit(),
+                      decoration: InputDecoration(
+                        labelText: 'Contrasena',
+                        prefixIcon: const Icon(Icons.lock_outline),
+                        suffixIcon: IconButton(
+                          onPressed: () {
+                            setState(() {
+                              _obscurePassword = !_obscurePassword;
+                            });
+                          },
+                          icon: Icon(
+                            _obscurePassword
+                                ? Icons.visibility_outlined
+                                : Icons.visibility_off_outlined,
+                          ),
+                        ),
+                      ),
+                      validator: _validatePassword,
+                    ),
+                    const SizedBox(height: 18),
+                    ElevatedButton(
+                      onPressed: _isSubmitting ? null : _submit,
+                      child: _isSubmitting
+                          ? const SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2.2,
+                                color: Colors.white,
+                              ),
+                            )
+                          : const Text('Ingresar'),
+                    ),
+                  ],
+                ),
+              ),
+              if (canUseBiometricLogin) ...<Widget>[
                 const SizedBox(height: 8),
-                OutlinedButton.icon(
-                  onPressed: _isSubmitting ? null : _submitWithBiometrics,
-                  icon: const Icon(Icons.face_6_outlined),
-                  label: const Text('Ingresar con biometría'),
+                TextButton(
+                  onPressed: _isSubmitting
+                      ? null
+                      : () {
+                          setState(() {
+                            _showManualLogin = false;
+                          });
+                        },
+                  child: const Text('Volver a biometría'),
                 ),
               ],
-              const SizedBox(height: 8),
-              Text(
-                'Si no recuerdas tu clave, puedes recuperarla desde la web.',
-                textAlign: TextAlign.center,
-                style: Theme.of(
-                  context,
-                ).textTheme.bodySmall?.copyWith(color: AppTheme.mutedText),
-              ),
-              const SizedBox(height: 6),
-              TextButton(
-                onPressed: () =>
-                    _openWeb('https://circulo-dorado.org/recuperar-clave'),
-                child: const Text('Recuperar contrasena'),
-              ),
             ],
-          ),
+            const SizedBox(height: 8),
+            Text(
+              'Si no recuerdas tu clave, puedes recuperarla desde la web.',
+              textAlign: TextAlign.center,
+              style: Theme.of(
+                context,
+              ).textTheme.bodySmall?.copyWith(color: AppTheme.mutedText),
+            ),
+            const SizedBox(height: 6),
+            TextButton(
+              onPressed: () =>
+                  _openWeb('https://circulo-dorado.org/recuperar-clave'),
+              child: const Text('Recuperar contrasena'),
+            ),
+          ],
         ),
       ),
     );
@@ -302,10 +364,49 @@ class _LoginPageState extends State<LoginPage> {
   }
 
   Future<void> _submitWithBiometrics() async {
-    await _submitInternal(requireBiometric: true);
+    if (_isSubmitting) {
+      return;
+    }
+
+    FocusScope.of(context).unfocus();
+    context.read<SessionController>().clearError();
+
+    setState(() {
+      _isSubmitting = true;
+    });
+
+    final authenticated = await _biometricAuthenticator.authenticate();
+    if (!mounted) {
+      return;
+    }
+    if (!authenticated) {
+      setState(() {
+        _isSubmitting = false;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('No se pudo completar la autenticación biométrica.'),
+        ),
+      );
+      return;
+    }
+
+    final success = await context
+        .read<SessionController>()
+        .loginWithSavedCredentials();
+
+    if (!mounted) {
+      return;
+    }
+
+    setState(() {
+      _isSubmitting = false;
+    });
+
+    if (!success) return;
   }
 
-  Future<void> _submitInternal({bool requireBiometric = false}) async {
+  Future<void> _submitInternal() async {
     if (_isSubmitting) {
       return;
     }
@@ -320,24 +421,6 @@ class _LoginPageState extends State<LoginPage> {
     setState(() {
       _isSubmitting = true;
     });
-
-    if (requireBiometric) {
-      final authenticated = await _biometricAuthenticator.authenticate();
-      if (!mounted) {
-        return;
-      }
-      if (!authenticated) {
-        setState(() {
-          _isSubmitting = false;
-        });
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('No se pudo completar la autenticación biométrica.'),
-          ),
-        );
-        return;
-      }
-    }
 
     final success = await context.read<SessionController>().login(
       email: _emailController.text.trim(),

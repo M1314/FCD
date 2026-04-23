@@ -27,7 +27,7 @@ Comportamiento adaptativo:
 ### Sesión y autenticación
 
 - Login real contra backend (`POST /login`).
-- Opción de acceso con Face ID/biometría desde pantalla de login.
+- Login biométrico con credenciales guardadas tras el primer acceso manual.
 - Restauración de sesión con refresh token (`POST /refresh`).
 - Bootstrap de sesión al iniciar (`SessionController.bootstrap`).
 - Logout y limpieza de sesión persistida.

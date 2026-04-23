@@ -78,6 +78,27 @@ class SessionController extends ChangeNotifier {
     }
   }
 
+  Future<bool> loginWithSavedCredentials() async {
+    _errorMessage = null;
+    _status = SessionStatus.checking;
+    notifyListeners();
+
+    try {
+      final session = await _authRepository.loginWithSavedCredentials();
+      _applySession(session);
+      return true;
+    } catch (error) {
+      _status = SessionStatus.unauthenticated;
+      _errorMessage = error.toString();
+      notifyListeners();
+      return false;
+    }
+  }
+
+  Future<bool> hasSavedLoginCredentials() {
+    return _authRepository.hasSavedLoginCredentials();
+  }
+
   Future<void> logout() async {
     await _authRepository.logout();
     _user = null;

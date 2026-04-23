@@ -1,12 +1,27 @@
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+class SavedLoginCredentials {
+  const SavedLoginCredentials({required this.email, required this.password});
+
+  final String email;
+  final String password;
+}
+
 class AppStorage {
+  AppStorage({FlutterSecureStorage? secureStorage})
+    : _secureStorage = secureStorage ?? const FlutterSecureStorage();
+
   static const String accessTokenKey = 'access_token';
   static const String refreshTokenKey = 'refresh_token';
   static const String userIdKey = 'user_id';
   static const String userNameKey = 'user_name';
   static const String userEmailKey = 'user_email';
   static const String userTypeKey = 'user_type';
+  static const String loginEmailKey = 'login_email';
+  static const String loginPasswordKey = 'login_password';
+
+  final FlutterSecureStorage _secureStorage;
 
   Future<void> saveSession({
     required String accessToken,
@@ -68,5 +83,31 @@ class AppStorage {
     await prefs.remove(userNameKey);
     await prefs.remove(userEmailKey);
     await prefs.remove(userTypeKey);
+  }
+
+  Future<void> saveLoginCredentials({
+    required String email,
+    required String password,
+  }) async {
+    await _secureStorage.write(key: loginEmailKey, value: email);
+    await _secureStorage.write(key: loginPasswordKey, value: password);
+  }
+
+  Future<SavedLoginCredentials?> getSavedLoginCredentials() async {
+    final email = await _secureStorage.read(key: loginEmailKey);
+    final password = await _secureStorage.read(key: loginPasswordKey);
+
+    if (email == null ||
+        email.isEmpty ||
+        password == null ||
+        password.isEmpty) {
+      return null;
+    }
+
+    return SavedLoginCredentials(email: email, password: password);
+  }
+
+  Future<bool> hasSavedLoginCredentials() async {
+    return (await getSavedLoginCredentials()) != null;
   }
 }

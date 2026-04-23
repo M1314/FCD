@@ -43,9 +43,25 @@ class AuthRepository {
       refreshToken: refreshToken,
     );
 
+    await _storage.saveLoginCredentials(email: email, password: password);
     await _persistSession(session);
     _apiClient.setTokens(accessToken: accessToken, refreshToken: refreshToken);
     return session;
+  }
+
+  Future<bool> hasSavedLoginCredentials() {
+    return _storage.hasSavedLoginCredentials();
+  }
+
+  Future<AuthSession> loginWithSavedCredentials() async {
+    final credentials = await _storage.getSavedLoginCredentials();
+    if (credentials == null) {
+      throw const AppException(
+        'Inicia sesión con correo y contraseña para activar biometría.',
+      );
+    }
+
+    return login(email: credentials.email, password: credentials.password);
   }
 
   Future<AuthSession?> restoreSession() async {

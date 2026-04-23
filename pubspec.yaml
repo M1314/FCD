@@ -46,6 +46,7 @@ dependencies:
   url_launcher: ^6.3.2
   better_player_plus: ^1.0.8
   local_auth: ^3.0.1
+  flutter_secure_storage: ^8.1.0
 
 dev_dependencies:
   flutter_test:
