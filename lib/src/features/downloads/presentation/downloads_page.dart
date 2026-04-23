@@ -9,6 +9,21 @@ import 'package:intl/intl.dart';
 import 'package:open_filex/open_filex.dart';
 import 'package:provider/provider.dart';
 
+String downloadsGroupHeadingFor(DownloadedFile file) {
+  final course = file.courseName.trim();
+  final lesson = file.lessonName.trim();
+  if (course.isNotEmpty && lesson.isNotEmpty) {
+    return '$course · $lesson';
+  }
+  if (course.isNotEmpty) {
+    return course;
+  }
+  if (lesson.isNotEmpty) {
+    return lesson;
+  }
+  return 'Descargas';
+}
+
 class DownloadsPage extends StatefulWidget {
   const DownloadsPage({super.key});
 
@@ -40,6 +55,21 @@ class _DownloadsPageState extends State<DownloadsPage> {
 
     if (_files.isEmpty) {
       return _DownloadsEmpty(onRefresh: _load);
+    }
+
+    // Group downloads by course/lesson heading, preserving insertion order.
+    final grouped = <String, List<DownloadedFile>>{};
+    for (final file in _files) {
+      final heading = downloadsGroupHeadingFor(file);
+      (grouped[heading] ??= <DownloadedFile>[]).add(file);
+    }
+
+    final items = <_DownloadListItem>[];
+    for (final heading in grouped.keys) {
+      items.add(_DownloadHeadingItem(heading));
+      for (final file in grouped[heading]!) {
+        items.add(_DownloadEntryItem(file));
+      }
     }
 
     return Column(
@@ -86,15 +116,36 @@ class _DownloadsPageState extends State<DownloadsPage> {
         Expanded(
           child: RefreshIndicator(
             onRefresh: _load,
-            child: ListView.separated(
+            child: ListView.builder(
               physics: const AlwaysScrollableScrollPhysics(),
               padding: const EdgeInsets.fromLTRB(14, 10, 14, 20),
               itemBuilder: (context, index) {
-                final file = _files[index];
-                return _DownloadCard(file: file, onOpen: () => _open(file));
+                final item = items[index];
+                if (item is _DownloadHeadingItem) {
+                  return Padding(
+                    padding: EdgeInsets.only(
+                      top: index == 0 ? 0 : 16,
+                      bottom: 8,
+                    ),
+                    child: Text(
+                      item.title,
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        color: AppTheme.deepBrown,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  );
+                }
+                final entryItem = item as _DownloadEntryItem;
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 10),
+                  child: _DownloadCard(
+                    file: entryItem.file,
+                    onOpen: () => _open(entryItem.file),
+                  ),
+                );
               },
-              separatorBuilder: (context, index) => const SizedBox(height: 10),
-              itemCount: _files.length,
+              itemCount: items.length,
             ),
           ),
         ),
@@ -200,19 +251,6 @@ class _DownloadCard extends StatelessWidget {
                         fontWeight: FontWeight.w700,
                       ),
                     ),
-                    if (file.courseName.isNotEmpty || file.lessonName.isNotEmpty)
-                      Padding(
-                        padding: const EdgeInsets.only(top: 2),
-                        child: Text(
-                          _courseLessonLabel(file),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: AppTheme.deepBrown,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ),
                     const SizedBox(height: 3),
                     Text(
                       formatter.format(file.downloadedAt),
@@ -242,14 +280,20 @@ class _DownloadCard extends StatelessWidget {
     }
   }
 
-  String _courseLessonLabel(DownloadedFile file) {
-    final course = file.courseName.trim();
-    final lesson = file.lessonName.trim();
-    if (course.isNotEmpty && lesson.isNotEmpty) {
-      return '$course · $lesson';
-    }
-    return course.isNotEmpty ? course : lesson;
-  }
+}
+
+class _DownloadListItem {}
+
+class _DownloadHeadingItem extends _DownloadListItem {
+  _DownloadHeadingItem(this.title);
+
+  final String title;
+}
+
+class _DownloadEntryItem extends _DownloadListItem {
+  _DownloadEntryItem(this.file);
+
+  final DownloadedFile file;
 }
 
 class _DownloadsEmpty extends StatelessWidget {
