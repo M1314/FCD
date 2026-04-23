@@ -45,6 +45,19 @@ void main() {
     expect(course.lessonsCount, 2);
   });
 
+  test('Course.fromJson keeps explicit zero lesson count', () {
+    final course = Course.fromJson(<String, dynamic>{
+      'id': 10,
+      'name': 'Curso sin lecciones',
+      'total_lecciones_curso': 0,
+      'lecciones': <Map<String, dynamic>>[
+        <String, dynamic>{'idleccion': 1},
+      ],
+    });
+
+    expect(course.lessonsCount, 0);
+  });
+
   test(
     'categoryName falls back to mapped categoryId when category is empty',
     () {

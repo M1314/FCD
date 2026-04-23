@@ -96,7 +96,7 @@ class Course {
 }
 
 int _readLessonsCount(Map<String, dynamic> json) {
-  final count = readInt(json, const <String>[
+  const keys = <String>[
     'total_lecciones_curso',
     'total_lecciones',
     'intTotalLecciones',
@@ -105,9 +105,20 @@ int _readLessonsCount(Map<String, dynamic> json) {
     'intNumberOfLessons',
     'lessonsCount',
     'totalLessons',
-  ]);
-  if (count != 0) {
-    return count;
+  ];
+
+  final raw = readFirst(json, keys);
+  if (raw != null) {
+    if (raw is int) {
+      return raw;
+    }
+    if (raw is num) {
+      return raw.toInt();
+    }
+    if (raw is String) {
+      return int.tryParse(raw.trim()) ?? 0;
+    }
+    return 0;
   }
 
   final lessons = readFirst(json, const <String>['lecciones', 'lessons']);
@@ -115,5 +126,5 @@ int _readLessonsCount(Map<String, dynamic> json) {
     return lessons.length;
   }
 
-  return count;
+  return 0;
 }
