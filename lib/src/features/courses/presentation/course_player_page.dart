@@ -173,7 +173,11 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
     if (widget.lessons.isEmpty) {
       return 0;
     }
-    return _completedLessonIds.length / widget.lessons.length;
+    final raw = _completedLessonIds.length / widget.lessons.length;
+    if (!raw.isFinite) {
+      return 0;
+    }
+    return raw.clamp(0.0, 1.0).toDouble();
   }
 
   @override
@@ -563,8 +567,12 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
           if (!mounted || total <= 0) {
             return;
           }
+          final raw = received / total;
+          if (!raw.isFinite) {
+            return;
+          }
           setState(() {
-            _downloadProgress = received / total;
+            _downloadProgress = raw.clamp(0.0, 1.0).toDouble();
           });
         },
       );
