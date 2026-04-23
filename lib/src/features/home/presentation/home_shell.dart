@@ -25,8 +25,80 @@ class _HomeShellState extends State<HomeShell> {
     AccountPage(),
   ];
 
+  static const List<NavigationDestination> _bottomDestinations =
+      <NavigationDestination>[
+        NavigationDestination(
+          icon: Icon(Icons.menu_book_outlined),
+          selectedIcon: Icon(Icons.menu_book),
+          label: 'Mis Cursos',
+        ),
+        NavigationDestination(
+          icon: Icon(Icons.storefront_outlined),
+          selectedIcon: Icon(Icons.storefront),
+          label: 'Catálogo',
+        ),
+        NavigationDestination(
+          icon: Icon(Icons.auto_awesome_outlined),
+          selectedIcon: Icon(Icons.auto_awesome),
+          label: 'IA',
+        ),
+        NavigationDestination(
+          icon: Icon(Icons.bookmark_outline_rounded),
+          selectedIcon: Icon(Icons.bookmark_rounded),
+          label: 'Favoritos',
+        ),
+        NavigationDestination(
+          icon: Icon(Icons.download_outlined),
+          selectedIcon: Icon(Icons.download_rounded),
+          label: 'Descargas',
+        ),
+        NavigationDestination(
+          icon: Icon(Icons.person_outline_rounded),
+          selectedIcon: Icon(Icons.person_rounded),
+          label: 'Cuenta',
+        ),
+      ];
+
+  static const List<NavigationRailDestination> _railDestinations =
+      <NavigationRailDestination>[
+        NavigationRailDestination(
+          icon: Icon(Icons.menu_book_outlined),
+          selectedIcon: Icon(Icons.menu_book),
+          label: Text('Mis Cursos'),
+        ),
+        NavigationRailDestination(
+          icon: Icon(Icons.storefront_outlined),
+          selectedIcon: Icon(Icons.storefront),
+          label: Text('Catálogo'),
+        ),
+        NavigationRailDestination(
+          icon: Icon(Icons.auto_awesome_outlined),
+          selectedIcon: Icon(Icons.auto_awesome),
+          label: Text('IA'),
+        ),
+        NavigationRailDestination(
+          icon: Icon(Icons.bookmark_outline_rounded),
+          selectedIcon: Icon(Icons.bookmark_rounded),
+          label: Text('Favoritos'),
+        ),
+        NavigationRailDestination(
+          icon: Icon(Icons.download_outlined),
+          selectedIcon: Icon(Icons.download_rounded),
+          label: Text('Descargas'),
+        ),
+        NavigationRailDestination(
+          icon: Icon(Icons.person_outline_rounded),
+          selectedIcon: Icon(Icons.person_rounded),
+          label: Text('Cuenta'),
+        ),
+      ];
+
   @override
   Widget build(BuildContext context) {
+    final isTablet = MediaQuery.sizeOf(context).shortestSide >= 600;
+
+    final content = IndexedStack(index: _selectedIndex, children: _pages);
+
     return Scaffold(
       appBar: AppBar(
         title: Column(
@@ -49,60 +121,50 @@ class _HomeShellState extends State<HomeShell> {
           ],
         ),
       ),
-      body: SafeArea(
-        child: IndexedStack(index: _selectedIndex, children: _pages),
-      ),
-      bottomNavigationBar: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            colors: <Color>[Color(0xFFFFFCF7), Color(0xFFF5E8D5)],
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-          ),
-          border: Border(top: BorderSide(color: Color(0xFFE8DACA))),
-        ),
-        child: NavigationBar(
-          selectedIndex: _selectedIndex,
-          indicatorColor: const Color(0xFFE7C89C),
-          onDestinationSelected: (index) {
-            setState(() {
-              _selectedIndex = index;
-            });
-          },
-          destinations: const <NavigationDestination>[
-            NavigationDestination(
-              icon: Icon(Icons.menu_book_outlined),
-              selectedIcon: Icon(Icons.menu_book),
-              label: 'Mis Cursos',
+      body: isTablet
+          ? Row(
+              children: <Widget>[
+                SafeArea(
+                  child: NavigationRail(
+                    selectedIndex: _selectedIndex,
+                    labelType: NavigationRailLabelType.all,
+                    onDestinationSelected: (index) {
+                      setState(() {
+                        _selectedIndex = index;
+                      });
+                    },
+                    destinations: _railDestinations,
+                  ),
+                ),
+                const VerticalDivider(width: 1),
+                Expanded(
+                  child: SafeArea(left: false, child: content),
+                ),
+              ],
+            )
+          : SafeArea(child: content),
+      bottomNavigationBar: isTablet
+          ? null
+          : Container(
+              decoration: const BoxDecoration(
+                gradient: LinearGradient(
+                  colors: <Color>[Color(0xFFFFFCF7), Color(0xFFF5E8D5)],
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                ),
+                border: Border(top: BorderSide(color: Color(0xFFE8DACA))),
+              ),
+              child: NavigationBar(
+                selectedIndex: _selectedIndex,
+                indicatorColor: const Color(0xFFE7C89C),
+                onDestinationSelected: (index) {
+                  setState(() {
+                    _selectedIndex = index;
+                  });
+                },
+                destinations: _bottomDestinations,
+              ),
             ),
-            NavigationDestination(
-              icon: Icon(Icons.storefront_outlined),
-              selectedIcon: Icon(Icons.storefront),
-              label: 'Catálogo',
-            ),
-            NavigationDestination(
-              icon: Icon(Icons.auto_awesome_outlined),
-              selectedIcon: Icon(Icons.auto_awesome),
-              label: 'IA',
-            ),
-            NavigationDestination(
-              icon: Icon(Icons.bookmark_outline_rounded),
-              selectedIcon: Icon(Icons.bookmark_rounded),
-              label: 'Favoritos',
-            ),
-            NavigationDestination(
-              icon: Icon(Icons.download_outlined),
-              selectedIcon: Icon(Icons.download_rounded),
-              label: 'Descargas',
-            ),
-            NavigationDestination(
-              icon: Icon(Icons.person_outline_rounded),
-              selectedIcon: Icon(Icons.person_rounded),
-              label: 'Cuenta',
-            ),
-          ],
-        ),
-      ),
     );
   }
 
