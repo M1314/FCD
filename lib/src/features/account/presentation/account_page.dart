@@ -1,6 +1,7 @@
 import 'package:fcd_app/src/core/theme/app_theme.dart';
 import 'package:fcd_app/src/state/session_controller.dart';
 import 'package:flutter/material.dart';
+import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -121,7 +122,11 @@ class _AccountPageState extends State<AccountPage> {
           title: 'Portal web',
           children: <Widget>[
             _LinkRow(
-              icon: Icons.language_rounded,
+              icon: const Icon(
+                Icons.language_rounded,
+                size: 18,
+                color: AppTheme.deepBrown,
+              ),
               label: 'Ir a circulo-dorado.org',
               onTap: () => _openWeb('https://circulo-dorado.org'),
             ),
@@ -132,13 +137,21 @@ class _AccountPageState extends State<AccountPage> {
           title: 'Redes sociales',
           children: <Widget>[
             _LinkRow(
-              icon: Icons.facebook_rounded,
+              icon: const Icon(
+                Icons.facebook_rounded,
+                size: 18,
+                color: AppTheme.deepBrown,
+              ),
               label: 'Facebook',
               onTap: () =>
                   _openWeb('https://www.facebook.com/FraternidadDelCirculoDorado'),
             ),
             _LinkRow(
-              icon: Icons.camera_alt_rounded,
+              icon: const FaIcon(
+                FontAwesomeIcons.instagram,
+                size: 18,
+                color: AppTheme.deepBrown,
+              ),
               label: 'Instagram',
               onTap: () => _openWeb('https://www.instagram.com/fcd_oficial/'),
             ),
@@ -300,7 +313,7 @@ class _LinkRow extends StatelessWidget {
     required this.onTap,
   });
 
-  final IconData icon;
+  final Widget icon;
   final String label;
   final VoidCallback onTap;
 
@@ -311,9 +324,9 @@ class _LinkRow extends StatelessWidget {
       borderRadius: BorderRadius.circular(18),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
-        child: Row(
-          children: <Widget>[
-            Icon(icon, size: 18, color: AppTheme.deepBrown),
+          child: Row(
+            children: <Widget>[
+              icon,
             const SizedBox(width: 10),
             Text(label, style: Theme.of(context).textTheme.bodyMedium),
             const Spacer(),
