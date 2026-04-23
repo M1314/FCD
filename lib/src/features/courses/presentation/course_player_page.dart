@@ -177,7 +177,7 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
     if (!raw.isFinite) {
       return 0;
     }
-    return raw.clamp(0.0, 1.0).toDouble();
+    return raw.clamp(0.0, 1.0);
   }
 
   @override
@@ -572,7 +572,7 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
             return;
           }
           setState(() {
-            _downloadProgress = raw.clamp(0.0, 1.0).toDouble();
+            _downloadProgress = raw.clamp(0.0, 1.0);
           });
         },
       );
