@@ -138,12 +138,12 @@ class _AccountPageState extends State<AccountPage> {
                   _openWeb('https://www.facebook.com/FraternidadDelCirculoDorado'),
             ),
             _LinkRow(
-              icon: Icons.camera_alt_rounded,
+              icon: Icons.photo_camera_rounded,
               label: 'Instagram',
               onTap: () => _openWeb('https://www.instagram.com/fratercirculo_dorado'),
             ),
             _LinkRow(
-              icon: Icons.play_circle_fill_rounded,
+              icon: Icons.music_note_rounded,
               label: 'TikTok',
               onTap: () =>
                   _openWeb('https://www.tiktok.com/@fraternidadcirculodorado'),
