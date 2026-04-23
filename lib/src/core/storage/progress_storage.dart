@@ -11,11 +11,13 @@ class ProgressStorage {
     required int courseId,
     required int lessonIndex,
     required int resourceIndex,
+    int mediaPositionMs = 0,
   }) async {
     final prefs = await SharedPreferences.getInstance();
     final data = jsonEncode(<String, int>{
       'lessonIndex': lessonIndex,
       'resourceIndex': resourceIndex,
+      'mediaPositionMs': mediaPositionMs,
     });
     await prefs.setString('$_prefix$courseId', data);
   }
@@ -29,8 +31,9 @@ class ProgressStorage {
     try {
       final map = jsonDecode(raw) as Map<String, dynamic>;
       return CourseProgress(
-        lessonIndex: (map['lessonIndex'] as int?) ?? 0,
-        resourceIndex: (map['resourceIndex'] as int?) ?? 0,
+        lessonIndex: _readInt(map['lessonIndex']),
+        resourceIndex: _readInt(map['resourceIndex']),
+        mediaPositionMs: _readInt(map['mediaPositionMs']),
       );
     } catch (_) {
       return null;
@@ -44,8 +47,24 @@ class ProgressStorage {
 }
 
 class CourseProgress {
-  const CourseProgress({required this.lessonIndex, required this.resourceIndex});
+  const CourseProgress({
+    required this.lessonIndex,
+    required this.resourceIndex,
+    required this.mediaPositionMs,
+  });
 
   final int lessonIndex;
   final int resourceIndex;
+  final int mediaPositionMs;
+}
+
+int _readInt(dynamic value) {
+  // JSON numeric values can be returned as int or double depending on parser.
+  if (value is int) {
+    return value;
+  }
+  if (value is double) {
+    return value.toInt();
+  }
+  return 0;
 }
