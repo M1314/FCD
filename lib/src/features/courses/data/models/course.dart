@@ -127,7 +127,7 @@ int _readLessonsCount(Map<String, dynamic> json) {
   return inferred ?? 0;
 }
 
-const List<String> lessonCountTokens = <String>[
+const List<String> _lessonCountTokens = <String>[
   'total',
   'cantidad',
   'numero',
@@ -156,6 +156,7 @@ int? _parseLessonCountValue(dynamic raw) {
       return parsed;
     }
     if (trimmed.startsWith('[')) {
+      // Some API responses return a JSON-encoded list string for lessons.
       final decoded = decodeJsonArray(trimmed);
       if (decoded.isNotEmpty) {
         return decoded.length;
@@ -183,7 +184,7 @@ int? _inferLessonCount(Map<String, dynamic> json) {
       continue;
     }
 
-    final priority = _priorityForKey(lower, lessonCountTokens);
+    final priority = _priorityForKey(lower, _lessonCountTokens);
     if (priority != null) {
       final currentPriority = preferredPriority;
       if (currentPriority == null || priority < currentPriority) {
@@ -218,13 +219,14 @@ bool _isIdLikeKey(String key) {
     return true;
   }
   if (key.startsWith('id')) {
+    // Treat id-prefixed keys with count tokens as counts, not identifiers.
     return !_containsLessonCountToken(key);
   }
   return false;
 }
 
 bool _containsLessonCountToken(String key) {
-  for (final token in lessonCountTokens) {
+  for (final token in _lessonCountTokens) {
     if (key.contains(token)) {
       return true;
     }
