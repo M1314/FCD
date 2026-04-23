@@ -95,7 +95,6 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.paused) {
       _saveProgress();
-      _videoController?.pause();
     }
   }
 
@@ -1011,6 +1010,7 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
         autoPlay: false,
         fit: BoxFit.contain,
         allowedScreenSleep: false,
+        handleLifecycle: false,
         autoDispose: false,
         controlsConfiguration: BetterPlayerControlsConfiguration(
           enableSkips: true,
