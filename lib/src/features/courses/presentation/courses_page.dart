@@ -87,9 +87,9 @@ class _CoursesPageState extends State<CoursesPage> {
 
     if (_courses.isEmpty) {
       return _CoursesMessageView(
-        title: 'Aun no tienes cursos activos',
+        title: 'Aún no tienes cursos activos',
         message:
-            'Cuando adquieras un curso en circulo-dorado.org aparecera aqui.',
+            'Cuando adquieras un curso en círculo-dorado.org aparecerá aquí.',
         actionLabel: 'Actualizar',
         onAction: _loadCourses,
       );
@@ -215,7 +215,7 @@ class _CoursesPageState extends State<CoursesPage> {
     if (user == null) {
       setState(() {
         _loading = false;
-        _error = 'Sesion no valida. Vuelve a iniciar sesion.';
+        _error = 'Sesión no válida. Vuelve a iniciar sesión.';
       });
       return;
     }
@@ -266,7 +266,7 @@ class _CoursesPageState extends State<CoursesPage> {
       if (lessons.isEmpty) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Este curso aun no tiene lecciones disponibles.'),
+            content: Text('Este curso aún no tiene lecciones disponibles.'),
           ),
         );
         return;
@@ -364,7 +364,7 @@ class _CourseCard extends StatelessWidget {
               const SizedBox(height: 10),
               Text(
                 course.description.isEmpty
-                    ? 'Continua tu ruta de estudio en la app.'
+                    ? 'Continúa tu ruta de estudio en la app.'
                     : course.description,
                 maxLines: 3,
                 overflow: TextOverflow.ellipsis,
