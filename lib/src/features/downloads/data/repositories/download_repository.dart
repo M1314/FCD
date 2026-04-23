@@ -80,7 +80,7 @@ class DownloadRepository {
     return files;
   }
 
-  Future<int> removeMissingDownloads() async {
+  Future<DownloadCleanupResult> removeMissingDownloads() async {
     final files = await getDownloads();
     final existing = <DownloadedFile>[];
     for (final file in files) {
@@ -94,7 +94,7 @@ class DownloadRepository {
     if (removed > 0) {
       await _setHistory(existing);
     }
-    return removed;
+    return DownloadCleanupResult(removed: removed, files: existing);
   }
 
   Future<void> clearHistory() async {
@@ -165,4 +165,11 @@ class DownloadRepository {
     }
     return '$withTime.$extension';
   }
+}
+
+class DownloadCleanupResult {
+  const DownloadCleanupResult({required this.removed, required this.files});
+
+  final int removed;
+  final List<DownloadedFile> files;
 }

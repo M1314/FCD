@@ -108,17 +108,16 @@ class _DownloadsPageState extends State<DownloadsPage> {
       _info = null;
     });
 
-    final removed = await _downloadRepository.removeMissingDownloads();
-    final files = await _downloadRepository.getDownloads();
+    final cleanupResult = await _downloadRepository.removeMissingDownloads();
     if (!mounted) {
       return;
     }
 
     setState(() {
-      _files = files;
+      _files = cleanupResult.files;
       _loading = false;
-      _info = removed > 0
-          ? 'Se limpiaron $removed archivo(s) inexistente(s) del historial.'
+      _info = cleanupResult.removed > 0
+          ? 'Se limpiaron ${cleanupResult.removed} archivo(s) inexistente(s) del historial.'
           : null;
     });
   }
