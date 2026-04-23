@@ -137,6 +137,11 @@ class _AccountPageState extends State<AccountPage> {
               onTap: () =>
                   _openWeb('https://www.facebook.com/FraternidadDelCirculoDorado'),
             ),
+            _LinkRow(
+              icon: Icons.photo_camera_rounded,
+              label: 'Instagram',
+              onTap: () => _openWeb('https://www.instagram.com/fcd_oficial/'),
+            ),
           ],
         ),
         const SizedBox(height: 28),
