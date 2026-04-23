@@ -30,11 +30,18 @@ class _HomeShellState extends State<HomeShell> {
     return Scaffold(
       appBar: AppBar(
         title: Column(
+          mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
-            Text(_titleForIndex(_selectedIndex)),
+            Text(
+              _titleForIndex(_selectedIndex),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
             Text(
               _subtitleForIndex(_selectedIndex),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
                 color: Theme.of(context).colorScheme.onSurfaceVariant,
               ),
