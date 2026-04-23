@@ -136,6 +136,12 @@ const List<String> _lessonCountTokens = <String>[
   'num',
 ];
 
+const List<String> _lessonIdTokens = <String>[
+  'idleccion',
+  'lesson_id',
+  'idlesson',
+];
+
 int? _parseLessonCountValue(dynamic raw) {
   if (raw == null) {
     return null;
@@ -158,9 +164,7 @@ int? _parseLessonCountValue(dynamic raw) {
     if (trimmed.startsWith('[')) {
       // Some API responses return a JSON-encoded list string for lessons.
       final decoded = decodeJsonArray(trimmed);
-      if (decoded.isNotEmpty) {
-        return decoded.length;
-      }
+      return decoded.length;
     }
   }
   return null;
@@ -212,7 +216,7 @@ int? _priorityForKey(String key, List<String> tokens) {
 }
 
 bool _isIdLikeKey(String key) {
-  if (key == 'idleccion' || key == 'lesson_id' || key == 'idlesson') {
+  if (_lessonIdTokens.contains(key)) {
     return true;
   }
   if (key.endsWith('_id') || key.startsWith('id_')) {
