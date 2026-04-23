@@ -220,6 +220,9 @@ class _BackgroundDownloadBanner extends StatelessWidget {
     required this.resourceName,
   });
 
+  static const Color _bannerColor = Color(0xFFFFF5E8);
+  static const Color _bannerBorderColor = Color(0xFFE8DACA);
+
   final double progress;
   final String resourceName;
 
@@ -227,14 +230,14 @@ class _BackgroundDownloadBanner extends StatelessWidget {
   Widget build(BuildContext context) {
     final percent = (progress.clamp(0.0, 1.0) * 100).toStringAsFixed(0);
     return Material(
-      color: const Color(0xFFFFF5E8),
+      color: _bannerColor,
       child: SafeArea(
         bottom: false,
         child: Container(
           width: double.infinity,
           padding: const EdgeInsets.fromLTRB(14, 8, 14, 10),
           decoration: const BoxDecoration(
-            border: Border(bottom: BorderSide(color: Color(0xFFE8DACA))),
+            border: Border(bottom: BorderSide(color: _bannerBorderColor)),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,

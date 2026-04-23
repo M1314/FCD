@@ -61,10 +61,10 @@ class _FavoritesPageState extends State<FavoritesPage> {
         return;
       }
 
-      final cachedCourses = await _favoritesCacheStorage.read(user.id);
+      final coursesFromCache = await _favoritesCacheStorage.read(user.id);
       final cachedEntries = _buildEntries(
         favoriteIds: favoriteIds,
-        courses: cachedCourses,
+        courses: coursesFromCache,
       );
 
       if (!mounted) {
@@ -104,31 +104,29 @@ class _FavoritesPageState extends State<FavoritesPage> {
         }),
       );
 
-      final syncedCourses = <CachedFavoriteCourse>[];
+      final apiCourses = <CachedFavoriteCourse>[];
       var failedCount = 0;
       for (final result in results) {
         if (result.failed) {
           failedCount++;
           continue;
         }
-        syncedCourses.add(
+        apiCourses.add(
           CachedFavoriteCourse(course: result.course, lessons: result.lessons),
         );
       }
 
-      if (syncedCourses.isNotEmpty) {
-        await _favoritesCacheStorage.save(user.id, syncedCourses);
+      if (apiCourses.isNotEmpty) {
+        await _favoritesCacheStorage.save(user.id, apiCourses);
       }
 
-      final sourceCourses = syncedCourses.isNotEmpty
-          ? syncedCourses
-          : cachedCourses;
+      final sourceCourses = apiCourses.isNotEmpty ? apiCourses : coursesFromCache;
       final entries = _buildEntries(
         favoriteIds: favoriteIds,
         courses: sourceCourses,
       );
-      final usingCacheFallback =
-          syncedCourses.isEmpty && cachedEntries.isNotEmpty;
+      final shouldShowCacheFallbackNotice =
+          apiCourses.isEmpty && cachedEntries.isNotEmpty;
 
       if (!mounted) return;
       setState(() {
@@ -138,8 +136,8 @@ class _FavoritesPageState extends State<FavoritesPage> {
         _error = entries.isEmpty && failedCount == courses.length
             ? 'No se pudieron cargar tus cursos favoritos. Intenta nuevamente.'
             : null;
-        _notice = usingCacheFallback
-            ? 'Mostrando copia local mientras se restablece la conexion.'
+        _notice = shouldShowCacheFallbackNotice
+            ? 'Mostrando copia local mientras se restablece la conexión.'
             : failedCount > 0
             ? 'No se pudieron cargar $failedCount curso(s). Intenta actualizar.'
             : null;
@@ -151,7 +149,7 @@ class _FavoritesPageState extends State<FavoritesPage> {
         _isRefreshing = false;
         if (_favorites.isNotEmpty) {
           _notice =
-              'Mostrando copia local. Revisa tu conexion e intenta actualizar.';
+              'Mostrando copia local. Revisa tu conexión e intenta actualizar.';
         } else {
           _error = userMessageFromError(
             e,
