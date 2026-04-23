@@ -163,6 +163,7 @@ int? _parseLessonCountValue(dynamic raw) {
     }
     if (trimmed.startsWith('[')) {
       // Some API responses return a JSON-encoded list string for lessons.
+      // decodeJsonArray (from json_utils.dart) safely handles malformed JSON.
       try {
         final decoded = decodeJsonArray(trimmed);
         return decoded.length;
@@ -249,5 +250,6 @@ bool _startsWithIdPrefix(String key) {
     return false;
   }
   final third = key[2];
-  return third.compareTo('0') >= 0 && third.compareTo('9') <= 0;
+  final code = third.codeUnitAt(0);
+  return code >= '0'.codeUnitAt(0) && code <= '9'.codeUnitAt(0);
 }
