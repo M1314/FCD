@@ -719,13 +719,15 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
       }
     }
     _savedMediaPositionMs = mediaPositionMs;
+    // Best-effort fallback for exits where we cannot await async work (dispose).
+    // Primary path is the awaited save when user leaves via back navigation.
     unawaited(
       _progressStorage.saveProgress(
         courseId: widget.course.id,
         lessonIndex: _lessonIndex,
         resourceIndex: _resourceIndex,
         mediaPositionMs: mediaPositionMs,
-      ),
+      ).catchError((_) {}),
     );
   }
 
