@@ -138,7 +138,7 @@ class _AccountPageState extends State<AccountPage> {
                   _openWeb('https://www.facebook.com/FraternidadDelCirculoDorado'),
             ),
             _LinkRow(
-              icon: Icons.photo_camera_rounded,
+              icon: Icons.camera_alt_rounded,
               label: 'Instagram',
               onTap: () => _openWeb('https://www.instagram.com/fcd_oficial/'),
             ),
