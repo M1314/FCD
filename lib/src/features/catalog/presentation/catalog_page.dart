@@ -127,12 +127,21 @@ class _CatalogPageState extends State<CatalogPage> {
           return MapEntry(course.id, lessons.length);
         } catch (error, stackTrace) {
           FlutterError.reportError(
-            FlutterErrorDetails(exception: error, stack: stackTrace),
+            FlutterErrorDetails(
+              exception: error,
+              stack: stackTrace,
+              context: ErrorDescription(
+                'Fetching lesson counts for course ${course.id}',
+              ),
+            ),
           );
           return MapEntry(course.id, course.lessonsCount);
         }
       }));
       counts.addEntries(results);
+      if (i + _lessonCountBatchSize < courses.length) {
+        await Future.delayed(const Duration(milliseconds: 120));
+      }
     }
     return counts;
   }
