@@ -15,6 +15,9 @@ class CatalogPage extends StatefulWidget {
 }
 
 class _CatalogPageState extends State<CatalogPage> {
+  /// Keep concurrent lesson-count requests small to avoid API overload.
+  static const int _lessonCountBatchSize = 6;
+
   bool _loading = true;
   String? _error;
   List<Course> _allCourses = <Course>[];
@@ -113,17 +116,19 @@ class _CatalogPageState extends State<CatalogPage> {
     SessionController session,
     List<Course> courses,
   ) async {
-    const batchSize = 6;
     final counts = <int, int>{};
-    for (var i = 0; i < courses.length; i += batchSize) {
-      final batch = courses.skip(i).take(batchSize);
+    for (var i = 0; i < courses.length; i += _lessonCountBatchSize) {
+      final batch = courses.skip(i).take(_lessonCountBatchSize);
       final results = await Future.wait(batch.map((course) async {
         try {
           final lessons = await session.courseRepository.getAllLessonsByCourse(
             courseId: course.id,
           );
           return MapEntry(course.id, lessons.length);
-        } catch (_) {
+        } catch (error, stackTrace) {
+          FlutterError.reportError(
+            FlutterErrorDetails(exception: error, stack: stackTrace),
+          );
           return MapEntry(course.id, course.lessonsCount);
         }
       }));
