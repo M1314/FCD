@@ -200,6 +200,19 @@ class _DownloadCard extends StatelessWidget {
                         fontWeight: FontWeight.w700,
                       ),
                     ),
+                    if (file.courseName.isNotEmpty || file.lessonName.isNotEmpty)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 2),
+                        child: Text(
+                          _courseLessonLabel(file),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            color: AppTheme.deepBrown,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
                     const SizedBox(height: 3),
                     Text(
                       formatter.format(file.downloadedAt),
@@ -227,6 +240,15 @@ class _DownloadCard extends StatelessWidget {
       default:
         return Icons.description_rounded;
     }
+  }
+
+  String _courseLessonLabel(DownloadedFile file) {
+    final course = file.courseName.trim();
+    final lesson = file.lessonName.trim();
+    if (course.isNotEmpty && lesson.isNotEmpty) {
+      return '$course · $lesson';
+    }
+    return course.isNotEmpty ? course : lesson;
   }
 }
 
