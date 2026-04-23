@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:better_player_plus/better_player_plus.dart';
 import 'package:dio/dio.dart';
 import 'package:fcd_app/src/core/config/api_config.dart';
@@ -41,6 +43,9 @@ class CoursePlayerPage extends StatefulWidget {
 
 class _CoursePlayerPageState extends State<CoursePlayerPage>
     with WidgetsBindingObserver {
+  // Delay needed so Better Player is ready to accept seek operations.
+  static const Duration _videoRestoreDelay = Duration(milliseconds: 350);
+
   late final DownloadRepository _downloadRepository;
   final ProgressStorage _progressStorage = ProgressStorage();
   final FavoritesStorage _favoritesStorage = FavoritesStorage();
@@ -52,6 +57,9 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
   double _downloadProgress = 0;
   bool _isCompleted = false;
   bool _isCurrentFavorite = false;
+  int _savedMediaPositionMs = 0;
+  int _resourcePreparationRequestId = 0;
+  String? _activeMediaResourceKey;
 
   BetterPlayerController? _videoController;
   AudioPlayer? _audioPlayer;
@@ -75,6 +83,7 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _saveProgressOnDispose();
     _videoController?.dispose();
     _audioPlayer?.dispose();
     _downloadCancelToken?.cancel();
@@ -84,6 +93,7 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.paused) {
+      _saveProgress();
       _videoController?.pause();
       _audioPlayer?.pause();
     }
@@ -132,16 +142,19 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
           _resourceIndex = resources.isEmpty
               ? 0
               : saved.resourceIndex.clamp(0, resources.length - 1);
+          _savedMediaPositionMs = saved.mediaPositionMs;
         } else {
           final firstPending = widget.lessons.indexWhere(
             (lesson) => !_completedLessonIds.contains(lesson.id),
           );
           _lessonIndex = firstPending == -1 ? 0 : firstPending;
           _resourceIndex = 0;
+          _savedMediaPositionMs = 0;
         }
       } else {
         _lessonIndex = 0;
         _resourceIndex = 0;
+        _savedMediaPositionMs = 0;
       }
 
       _isCompleted = _completedLessonIds.contains(currentLesson.id);
@@ -157,14 +170,27 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
 
   List<LessonResource> get currentResources => currentLesson.resources;
 
-  LessonResource? get currentResource {
+  int? _clampedResourceIndexOrNull() {
     if (currentResources.isEmpty) {
       return null;
     }
-    return currentResources[_resourceIndex.clamp(
-      0,
-      currentResources.length - 1,
-    )];
+    return _resourceIndex.clamp(0, currentResources.length - 1);
+  }
+
+  LessonResource? get currentResource {
+    final clampedResourceIndex = _clampedResourceIndexOrNull();
+    if (clampedResourceIndex == null) {
+      return null;
+    }
+    return currentResources[clampedResourceIndex];
+  }
+
+  String? get _currentMediaResourceKey {
+    final clampedResourceIndex = _clampedResourceIndexOrNull();
+    if (clampedResourceIndex == null) {
+      return null;
+    }
+    return '$_lessonIndex:$clampedResourceIndex';
   }
 
   bool get _hasPreviousLesson => _lessonIndex > 0;
@@ -218,7 +244,13 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
       child: Row(
         children: <Widget>[
           IconButton(
-            onPressed: () => Navigator.of(context).pop(),
+            onPressed: () async {
+              await _saveProgress();
+              if (!context.mounted) {
+                return;
+              }
+              Navigator.of(context).pop();
+            },
             icon: const Icon(Icons.arrow_back_rounded),
           ),
           Expanded(
@@ -471,6 +503,7 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
                   setState(() {
                     _resourceIndex = index;
                   });
+                  _savedMediaPositionMs = 0;
                   await _saveProgress();
                   await _prepareCurrentResource();
                   if (mounted) {
@@ -707,6 +740,7 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
       _isCompleted = _completedLessonIds.contains(currentLesson.id);
       _isCurrentFavorite = _favoriteIds.contains(currentLesson.id);
     });
+    _savedMediaPositionMs = 0;
 
     await _saveProgress();
     await _prepareCurrentResource();
@@ -717,12 +751,70 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
 
   Future<void> _saveProgress() async {
     try {
+      final mediaPositionMs = await _readCurrentMediaPositionMs();
+      _savedMediaPositionMs = mediaPositionMs;
       await _progressStorage.saveProgress(
         courseId: widget.course.id,
         lessonIndex: _lessonIndex,
         resourceIndex: _resourceIndex,
+        mediaPositionMs: mediaPositionMs,
       );
     } catch (_) {}
+  }
+
+  void _saveProgressOnDispose() {
+    var mediaPositionMs = _savedMediaPositionMs;
+    if (_currentMediaResourceKey == _activeMediaResourceKey) {
+      final resource = currentResource;
+      if (resource != null) {
+        if (resource.isAudio && _audioPlayer != null) {
+          mediaPositionMs = _audioPlayer!.position.inMilliseconds;
+        } else if (resource.isVideo && _videoController != null) {
+          final controller = _videoController!.videoPlayerController;
+          if (controller != null) {
+            mediaPositionMs = controller.value.position.inMilliseconds;
+          }
+        }
+      }
+    }
+    _savedMediaPositionMs = mediaPositionMs;
+    // Best-effort fallback for exits where we cannot await async work (dispose).
+    // Primary path is the awaited save when user leaves via back navigation.
+    unawaited(
+      _progressStorage.saveProgress(
+        courseId: widget.course.id,
+        lessonIndex: _lessonIndex,
+        resourceIndex: _resourceIndex,
+        mediaPositionMs: mediaPositionMs,
+      ).catchError((_) {}),
+    );
+  }
+
+  Future<int> _readCurrentMediaPositionMs() async {
+    final resource = currentResource;
+    if (resource == null) {
+      return 0;
+    }
+    // Only persist position when the currently selected resource is the same
+    // resource that actually owns the active player instance.
+    if (_currentMediaResourceKey != _activeMediaResourceKey) {
+      return 0;
+    }
+
+    if (resource.isAudio && _audioPlayer != null) {
+      return _audioPlayer!.position.inMilliseconds;
+    }
+
+    if (resource.isVideo && _videoController != null) {
+      final controller = _videoController!.videoPlayerController;
+      if (controller == null) {
+        return 0;
+      }
+      final position = await controller.position;
+      return position?.inMilliseconds ?? 0;
+    }
+
+    return 0;
   }
 
   Future<void> _toggleFavorite() async {
@@ -783,17 +875,23 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
   }
 
   Future<void> _prepareCurrentResource() async {
+    final requestId = ++_resourcePreparationRequestId;
     final previousVideoController = _videoController;
     final previousAudioPlayer = _audioPlayer;
 
     _videoController = null;
     _audioPlayer = null;
     _webViewController = null;
+    _activeMediaResourceKey = null;
 
     previousVideoController?.dispose();
     if (previousAudioPlayer != null) {
       await previousAudioPlayer.stop();
       await previousAudioPlayer.dispose();
+    }
+
+    if (!mounted || requestId != _resourcePreparationRequestId) {
+      return;
     }
 
     final resource = currentResource;
@@ -802,18 +900,57 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
     }
 
     if (resource.isVideo) {
-      _setupVideo(resource.url);
+      final videoController = _buildVideoController(
+        resource.url,
+        requestId: requestId,
+      );
+      if (!mounted || requestId != _resourcePreparationRequestId) {
+        videoController.dispose();
+        return;
+      }
+      _videoController = videoController;
+      _activeMediaResourceKey = _currentMediaResourceKey;
       return;
     }
     if (resource.isAudio) {
-      await _setupAudio(resource.url);
+      final audioPlayer = AudioPlayer();
+      await audioPlayer.setUrl(resource.url);
+      if (!mounted || requestId != _resourcePreparationRequestId) {
+        await audioPlayer.dispose();
+        return;
+      }
+      _audioPlayer = audioPlayer;
+      _activeMediaResourceKey = _currentMediaResourceKey;
+      if (_savedMediaPositionMs > 0) {
+        try {
+          await audioPlayer.seek(Duration(milliseconds: _savedMediaPositionMs));
+        } catch (_) {
+          if (requestId == _resourcePreparationRequestId) {
+            rethrow;
+          }
+          // The request became stale while seeking; cleanup is handled below.
+        }
+      }
+      if (mounted && requestId == _resourcePreparationRequestId) {
+        return;
+      }
+      if (_audioPlayer == audioPlayer) {
+        _audioPlayer = null;
+      }
+      _activeMediaResourceKey = null;
+      await audioPlayer.stop();
+      await audioPlayer.dispose();
       return;
     }
 
     _setupDocument(resource.url);
   }
 
-  void _setupVideo(String url) {
+  BetterPlayerController _buildVideoController(
+    String url, {
+    required int requestId,
+  }) {
+    final restorePositionMs = _savedMediaPositionMs;
     final dataSource = BetterPlayerDataSource(
       BetterPlayerDataSourceType.network,
       url,
@@ -832,7 +969,7 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
       ),
     );
 
-    _videoController = BetterPlayerController(
+    final videoController = BetterPlayerController(
       const BetterPlayerConfiguration(
         autoPlay: false,
         fit: BoxFit.contain,
@@ -849,12 +986,19 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
       ),
       betterPlayerDataSource: dataSource,
     );
-  }
 
-  Future<void> _setupAudio(String url) async {
-    final player = AudioPlayer();
-    await player.setUrl(url);
-    _audioPlayer = player;
+    if (restorePositionMs > 0) {
+      // Better Player may ignore immediate seeks until the first frame is ready.
+      Future<void>.delayed(_videoRestoreDelay, () {
+        if (!mounted ||
+            requestId != _resourcePreparationRequestId ||
+            _videoController != videoController) {
+          return;
+        }
+        videoController.seekTo(Duration(milliseconds: restorePositionMs));
+      });
+    }
+    return videoController;
   }
 
   void _setupDocument(String url) {
@@ -958,6 +1102,8 @@ class _AudioWidget extends StatefulWidget {
 }
 
 class _AudioWidgetState extends State<_AudioWidget> {
+  double? _dragValueMs;
+
   @override
   Widget build(BuildContext context) {
     return StreamBuilder<PlayerState>(
@@ -1007,31 +1153,47 @@ class _AudioWidgetState extends State<_AudioWidget> {
               builder: (context, positionSnapshot) {
                 final position = positionSnapshot.data ?? Duration.zero;
                 final total = widget.player.duration ?? Duration.zero;
+                final canSeek = total.inMilliseconds > 0;
                 final max = total.inMilliseconds <= 0
                     ? 1.0
                     : total.inMilliseconds.toDouble();
-                final value = position.inMilliseconds
+                final liveValue = position.inMilliseconds
                     .clamp(0, max.toInt())
                     .toDouble();
+                final sliderValue = (_dragValueMs ?? liveValue).clamp(0.0, max);
+                final displayPosition = _dragValueMs == null
+                    ? position
+                    : Duration(milliseconds: sliderValue.round());
 
                 return Column(
                   children: <Widget>[
                     Slider(
-                      value: value,
+                      value: sliderValue,
                       max: max,
-                      onChanged: total.inMilliseconds <= 0
-                          ? null
-                          : (newValue) {
-                              widget.player.seek(
+                      onChangeStart: canSeek
+                          ? (newValue) {
+                              setState(() => _dragValueMs = newValue);
+                            }
+                          : null,
+                      onChanged: canSeek
+                          ? (newValue) {
+                              setState(() => _dragValueMs = newValue);
+                            }
+                          : null,
+                      onChangeEnd: canSeek
+                          ? (newValue) async {
+                              setState(() => _dragValueMs = null);
+                              await widget.player.seek(
                                 Duration(milliseconds: newValue.round()),
                               );
-                            },
+                            }
+                          : null,
                     ),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: <Widget>[
                         Text(
-                          _formatDuration(position),
+                          _formatDuration(displayPosition),
                           style: Theme.of(context).textTheme.bodySmall,
                         ),
                         Text(
