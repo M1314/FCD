@@ -25,7 +25,14 @@ class DownloadRepository {
     LessonResource resource, {
     required ProgressCallback onProgress,
     CancelToken? cancelToken,
+    void Function()? onAlreadyDownloaded,
   }) async {
+    final existingFile = await getExistingDownloadedFile(resource);
+    if (existingFile != null) {
+      onAlreadyDownloaded?.call();
+      return existingFile;
+    }
+
     final baseDir = await getBaseDirectory();
     final folder = Directory('${baseDir.path}/downloads');
     if (!await folder.exists()) {
@@ -49,7 +56,7 @@ class DownloadRepository {
 
     await _saveToHistory(
       DownloadedFile(
-        id: '${resource.type.name}:${resource.url.hashCode}',
+        id: _resourceId(resource),
         url: resource.url,
         name: resource.name,
         type: resource.type.name,
@@ -61,21 +68,25 @@ class DownloadRepository {
     return file;
   }
 
+  Future<File?> getExistingDownloadedFile(LessonResource resource) async {
+    final downloads = await getDownloads();
+    for (final existing in downloads) {
+      if (!_matchesResource(existing, resource)) {
+        continue;
+      }
+
+      final file = File(existing.localPath);
+      if (!await file.exists()) {
+        await _removeResourceFromHistory(resource);
+        return null;
+      }
+      return file;
+    }
+    return null;
+  }
+
   Future<List<DownloadedFile>> getDownloads() async {
-    final prefs = await SharedPreferences.getInstance();
-    final rawList = prefs.getStringList(_downloadHistoryKey) ?? <String>[];
-
-    final files = rawList
-        .map((entry) {
-          try {
-            return DownloadedFile.fromRawJson(entry);
-          } catch (_) {
-            return null;
-          }
-        })
-        .whereType<DownloadedFile>()
-        .toList();
-
+    final files = await _readHistory();
     files.sort((a, b) => b.downloadedAt.compareTo(a.downloadedAt));
     return files;
   }
@@ -103,21 +114,8 @@ class DownloadRepository {
   }
 
   Future<void> _saveToHistory(DownloadedFile file) async {
-    final prefs = await SharedPreferences.getInstance();
-    final current = prefs.getStringList(_downloadHistoryKey) ?? <String>[];
-
-    final parsed = current
-        .map((entry) {
-          try {
-            return DownloadedFile.fromRawJson(entry);
-          } catch (_) {
-            return null;
-          }
-        })
-        .whereType<DownloadedFile>()
-        .toList();
-
-    parsed.removeWhere((entry) => entry.id == file.id);
+    final parsed = await _readHistory();
+    parsed.removeWhere((entry) => _isSameResourceEntry(entry, file));
     parsed.insert(0, file);
 
     await _setHistory(parsed);
@@ -129,6 +127,47 @@ class DownloadRepository {
       _downloadHistoryKey,
       files.map((entry) => entry.toRawJson()).toList(),
     );
+  }
+
+  Future<List<DownloadedFile>> _readHistory() async {
+    final prefs = await SharedPreferences.getInstance();
+    final rawList = prefs.getStringList(_downloadHistoryKey) ?? <String>[];
+    return rawList
+        .map((entry) {
+          try {
+            return DownloadedFile.fromRawJson(entry);
+          } catch (_) {
+            return null;
+          }
+        })
+        .whereType<DownloadedFile>()
+        .toList();
+  }
+
+  Future<void> _removeResourceFromHistory(LessonResource resource) async {
+    final parsed = await _readHistory();
+    parsed.removeWhere((entry) => _matchesResource(entry, resource));
+    await _setHistory(parsed);
+  }
+
+  bool _matchesResource(DownloadedFile existing, LessonResource resource) {
+    final stableId = _resourceId(resource);
+    final legacyId = _legacyResourceId(resource);
+    return existing.id == stableId ||
+        existing.id == legacyId ||
+        (existing.type == resource.type.name && existing.url == resource.url);
+  }
+
+  bool _isSameResourceEntry(DownloadedFile a, DownloadedFile b) {
+    return a.id == b.id || (a.type == b.type && a.url == b.url);
+  }
+
+  String _legacyResourceId(LessonResource resource) {
+    return '${resource.type.name}:${resource.url.hashCode}';
+  }
+
+  String _resourceId(LessonResource resource) {
+    return '${resource.type.name}:${resource.url}';
   }
 
   String _extensionFromResource(LessonResource resource) {

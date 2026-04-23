@@ -693,9 +693,13 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
     });
 
     try {
+      var alreadyDownloaded = false;
       final file = await _downloadRepository.downloadResource(
         resource,
         cancelToken: _downloadCancelToken,
+        onAlreadyDownloaded: () {
+          alreadyDownloaded = true;
+        },
         onProgress: (received, total) {
           if (!mounted || total <= 0) {
             return;
@@ -711,6 +715,15 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
       );
 
       if (!mounted) {
+        return;
+      }
+
+      if (alreadyDownloaded) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Este recurso ya fue descargado previamente.'),
+          ),
+        );
         return;
       }
 
