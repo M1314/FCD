@@ -68,7 +68,8 @@ class _DownloadsPageState extends State<DownloadsPage> {
     final items = <_DownloadListItem>[];
     for (final heading in grouped.keys) {
       items.add(_DownloadHeadingItem(heading));
-      for (final file in grouped[heading]!) {
+      final filesInGroup = grouped[heading] ?? const <DownloadedFile>[];
+      for (final file in filesInGroup) {
         items.add(_DownloadEntryItem(file));
       }
     }
