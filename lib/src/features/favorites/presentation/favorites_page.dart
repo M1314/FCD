@@ -4,6 +4,7 @@ import 'package:fcd_app/src/core/theme/app_theme.dart';
 import 'package:fcd_app/src/features/courses/data/models/course.dart';
 import 'package:fcd_app/src/features/courses/data/models/course_lesson.dart';
 import 'package:fcd_app/src/features/courses/presentation/course_player_page.dart';
+import 'package:fcd_app/src/features/favorites/data/favorites_cache_storage.dart';
 import 'package:fcd_app/src/state/session_controller.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -17,8 +18,10 @@ class FavoritesPage extends StatefulWidget {
 
 class _FavoritesPageState extends State<FavoritesPage> {
   final FavoritesStorage _favoritesStorage = FavoritesStorage();
+  final FavoritesCacheStorage _favoritesCacheStorage = FavoritesCacheStorage();
 
   bool _loading = true;
+  bool _isRefreshing = false;
   String? _error;
   String? _notice;
 
@@ -43,12 +46,6 @@ class _FavoritesPageState extends State<FavoritesPage> {
       return;
     }
 
-    setState(() {
-      _loading = true;
-      _error = null;
-      _notice = null;
-    });
-
     try {
       // 1. Get the set of favorited lesson IDs.
       final favoriteIds = await _favoritesStorage.getFavorites(user.id);
@@ -58,11 +55,33 @@ class _FavoritesPageState extends State<FavoritesPage> {
         setState(() {
           _favorites = <_FavoriteEntry>[];
           _loading = false;
+          _isRefreshing = false;
+          _notice = null;
         });
         return;
       }
 
-      // 2. Fetch all user courses.
+      final coursesFromCache = await _favoritesCacheStorage.read(user.id);
+      final cachedEntries = _buildEntries(
+        favoriteIds: favoriteIds,
+        courses: coursesFromCache,
+      );
+
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _loading = cachedEntries.isEmpty;
+        _isRefreshing = true;
+        _error = null;
+        _notice = null;
+        if (cachedEntries.isNotEmpty) {
+          _favorites = cachedEntries;
+        }
+      });
+
+      // 2. Refresh from API and replace cache.
       final courses = await session.courseRepository.getMyCourses(user.id);
 
       final results = await Future.wait(
@@ -85,34 +104,41 @@ class _FavoritesPageState extends State<FavoritesPage> {
         }),
       );
 
-      final entries = <_FavoriteEntry>[];
+      final apiCourses = <CachedFavoriteCourse>[];
       var failedCount = 0;
       for (final result in results) {
         if (result.failed) {
           failedCount++;
           continue;
         }
-        for (final lesson in result.lessons) {
-          if (favoriteIds.contains(lesson.id)) {
-            entries.add(
-              _FavoriteEntry(
-                course: result.course,
-                lessons: result.lessons,
-                lesson: lesson,
-              ),
-            );
-          }
-        }
+        apiCourses.add(
+          CachedFavoriteCourse(course: result.course, lessons: result.lessons),
+        );
       }
+
+      if (apiCourses.isNotEmpty) {
+        await _favoritesCacheStorage.save(user.id, apiCourses);
+      }
+
+      final sourceCourses = apiCourses.isNotEmpty ? apiCourses : coursesFromCache;
+      final entries = _buildEntries(
+        favoriteIds: favoriteIds,
+        courses: sourceCourses,
+      );
+      final shouldShowCacheFallbackNotice =
+          apiCourses.isEmpty && cachedEntries.isNotEmpty;
 
       if (!mounted) return;
       setState(() {
         _favorites = entries;
         _loading = false;
+        _isRefreshing = false;
         _error = entries.isEmpty && failedCount == courses.length
             ? 'No se pudieron cargar tus cursos favoritos. Intenta nuevamente.'
             : null;
-        _notice = failedCount > 0
+        _notice = shouldShowCacheFallbackNotice
+            ? 'Mostrando copia local mientras se restablece la conexión.'
+            : failedCount > 0
             ? 'No se pudieron cargar $failedCount curso(s). Intenta actualizar.'
             : null;
       });
@@ -120,12 +146,39 @@ class _FavoritesPageState extends State<FavoritesPage> {
       if (!mounted) return;
       setState(() {
         _loading = false;
-        _error = userMessageFromError(
-          e,
-          fallbackMessage: 'No se pudieron cargar los favoritos.',
-        );
+        _isRefreshing = false;
+        if (_favorites.isNotEmpty) {
+          _notice =
+              'Mostrando copia local. Revisa tu conexión e intenta actualizar.';
+        } else {
+          _error = userMessageFromError(
+            e,
+            fallbackMessage: 'No se pudieron cargar los favoritos.',
+          );
+        }
       });
     }
+  }
+
+  List<_FavoriteEntry> _buildEntries({
+    required Set<int> favoriteIds,
+    required List<CachedFavoriteCourse> courses,
+  }) {
+    final entries = <_FavoriteEntry>[];
+    for (final courseItem in courses) {
+      for (final lesson in courseItem.lessons) {
+        if (favoriteIds.contains(lesson.id)) {
+          entries.add(
+            _FavoriteEntry(
+              course: courseItem.course,
+              lessons: courseItem.lessons,
+              lesson: lesson,
+            ),
+          );
+        }
+      }
+    }
+    return entries;
   }
 
   @override
@@ -175,9 +228,18 @@ class _FavoritesPageState extends State<FavoritesPage> {
       child: ListView.builder(
         physics: const AlwaysScrollableScrollPhysics(),
         padding: const EdgeInsets.fromLTRB(16, 12, 16, 30),
-        itemCount: items.length + (_notice != null ? 1 : 0),
+        itemCount:
+            items.length + (_notice != null ? 1 : 0) + (_isRefreshing ? 1 : 0),
         itemBuilder: (context, index) {
-          if (_notice != null && index == 0) {
+          if (_isRefreshing && index == 0) {
+            return const Padding(
+              padding: EdgeInsets.only(bottom: 10),
+              child: LinearProgressIndicator(minHeight: 3),
+            );
+          }
+
+          final noticeIndex = _isRefreshing ? 1 : 0;
+          if (_notice != null && index == noticeIndex) {
             return Container(
               margin: const EdgeInsets.only(bottom: 10),
               padding: const EdgeInsets.all(10),
@@ -195,7 +257,8 @@ class _FavoritesPageState extends State<FavoritesPage> {
             );
           }
 
-          final adjustedIndex = _notice == null ? index : index - 1;
+          final adjustedIndex =
+              index - (_isRefreshing ? 1 : 0) - (_notice != null ? 1 : 0);
           final item = items[adjustedIndex];
           if (item is _HeadingItem) {
             return Padding(
