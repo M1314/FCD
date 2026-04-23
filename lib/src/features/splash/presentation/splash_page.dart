@@ -117,7 +117,7 @@ class _SplashPageState extends State<SplashPage>
                       ),
                       const SizedBox(height: 8),
                       Text(
-                        'Estudio, práctica y guía espiritual',
+                        'Sigue la luz, no la lámpara',
                         textAlign: TextAlign.center,
                         style: GoogleFonts.montserrat(
                           fontSize: 13,
