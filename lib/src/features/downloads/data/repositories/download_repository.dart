@@ -80,6 +80,23 @@ class DownloadRepository {
     return files;
   }
 
+  Future<int> removeMissingDownloads() async {
+    final files = await getDownloads();
+    final existing = <DownloadedFile>[];
+    for (final file in files) {
+      final local = File(file.localPath);
+      if (await local.exists()) {
+        existing.add(file);
+      }
+    }
+
+    final removed = files.length - existing.length;
+    if (removed > 0) {
+      await _setHistory(existing);
+    }
+    return removed;
+  }
+
   Future<void> clearHistory() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_downloadHistoryKey);
@@ -103,9 +120,14 @@ class DownloadRepository {
     parsed.removeWhere((entry) => entry.id == file.id);
     parsed.insert(0, file);
 
+    await _setHistory(parsed);
+  }
+
+  Future<void> _setHistory(List<DownloadedFile> files) async {
+    final prefs = await SharedPreferences.getInstance();
     await prefs.setStringList(
       _downloadHistoryKey,
-      parsed.map((entry) => entry.toRawJson()).toList(),
+      files.map((entry) => entry.toRawJson()).toList(),
     );
   }
 

@@ -21,6 +21,7 @@ class _DownloadsPageState extends State<DownloadsPage> {
 
   bool _loading = true;
   List<DownloadedFile> _files = <DownloadedFile>[];
+  String? _info;
 
   @override
   void initState() {
@@ -43,6 +44,25 @@ class _DownloadsPageState extends State<DownloadsPage> {
 
     return Column(
       children: <Widget>[
+        if (_info != null)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(14, 8, 14, 0),
+            child: Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFFF5E8),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: const Color(0xFFE8DACA)),
+              ),
+              child: Text(
+                _info!,
+                style: Theme.of(
+                  context,
+                ).textTheme.bodySmall?.copyWith(color: AppTheme.deepBrown),
+              ),
+            ),
+          ),
         Padding(
           padding: const EdgeInsets.fromLTRB(14, 8, 14, 0),
           child: Row(
@@ -85,8 +105,10 @@ class _DownloadsPageState extends State<DownloadsPage> {
   Future<void> _load() async {
     setState(() {
       _loading = true;
+      _info = null;
     });
 
+    final removed = await _downloadRepository.removeMissingDownloads();
     final files = await _downloadRepository.getDownloads();
     if (!mounted) {
       return;
@@ -95,6 +117,9 @@ class _DownloadsPageState extends State<DownloadsPage> {
     setState(() {
       _files = files;
       _loading = false;
+      _info = removed > 0
+          ? 'Se limpiaron $removed archivo(s) inexistente(s) del historial.'
+          : null;
     });
   }
 
