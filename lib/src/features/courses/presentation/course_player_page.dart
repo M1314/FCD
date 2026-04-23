@@ -949,6 +949,8 @@ class _AudioWidget extends StatefulWidget {
 }
 
 class _AudioWidgetState extends State<_AudioWidget> {
+  double? _dragValueMs;
+
   @override
   Widget build(BuildContext context) {
     return StreamBuilder<PlayerState>(
@@ -998,31 +1000,47 @@ class _AudioWidgetState extends State<_AudioWidget> {
               builder: (context, positionSnapshot) {
                 final position = positionSnapshot.data ?? Duration.zero;
                 final total = widget.player.duration ?? Duration.zero;
+                final canSeek = total.inMilliseconds > 0;
                 final max = total.inMilliseconds <= 0
                     ? 1.0
                     : total.inMilliseconds.toDouble();
-                final value = position.inMilliseconds
+                final liveValue = position.inMilliseconds
                     .clamp(0, max.toInt())
                     .toDouble();
+                final sliderValue = (_dragValueMs ?? liveValue).clamp(0.0, max);
+                final displayPosition = _dragValueMs == null
+                    ? position
+                    : Duration(milliseconds: sliderValue.round());
 
                 return Column(
                   children: <Widget>[
                     Slider(
-                      value: value,
+                      value: sliderValue,
                       max: max,
-                      onChanged: total.inMilliseconds <= 0
-                          ? null
-                          : (newValue) {
-                              widget.player.seek(
+                      onChangeStart: canSeek
+                          ? (newValue) {
+                              setState(() => _dragValueMs = newValue);
+                            }
+                          : null,
+                      onChanged: canSeek
+                          ? (newValue) {
+                              setState(() => _dragValueMs = newValue);
+                            }
+                          : null,
+                      onChangeEnd: canSeek
+                          ? (newValue) async {
+                              setState(() => _dragValueMs = null);
+                              await widget.player.seek(
                                 Duration(milliseconds: newValue.round()),
                               );
-                            },
+                            }
+                          : null,
                     ),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: <Widget>[
                         Text(
-                          _formatDuration(position),
+                          _formatDuration(displayPosition),
                           style: Theme.of(context).textTheme.bodySmall,
                         ),
                         Text(
