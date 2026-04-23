@@ -167,24 +167,26 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
 
   List<LessonResource> get currentResources => currentLesson.resources;
 
-  LessonResource? get currentResource {
+  int? _clampedResourceIndexOrNull() {
     if (currentResources.isEmpty) {
       return null;
     }
-    return currentResources[_resourceIndex.clamp(
-      0,
-      currentResources.length - 1,
-    )];
+    return _resourceIndex.clamp(0, currentResources.length - 1);
+  }
+
+  LessonResource? get currentResource {
+    final clampedResourceIndex = _clampedResourceIndexOrNull();
+    if (clampedResourceIndex == null) {
+      return null;
+    }
+    return currentResources[clampedResourceIndex];
   }
 
   String? get _currentMediaResourceKey {
-    if (currentResources.isEmpty) {
+    final clampedResourceIndex = _clampedResourceIndexOrNull();
+    if (clampedResourceIndex == null) {
       return null;
     }
-    final clampedResourceIndex = _resourceIndex.clamp(
-      0,
-      currentResources.length - 1,
-    );
     return '$_lessonIndex:$clampedResourceIndex';
   }
 
