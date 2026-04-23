@@ -1,9 +1,9 @@
 import 'package:fcd_app/src/core/theme/app_theme.dart';
+import 'package:fcd_app/src/features/auth/presentation/register_page.dart';
 import 'package:fcd_app/src/state/session_controller.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -86,8 +86,10 @@ class _LoginPageState extends State<LoginPage> {
                                   ?.copyWith(color: AppTheme.mutedText),
                             ),
                             TextButton(
-                              onPressed: () => _openWeb(
-                                'https://circulo-dorado.org/registro',
+                              onPressed: () => Navigator.of(context).push(
+                                MaterialPageRoute<void>(
+                                  builder: (_) => const RegisterPage(),
+                                ),
                               ),
                               child: const Text('Registrarse'),
                             ),
@@ -225,9 +227,12 @@ class _LoginPageState extends State<LoginPage> {
               ),
               const SizedBox(height: 6),
               TextButton(
-                onPressed: () =>
-                    _openWeb('https://circulo-dorado.org/recuperar-clave'),
-                child: const Text('Recuperar contrasena'),
+                onPressed: () => Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) => const RegisterPage(),
+                  ),
+                ),
+                child: const Text('Registrarse'),
               ),
             ],
           ),
@@ -257,18 +262,6 @@ class _LoginPageState extends State<LoginPage> {
       return 'Minimo 8 caracteres.';
     }
     return null;
-  }
-
-  Future<void> _openWeb(String url) async {
-    final uri = Uri.parse(url);
-    if (!await launchUrl(uri, mode: LaunchMode.externalApplication)) {
-      if (!mounted) {
-        return;
-      }
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('No se pudo abrir el navegador.')),
-      );
-    }
   }
 
   Future<void> _submit() async {
