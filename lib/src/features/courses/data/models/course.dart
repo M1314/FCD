@@ -207,12 +207,8 @@ int? _inferLessonCount(Map<String, dynamic> json) {
 }
 
 int? _priorityForKey(String key, List<String> tokens) {
-  for (var i = 0; i < tokens.length; i++) {
-    if (key.contains(tokens[i])) {
-      return i;
-    }
-  }
-  return null;
+  final index = tokens.indexWhere((token) => key.contains(token));
+  return index == -1 ? null : index;
 }
 
 bool _isIdLikeKey(String key) {
