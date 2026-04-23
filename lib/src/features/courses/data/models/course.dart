@@ -127,6 +127,15 @@ int _readLessonsCount(Map<String, dynamic> json) {
   return inferred ?? 0;
 }
 
+const List<String> lessonCountTokens = <String>[
+  'total',
+  'cantidad',
+  'numero',
+  'count',
+  'cant',
+  'num',
+];
+
 int? _parseLessonCountValue(dynamic raw) {
   if (raw == null) {
     return null;
@@ -157,14 +166,6 @@ int? _parseLessonCountValue(dynamic raw) {
 }
 
 int? _inferLessonCount(Map<String, dynamic> json) {
-  const preferredTokens = <String>[
-    'total',
-    'cantidad',
-    'numero',
-    'count',
-    'cant',
-    'num',
-  ];
   int? preferred;
   int? preferredPriority;
   int? fallback;
@@ -182,7 +183,7 @@ int? _inferLessonCount(Map<String, dynamic> json) {
       continue;
     }
 
-    final priority = _priorityForKey(lower, preferredTokens);
+    final priority = _priorityForKey(lower, lessonCountTokens);
     if (priority != null) {
       final currentPriority = preferredPriority;
       if (currentPriority == null || priority < currentPriority) {
@@ -201,7 +202,7 @@ int? _inferLessonCount(Map<String, dynamic> json) {
 }
 
 int? _priorityForKey(String key, List<String> tokens) {
-  for (var i = 0; i < tokens.length; i += 1) {
+  for (var i = 0; i < tokens.length; i++) {
     if (key.contains(tokens[i])) {
       return i;
     }
@@ -217,10 +218,16 @@ bool _isIdLikeKey(String key) {
     return true;
   }
   if (key.startsWith('id')) {
-    return !key.contains('total') &&
-        !key.contains('cantidad') &&
-        !key.contains('numero') &&
-        !key.contains('count');
+    return !_containsLessonCountToken(key);
+  }
+  return false;
+}
+
+bool _containsLessonCountToken(String key) {
+  for (final token in lessonCountTokens) {
+    if (key.contains(token)) {
+      return true;
+    }
   }
   return false;
 }
