@@ -118,13 +118,15 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
 
     if (mounted) {
       if (widget.initialLessonIndex != null) {
-        _lessonIndex = widget.initialLessonIndex!.clamp(0, widget.lessons.length - 1);
+        _lessonIndex = widget.initialLessonIndex!.clamp(
+          0,
+          widget.lessons.length - 1,
+        );
         _resourceIndex = 0;
       } else if (!widget.forceStart) {
         // Prefer saved local progress; fall back to first pending lesson.
         final saved = await _progressStorage.getProgress(widget.course.id);
-        if (saved != null &&
-            saved.lessonIndex < widget.lessons.length) {
+        if (saved != null && saved.lessonIndex < widget.lessons.length) {
           _lessonIndex = saved.lessonIndex;
           final resources = widget.lessons[saved.lessonIndex].resources;
           _resourceIndex = resources.isEmpty
@@ -187,6 +189,7 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
     }
 
     return Scaffold(
+      drawer: _buildLessonsDrawer(context),
       body: SafeArea(
         child: Column(
           children: <Widget>[
@@ -238,6 +241,13 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
               ],
             ),
           ),
+          Builder(
+            builder: (drawerContext) => IconButton(
+              onPressed: () => Scaffold.of(drawerContext).openDrawer(),
+              icon: const Icon(Icons.menu_book_rounded),
+              tooltip: 'Temario',
+            ),
+          ),
           IconButton(
             onPressed: _hasPreviousLesson ? _previousLesson : null,
             icon: const Icon(Icons.skip_previous_rounded),
@@ -247,6 +257,58 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
             icon: const Icon(Icons.skip_next_rounded),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildLessonsDrawer(BuildContext context) {
+    return Drawer(
+      child: SafeArea(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: <Widget>[
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+              child: Text(
+                'Temario',
+                style: Theme.of(context).textTheme.titleLarge,
+              ),
+            ),
+            Expanded(
+              child: ListView.builder(
+                itemCount: widget.lessons.length,
+                itemBuilder: (context, index) {
+                  final lesson = widget.lessons[index];
+                  final selected = index == _lessonIndex;
+                  final resourcesCount = lesson.resources.length;
+                  final resourcesLabel = resourcesCount == 1
+                      ? '1 recurso'
+                      : '$resourcesCount recursos';
+                  return ListTile(
+                    selected: selected,
+                    leading: CircleAvatar(
+                      radius: 14,
+                      child: Text('${index + 1}'),
+                    ),
+                    title: Text(
+                      lesson.name,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    subtitle: Text(resourcesLabel),
+                    trailing: selected
+                        ? const Icon(Icons.check_circle_rounded)
+                        : null,
+                    onTap: () async {
+                      Navigator.of(context).pop();
+                      await _goToLesson(index);
+                    },
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -348,7 +410,9 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
                   _isCurrentFavorite
                       ? Icons.bookmark_rounded
                       : Icons.bookmark_outline_rounded,
-                  color: _isCurrentFavorite ? AppTheme.bronze : AppTheme.mutedText,
+                  color: _isCurrentFavorite
+                      ? AppTheme.bronze
+                      : AppTheme.mutedText,
                 ),
                 tooltip: _isCurrentFavorite
                     ? 'Quitar de favoritos'
@@ -639,6 +703,25 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
 
     setState(() {
       _lessonIndex -= 1;
+      _resourceIndex = 0;
+      _isCompleted = _completedLessonIds.contains(currentLesson.id);
+      _isCurrentFavorite = _favoriteIds.contains(currentLesson.id);
+    });
+
+    await _saveProgress();
+    await _prepareCurrentResource();
+    if (mounted) {
+      setState(() {});
+    }
+  }
+
+  Future<void> _goToLesson(int index) async {
+    if (index < 0 || index >= widget.lessons.length || index == _lessonIndex) {
+      return;
+    }
+
+    setState(() {
+      _lessonIndex = index;
       _resourceIndex = 0;
       _isCompleted = _completedLessonIds.contains(currentLesson.id);
       _isCurrentFavorite = _favoriteIds.contains(currentLesson.id);

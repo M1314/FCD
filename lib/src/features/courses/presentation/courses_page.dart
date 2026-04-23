@@ -45,12 +45,12 @@ class _CoursesPageState extends State<CoursesPage> {
       _filtered = query.isEmpty
           ? _courses
           : _courses
-              .where(
-                (course) =>
-                    course.name.toLowerCase().contains(query) ||
-                    course.subtitle.toLowerCase().contains(query),
-              )
-              .toList();
+                .where(
+                  (course) =>
+                      course.name.toLowerCase().contains(query) ||
+                      course.subtitle.toLowerCase().contains(query),
+                )
+                .toList();
     });
   }
 
@@ -115,9 +115,7 @@ class _CoursesPageState extends State<CoursesPage> {
             ),
           ),
         ),
-        Expanded(
-          child: isSearching ? _buildFlatList() : _buildGroupedList(),
-        ),
+        Expanded(child: isSearching ? _buildFlatList() : _buildGroupedList()),
       ],
     );
   }
@@ -173,7 +171,8 @@ class _CoursesPageState extends State<CoursesPage> {
                     Expanded(
                       child: Text(
                         category,
-                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        style: Theme.of(context).textTheme.titleMedium
+                            ?.copyWith(
                               color: AppTheme.deepBrown,
                               fontWeight: FontWeight.bold,
                             ),
@@ -186,19 +185,16 @@ class _CoursesPageState extends State<CoursesPage> {
             SliverPadding(
               padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
               sliver: SliverList(
-                delegate: SliverChildBuilderDelegate(
-                  (context, index) {
-                    final course = _grouped[category]![index];
-                    return Padding(
-                      padding: const EdgeInsets.only(bottom: 12),
-                      child: _CourseCard(
-                        course: course,
-                        onTap: () => _openCourse(course),
-                      ),
-                    );
-                  },
-                  childCount: _grouped[category]!.length,
-                ),
+                delegate: SliverChildBuilderDelegate((context, index) {
+                  final course = _grouped[category]![index];
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 12),
+                    child: _CourseCard(
+                      course: course,
+                      onTap: () => _openCourse(course),
+                    ),
+                  );
+                }, childCount: _grouped[category]!.length),
               ),
             ),
           ],
@@ -253,13 +249,8 @@ class _CoursesPageState extends State<CoursesPage> {
     );
 
     try {
-      final maxLessons = course.maxLessons <= 0
-          ? (course.lessonsCount <= 0 ? 12 : course.lessonsCount)
-          : course.maxLessons;
-
-      final lessons = await session.courseRepository.getLessonsByCourse(
+      final lessons = await session.courseRepository.getAllLessonsByCourse(
         courseId: course.id,
-        maxLessons: maxLessons,
       );
 
       if (!mounted) return;
@@ -341,7 +332,6 @@ class _CourseCard extends StatelessWidget {
                               icon: Icons.menu_book_rounded,
                               text: '${course.lessonsCount} lecciones',
                             ),
-
                           ],
                         ),
                       ],
