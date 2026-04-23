@@ -215,10 +215,10 @@ bool _isIdLikeKey(String key) {
   if (_lessonIdTokens.contains(key)) {
     return true;
   }
-  if (key.endsWith('_id') || key.startsWith('id_')) {
+  if (key.endsWith('_id')) {
     return true;
   }
-  if (key.startsWith('id')) {
+  if (_startsWithIdPrefix(key)) {
     // Treat id-prefixed keys with count tokens as counts, not identifiers.
     return !_containsLessonCountToken(key);
   }
@@ -230,6 +230,20 @@ bool _containsLessonCountToken(String key) {
     if (key.contains(token)) {
       return true;
     }
+  }
+  return false;
+}
+
+bool _startsWithIdPrefix(String key) {
+  if (key == 'id') {
+    return true;
+  }
+  if (key.startsWith('id_') || key.startsWith('id-')) {
+    return true;
+  }
+  if (key.length > 2) {
+    final code = key.codeUnitAt(2);
+    return code >= 48 && code <= 57;
   }
   return false;
 }
