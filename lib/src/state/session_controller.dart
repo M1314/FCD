@@ -23,6 +23,15 @@ class SessionController extends ChangeNotifier {
     aiChatRepository = AiChatRepository(apiClient: _apiClient);
   }
 
+  SessionController.forTesting({required ApiClient apiClient})
+    : _storage = AppStorage(),
+      _apiClient = apiClient,
+      _status = SessionStatus.checking {
+    _authRepository = AuthRepository(apiClient: _apiClient, storage: _storage);
+    courseRepository = CourseRepository(apiClient: _apiClient);
+    aiChatRepository = AiChatRepository(apiClient: _apiClient);
+  }
+
   final AppStorage _storage;
   late final ApiClient _apiClient;
   late final AuthRepository _authRepository;
