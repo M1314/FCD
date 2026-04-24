@@ -52,6 +52,7 @@ void main() {
                     'fileBanner': '',
                     'precio': 0,
                     'doublePrecioDolar': 0,
+                    // totalLessons intentionally differs from API response.
                     'totalLessons': 1,
                     'availableLessons': 0,
                     'strCategoria': 'Categoria',
