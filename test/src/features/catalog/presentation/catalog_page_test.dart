@@ -1,3 +1,4 @@
+import 'package:fcd_app/src/core/errors/app_exception.dart';
 import 'package:fcd_app/src/features/catalog/presentation/catalog_page.dart';
 import 'package:fcd_app/src/features/courses/data/repositories/course_repository.dart';
 import 'package:fcd_app/src/state/session_controller.dart';
@@ -7,8 +8,8 @@ import 'package:provider/provider.dart';
 
 import '../../../test_helpers/fake_api_client.dart';
 
-class TestSessionController extends SessionController {
-  TestSessionController(this._courseRepository) : super();
+class FakeSessionController extends SessionController {
+  FakeSessionController(this._courseRepository) : super();
 
   final CourseRepository _courseRepository;
 
@@ -18,7 +19,7 @@ class TestSessionController extends SessionController {
 
 Widget _buildSubject(CourseRepository repository) {
   return ChangeNotifierProvider<SessionController>.value(
-    value: TestSessionController(repository),
+    value: FakeSessionController(repository),
     child: const MaterialApp(
       home: Scaffold(body: SizedBox.expand(child: CatalogPage())),
     ),
@@ -99,7 +100,10 @@ void main() {
 
       expect(find.text('3 lecciones'), findsOneWidget);
       expect(find.text('5 lecciones'), findsOneWidget);
-      expect(recordedErrors, isNotEmpty);
+      expect(
+        recordedErrors.single.exception,
+        isA<AppException>().having((error) => error.message, 'message', 'error'),
+      );
     },
   );
 }
