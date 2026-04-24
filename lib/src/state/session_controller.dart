@@ -78,6 +78,35 @@ class SessionController extends ChangeNotifier {
     }
   }
 
+  Future<bool> register({
+    required String firstName,
+    required String lastName,
+    required String email,
+    required String password,
+  }) async {
+    _errorMessage = null;
+    _status = SessionStatus.checking;
+    notifyListeners();
+
+    try {
+      await _authRepository.register(
+        firstName: firstName,
+        lastName: lastName,
+        email: email,
+        password: password,
+      );
+      _status = SessionStatus.unauthenticated;
+      _errorMessage = null;
+      notifyListeners();
+      return true;
+    } catch (error) {
+      _status = SessionStatus.unauthenticated;
+      _errorMessage = error.toString();
+      notifyListeners();
+      return false;
+    }
+  }
+
   Future<void> logout() async {
     await _authRepository.logout();
     _user = null;

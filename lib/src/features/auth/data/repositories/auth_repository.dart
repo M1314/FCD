@@ -3,7 +3,6 @@ import 'package:fcd_app/src/core/http/api_client.dart';
 import 'package:fcd_app/src/core/storage/app_storage.dart';
 import 'package:fcd_app/src/features/auth/data/models/auth_session.dart';
 import 'package:fcd_app/src/features/auth/data/models/auth_user.dart';
-
 class AuthRepository {
   AuthRepository({required ApiClient apiClient, required AppStorage storage})
     : _apiClient = apiClient,
@@ -46,6 +45,66 @@ class AuthRepository {
     await _persistSession(session);
     _apiClient.setTokens(accessToken: accessToken, refreshToken: refreshToken);
     return session;
+  }
+
+  Future<void> register({
+    required String firstName,
+    required String lastName,
+    required String email,
+    required String password,
+    String phone = '',
+    String profession = '',
+    String maritalStatus = '',
+    String address = '',
+    String city = '',
+    String zipCode = '',
+    String question1 = '',
+    String question2 = '',
+    bool question3 = false,
+    bool question4 = false,
+    String question5 = '',
+    bool question6 = false,
+    bool question7 = false,
+    String question8 = '',
+    DateTime? dateOfBirth,
+  }) async {
+    final payload = <String, dynamic>{
+      'strEmail': email,
+      'strFirstName': firstName,
+      'strLastName': lastName,
+      'strPassword': password,
+      'strAddress': address,
+      'strCity': city,
+      'strZipCode': zipCode.isEmpty ? null : int.tryParse(zipCode),
+      'strQuestion1': question1,
+      'strQuestion2': question2,
+      'blnQuestion3': question3,
+      'blnQuestion4': question4,
+      'strQuestion5': question5,
+      'blnQuestion6': question6,
+      'blnQuestion7': question7,
+      'strQuestion8': question8,
+      if (dateOfBirth != null) 'dteDateOfBirth': _formatDateTime(dateOfBirth),
+      'dteRegistrationDate': _formatDateTime(DateTime.now()),
+      'strPhone': phone,
+      'strProfession': profession,
+      'strMaritalStatus': maritalStatus,
+      'strShippingAddresses': '[]',
+    };
+
+    final response = await _apiClient.post('/user', data: payload);
+    final statusCode = response['intResponse'] as int? ?? 500;
+    if (statusCode != 200) {
+      throw AppException(
+        response['strAnswer']?.toString() ?? 'No se pudo registrar el usuario.',
+        statusCode: statusCode,
+      );
+    }
+  }
+
+  String _formatDateTime(DateTime value) {
+    final local = value.toLocal();
+    return local.toIso8601String().substring(0, 16);
   }
 
   Future<AuthSession?> restoreSession() async {
