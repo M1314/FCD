@@ -1,4 +1,4 @@
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 class AppStorage {
   static const String accessTokenKey = 'access_token';
@@ -7,6 +7,13 @@ class AppStorage {
   static const String userNameKey = 'user_name';
   static const String userEmailKey = 'user_email';
   static const String userTypeKey = 'user_type';
+  static const String userPasswordKey = 'user_password';
+
+  final FlutterSecureStorage _secureStorage = const FlutterSecureStorage(
+    iOptions: IOSOptions(
+      accessibility: KeychainAccessibility.first_unlock_this_device,
+    ),
+  );
 
   Future<void> saveSession({
     required String accessToken,
@@ -16,57 +23,60 @@ class AppStorage {
     required String userEmail,
     required String userType,
   }) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(accessTokenKey, accessToken);
-    await prefs.setString(refreshTokenKey, refreshToken);
-    await prefs.setInt(userIdKey, userId);
-    await prefs.setString(userNameKey, userName);
-    await prefs.setString(userEmailKey, userEmail);
-    await prefs.setString(userTypeKey, userType);
+    await _secureStorage.write(key: accessTokenKey, value: accessToken);
+    await _secureStorage.write(key: refreshTokenKey, value: refreshToken);
+    await _secureStorage.write(key: userIdKey, value: userId.toString());
+    await _secureStorage.write(key: userNameKey, value: userName);
+    await _secureStorage.write(key: userEmailKey, value: userEmail);
+    await _secureStorage.write(key: userTypeKey, value: userType);
+  }
+
+  Future<void> savePassword(String password) async {
+    await _secureStorage.write(key: userPasswordKey, value: password);
+  }
+
+  Future<String?> getPassword() async {
+    return _secureStorage.read(key: userPasswordKey);
   }
 
   Future<void> saveAccessToken(String accessToken) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(accessTokenKey, accessToken);
+    await _secureStorage.write(key: accessTokenKey, value: accessToken);
   }
 
   Future<String?> getAccessToken() async {
-    final prefs = await SharedPreferences.getInstance();
-    return prefs.getString(accessTokenKey);
+    return _secureStorage.read(key: accessTokenKey);
   }
 
   Future<String?> getRefreshToken() async {
-    final prefs = await SharedPreferences.getInstance();
-    return prefs.getString(refreshTokenKey);
+    return _secureStorage.read(key: refreshTokenKey);
   }
 
   Future<int?> getUserId() async {
-    final prefs = await SharedPreferences.getInstance();
-    return prefs.getInt(userIdKey);
+    final value = await _secureStorage.read(key: userIdKey);
+    return value != null ? int.tryParse(value) : null;
   }
 
   Future<String?> getUserName() async {
-    final prefs = await SharedPreferences.getInstance();
-    return prefs.getString(userNameKey);
+    return _secureStorage.read(key: userNameKey);
   }
 
   Future<String?> getUserEmail() async {
-    final prefs = await SharedPreferences.getInstance();
-    return prefs.getString(userEmailKey);
+    return _secureStorage.read(key: userEmailKey);
   }
 
   Future<String?> getUserType() async {
-    final prefs = await SharedPreferences.getInstance();
-    return prefs.getString(userTypeKey);
+    return _secureStorage.read(key: userTypeKey);
   }
 
-  Future<void> clearSession() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.remove(accessTokenKey);
-    await prefs.remove(refreshTokenKey);
-    await prefs.remove(userIdKey);
-    await prefs.remove(userNameKey);
-    await prefs.remove(userEmailKey);
-    await prefs.remove(userTypeKey);
+Future<void> clearSession() async {
+    await _secureStorage.delete(key: accessTokenKey);
+    await _secureStorage.delete(key: refreshTokenKey);
+    await _secureStorage.delete(key: userIdKey);
+    await _secureStorage.delete(key: userNameKey);
+    await _secureStorage.delete(key: userTypeKey);
+  }
+
+  Future<void> clearCredentials() async {
+    await _secureStorage.delete(key: userPasswordKey);
   }
 }

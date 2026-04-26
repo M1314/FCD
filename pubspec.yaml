@@ -41,11 +41,13 @@ dependencies:
   webview_flutter: ^4.13.0
   path_provider: ^2.1.5
   open_filex: ^4.7.0
-  google_fonts: ^6.3.2
+  google_fonts: ^8.0.2
   intl: ^0.20.2
   url_launcher: ^6.3.2
   better_player_plus: ^1.0.8
   font_awesome_flutter: ^11.0.0
+  flutter_secure_storage: ^10.0.0
+  local_auth: ^3.0.1
 
 dev_dependencies:
   flutter_test:

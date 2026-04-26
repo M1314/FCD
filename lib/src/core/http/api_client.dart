@@ -3,10 +3,15 @@ import 'dart:async';
 import 'package:dio/dio.dart';
 import 'package:fcd_app/src/core/config/api_config.dart';
 import 'package:fcd_app/src/core/errors/app_exception.dart';
+import 'package:fcd_app/src/core/storage/app_storage.dart';
 
 class ApiClient {
-  ApiClient({Dio? dio, this.onUnauthorized, this.onTokenRefreshed})
-    : _dio =
+  ApiClient({
+    Dio? dio,
+    this.onUnauthorized,
+    this.onTokenRefreshed,
+    required this.storage,
+  }) : _dio =
           dio ??
           Dio(
             BaseOptions(
@@ -45,6 +50,7 @@ class ApiClient {
   final Dio _dio;
   final AsyncVoidCallback? onUnauthorized;
   final AsyncValueChanged<String>? onTokenRefreshed;
+  final AppStorage storage;
 
   String? _accessToken;
   String? _refreshToken;
