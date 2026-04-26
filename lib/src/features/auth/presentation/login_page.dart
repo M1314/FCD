@@ -1,6 +1,7 @@
 import 'package:fcd_app/src/core/theme/app_theme.dart';
 import 'package:fcd_app/src/features/auth/presentation/register_page.dart';
 import 'package:fcd_app/src/state/session_controller.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:local_auth/local_auth.dart';
@@ -36,6 +37,13 @@ class _LoginPageState extends State<LoginPage> {
     try {
       await Future<void>.delayed(const Duration(milliseconds: 100));
       if (!mounted) return;
+      final canCheck = await _localAuth.canCheckBiometrics;
+      final isDeviceSupported = await _localAuth.isDeviceSupported();
+      debugPrint('canCheckBiometrics: $canCheck, isDeviceSupported: $isDeviceSupported');
+      if (!canCheck || !isDeviceSupported) {
+        debugPrint('Biometrics not available on device');
+        return;
+      }
       final controller = context.read<SessionController>();
       final storage = controller.apiClient.storage;
       final storedEmail = await storage.getUserEmail();
@@ -243,7 +251,7 @@ class _LoginPageState extends State<LoginPage> {
                   child: OutlinedButton.icon(
                     onPressed: _isSubmitting ? null : _loginWithBiometrics,
                     icon: const Icon(Icons.face),
-                    label: Text('Usar $_storedEmail'),
+                    label: Text('Ingresar con: $_storedEmail'),
                     style: OutlinedButton.styleFrom(
                       foregroundColor: AppTheme.deepBrown,
                     ),
@@ -372,9 +380,15 @@ class _LoginPageState extends State<LoginPage> {
         persistAcrossBackgrounding: false,
       );
 
-      if (!authenticated || !mounted) {
+      if (!authenticated) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Autenticación cancelada o fallida')),
+          );
+        }
         return;
       }
+      if (!mounted) return;
 
       setState(() {
         _isSubmitting = true;
