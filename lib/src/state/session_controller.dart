@@ -124,8 +124,10 @@ SessionController.forTesting({required ApiClient apiClient})
     _status = SessionStatus.checking;
     notifyListeners();
 
+    debugPrint('loginWithStoredCredentials started');
     try {
       final session = await _authRepository.loginWithStoredCredentials();
+      debugPrint('loginWithStoredCredentials result: ${session?.user.email}');
       if (session == null) {
         _status = SessionStatus.unauthenticated;
         _errorMessage = 'No se encontraron credenciales guardadas.';
@@ -135,6 +137,7 @@ SessionController.forTesting({required ApiClient apiClient})
       _applySession(session);
       return true;
     } catch (error) {
+      debugPrint('loginWithStoredCredentials error: $error');
       _status = SessionStatus.unauthenticated;
       _errorMessage = error.toString();
       notifyListeners();
