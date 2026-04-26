@@ -5,55 +5,68 @@ import 'package:fcd_app/src/state/session_controller.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  test('register maps success to unauthenticated state', () async {
-    final apiClient = _FakeApiClient(
-      onPost: (path, {data, queryParameters, authenticated = false}) async {
-        if (path == '/user') {
-          return <String, dynamic>{'intResponse': 200, 'strAnswer': 'Correo enviado'};
-        }
-        throw StateError('Unexpected path: $path');
-      },
-    );
+  group('SessionController', () {
+    test('loginWithStoredCredentials returns false when no credentials stored', () async {
+      final apiClient = _FakeApiClient();
+      final controller = SessionController.forTesting(apiClient: apiClient);
 
-    final controller = SessionController.forTesting(apiClient: apiClient);
-    final result = await controller.register(
-      firstName: 'Prueba',
-      lastName: 'Prueba',
-      email: 'pedroprueba@gmail.com',
-      password: 'pruebapedro',
-    );
+      final success = await controller.loginWithStoredCredentials();
 
-    expect(result, isTrue);
-    expect(controller.status, SessionStatus.unauthenticated);
-    expect(controller.errorMessage, isNull);
+      expect(success, isFalse);
+      expect(controller.isUnauthenticated, isTrue);
+      expect(controller.errorMessage, isNotNull);
+    });
+
+    test('clearSessionExpired clears the flag', () async {
+      final apiClient = _FakeApiClient();
+      final controller = SessionController.forTesting(apiClient: apiClient);
+
+      controller.clearSessionExpired();
+
+      expect(controller.sessionExpired, isFalse);
+    });
   });
 }
 
 class _FakeApiClient extends ApiClient {
-  _FakeApiClient({this.onPost}) : super(dio: Dio());
+  _FakeApiClient() : super(dio: Dio(), storage: _FakeStorage());
+}
 
-  final Future<Map<String, dynamic>> Function(
-    String path, {
-    dynamic data,
-    Map<String, dynamic>? queryParameters,
-    bool authenticated,
-  })? onPost;
+class _FakeStorage extends AppStorage {
+  @override
+  Future<void> clearSession() async {}
 
   @override
-  Future<Map<String, dynamic>> post(
-    String path, {
-    data,
-    Map<String, dynamic>? queryParameters,
-    bool authenticated = false,
-  }) async {
-    if (onPost != null) {
-      return onPost!(
-        path,
-        data: data,
-        queryParameters: queryParameters,
-        authenticated: authenticated,
-      );
-    }
-    return <String, dynamic>{};
-  }
+  Future<String?> getAccessToken() async => null;
+
+  @override
+  Future<String?> getRefreshToken() async => null;
+
+  @override
+  Future<int?> getUserId() async => null;
+
+  @override
+  Future<String?> getUserName() async => null;
+
+  @override
+  Future<String?> getUserEmail() async => null;
+
+  @override
+  Future<String?> getUserType() async => null;
+
+  @override
+  Future<void> saveAccessToken(String accessToken) async {}
+
+  @override
+  Future<void> savePassword(String password) async {}
+
+  @override
+  Future<void> saveSession({
+    required String accessToken,
+    required String refreshToken,
+    required int userId,
+    required String userName,
+    required String userEmail,
+    required String userType,
+  }) async {}
 }

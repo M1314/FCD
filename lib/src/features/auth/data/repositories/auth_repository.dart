@@ -43,8 +43,24 @@ class AuthRepository {
     );
 
     await _persistSession(session);
+    await _storage.savePassword(password);
     _apiClient.setTokens(accessToken: accessToken, refreshToken: refreshToken);
     return session;
+  }
+
+  Future<AuthSession?> loginWithStoredCredentials() async {
+    final email = await _storage.getUserEmail();
+    final password = await _storage.getPassword();
+
+    if (email == null || email.isEmpty || password == null || password.isEmpty) {
+      return null;
+    }
+
+    try {
+      return await login(email: email, password: password);
+    } catch (_) {
+      return null;
+    }
   }
 
   Future<void> register({
@@ -164,9 +180,12 @@ class AuthRepository {
     return _storage.saveAccessToken(accessToken);
   }
 
-  Future<void> logout() async {
+  Future<void> logout({bool clearCredentials = false}) async {
     await _storage.clearSession();
     _apiClient.clearTokens();
+    if (clearCredentials) {
+      await _storage.clearCredentials();
+    }
   }
 
   Future<void> _persistSession(AuthSession session) async {

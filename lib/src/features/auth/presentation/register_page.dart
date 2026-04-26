@@ -48,6 +48,7 @@ class _RegisterPageState extends State<RegisterPage> {
         child: Form(
           key: _formKey,
           child: ListView(
+            keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
             padding: const EdgeInsets.all(16),
             children: <Widget>[
               Text('Cuenta', style: Theme.of(context).textTheme.titleMedium),
@@ -112,6 +113,7 @@ class _RegisterPageState extends State<RegisterPage> {
       child: TextFormField(
         controller: controller,
         keyboardType: keyboardType,
+        onTapOutside: (_) => FocusScope.of(context).unfocus(),
         decoration: InputDecoration(labelText: label, helperText: helper),
         validator: validator ?? (value) => _required(value, minLength: minLength),
       ),
@@ -131,6 +133,7 @@ class _RegisterPageState extends State<RegisterPage> {
       child: TextFormField(
         controller: controller,
         obscureText: obscure,
+        onTapOutside: (_) => FocusScope.of(context).unfocus(),
         decoration: InputDecoration(
           labelText: label,
           helperText: helper,

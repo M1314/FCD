@@ -1,5 +1,6 @@
 import 'package:dio/dio.dart';
 import 'package:fcd_app/src/core/http/api_client.dart';
+import 'package:fcd_app/src/core/storage/app_storage.dart';
 
 typedef FakeGetHandler =
     Future<Map<String, dynamic>> Function(
@@ -16,7 +17,8 @@ typedef FakePostHandler =
     });
 
 class FakeApiClient extends ApiClient {
-  FakeApiClient({this.onGet, this.onPost}) : super(dio: Dio());
+  FakeApiClient({this.onGet, this.onPost})
+      : super(dio: Dio(), storage: AppStorage());
 
   FakeGetHandler? onGet;
   FakePostHandler? onPost;

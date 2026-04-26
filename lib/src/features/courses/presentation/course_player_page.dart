@@ -57,6 +57,7 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
   int _savedMediaPositionMs = 0;
   int _resourcePreparationRequestId = 0;
   String? _activeMediaResourceKey;
+  bool _showSessionExpiredBanner = false;
 
   BetterPlayerController? _videoController;
   AudioPlayer? _audioPlayer;
@@ -70,6 +71,15 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _initializeProgress();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _checkSessionStatus();
+    });
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    context.read<SessionController>().addListener(_onSessionChanged);
   }
 
   @override
@@ -78,7 +88,28 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
     _saveProgressOnDispose();
     _videoController?.dispose();
     _audioPlayer?.dispose();
+    context.read<SessionController>().removeListener(_onSessionChanged);
     super.dispose();
+  }
+
+  void _checkSessionStatus() {
+    final session = context.read<SessionController>();
+    if (session.isUnauthenticated && session.sessionExpired) {
+      setState(() {
+        _showSessionExpiredBanner = true;
+      });
+    }
+  }
+
+  void _onSessionChanged() {
+    final session = context.read<SessionController>();
+    if (session.isUnauthenticated && session.sessionExpired) {
+      if (!_showSessionExpiredBanner) {
+        setState(() {
+          _showSessionExpiredBanner = true;
+        });
+      }
+    }
   }
 
   @override
@@ -243,6 +274,7 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
       body: SafeArea(
         child: Column(
           children: <Widget>[
+            if (_showSessionExpiredBanner) _buildSessionExpiredBanner(context),
             _buildTopBar(context),
             _buildProgressBanner(context),
             Expanded(
@@ -258,6 +290,35 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildSessionExpiredBanner(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      color: Colors.amber.shade100,
+      child: Row(
+        children: [
+          Icon(Icons.access_time, color: Colors.amber.shade800),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              'Tu sesión expiró. Por favor, inicia sesión de nuevo.',
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: Colors.amber.shade900,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.of(context).popUntil((route) => route.isFirst);
+            },
+            child: const Text('Ir al login'),
+          ),
+        ],
       ),
     );
   }

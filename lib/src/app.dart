@@ -55,7 +55,7 @@ class _BootstrapGateState extends State<_BootstrapGate> {
         } else if (session.isAuthenticated) {
           page = const HomeShell();
         } else {
-          page = const LoginPage();
+          page = const LoginPage(key: ValueKey('login'));
         }
 
         return AnimatedSwitcher(

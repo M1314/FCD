@@ -10,12 +10,13 @@ import 'package:flutter/foundation.dart';
 enum SessionStatus { checking, unauthenticated, authenticated }
 
 class SessionController extends ChangeNotifier {
-  SessionController()
-    : _storage = AppStorage(),
+SessionController()
+      : _storage = AppStorage(),
       _status = SessionStatus.checking {
     _apiClient = ApiClient(
       onUnauthorized: _handleUnauthorized,
       onTokenRefreshed: _handleTokenRefreshed,
+      storage: _storage,
     );
 
     _authRepository = AuthRepository(apiClient: _apiClient, storage: _storage);
@@ -23,10 +24,10 @@ class SessionController extends ChangeNotifier {
     aiChatRepository = AiChatRepository(apiClient: _apiClient);
   }
 
-  SessionController.forTesting({required ApiClient apiClient})
-    : _storage = AppStorage(),
-      _apiClient = apiClient,
-      _status = SessionStatus.checking {
+SessionController.forTesting({required ApiClient apiClient})
+      : _storage = AppStorage(),
+        _apiClient = apiClient,
+        _status = SessionStatus.checking {
     _authRepository = AuthRepository(apiClient: _apiClient, storage: _storage);
     courseRepository = CourseRepository(apiClient: _apiClient);
     aiChatRepository = AiChatRepository(apiClient: _apiClient);
@@ -42,10 +43,12 @@ class SessionController extends ChangeNotifier {
   SessionStatus _status;
   AuthUser? _user;
   String? _errorMessage;
+  bool _sessionExpired = false;
 
   SessionStatus get status => _status;
   AuthUser? get user => _user;
   String? get errorMessage => _errorMessage;
+  bool get sessionExpired => _sessionExpired;
   ApiClient get apiClient => _apiClient;
 
   bool get isChecking => _status == SessionStatus.checking;
@@ -116,10 +119,34 @@ class SessionController extends ChangeNotifier {
     }
   }
 
+  Future<bool> loginWithStoredCredentials() async {
+    _errorMessage = null;
+    _status = SessionStatus.checking;
+    notifyListeners();
+
+    try {
+      final session = await _authRepository.loginWithStoredCredentials();
+      if (session == null) {
+        _status = SessionStatus.unauthenticated;
+        _errorMessage = 'No se encontraron credenciales guardadas.';
+        notifyListeners();
+        return false;
+      }
+      _applySession(session);
+      return true;
+    } catch (error) {
+      _status = SessionStatus.unauthenticated;
+      _errorMessage = error.toString();
+      notifyListeners();
+      return false;
+    }
+  }
+
   Future<void> logout() async {
     await _authRepository.logout();
     _user = null;
     _errorMessage = null;
+    _sessionExpired = false;
     _status = SessionStatus.unauthenticated;
     notifyListeners();
   }
@@ -149,7 +176,12 @@ class SessionController extends ChangeNotifier {
     }
     await _authRepository.logout();
     _user = null;
+    _sessionExpired = true;
     _status = SessionStatus.unauthenticated;
     notifyListeners();
+  }
+
+  void clearSessionExpired() {
+    _sessionExpired = false;
   }
 }
