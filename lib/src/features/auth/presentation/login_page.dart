@@ -375,10 +375,24 @@ class _LoginPageState extends State<LoginPage> {
     }
 
     try {
-      final authenticated = await _localAuth.authenticate(
-        localizedReason: 'Inicia sesión con tu cuenta',
-        persistAcrossBackgrounding: false,
-      );
+      debugPrint('Starting biometric auth...');
+      bool authenticated = false;
+      try {
+        authenticated = await _localAuth.authenticate(
+          localizedReason: 'Inicia sesión con tu cuenta',
+          persistAcrossBackgrounding: false,
+        ).timeout(const Duration(seconds: 30));
+
+        debugPrint('Auth result: $authenticated');
+      } catch (authError) {
+        debugPrint('Auth error: $authError');
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Error: $authError')),
+          );
+        }
+        return;
+      }
 
       if (!authenticated) {
         if (mounted) {
