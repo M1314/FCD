@@ -127,5 +127,5 @@ flutter test --no-test-assets
 
 ## Limitaciones actuales
 
-- Flujo de registro/recuperación de contraseña no implementado en app.
+- Flujo de recuperación de contraseña no implementado en app.
 - El contenido visible depende de permisos/compras del usuario en backend.
