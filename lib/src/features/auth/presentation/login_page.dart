@@ -74,7 +74,6 @@ class _LoginPageState extends State<LoginPage> {
         if (email != null && email.isNotEmpty && mounted) {
           setState(() {
             _storedEmail = email;
-            _canUseBiometrics = true;
           });
         }
       });
@@ -323,10 +322,7 @@ class _LoginPageState extends State<LoginPage> {
 
   String? _validatePassword(String? value) {
     final text = value ?? '';
-    if (text.isEmpty) {
-      return 'Ingresa tu contraseña.';
-    }
-    if (text.length < 8) {
+    if (text.isNotEmpty && text.length < 8) {
       return 'Mínimo 8 caracteres.';
     }
     return null;
@@ -390,9 +386,14 @@ class _LoginPageState extends State<LoginPage> {
         debugPrint('Auth result: $authenticated');
       } catch (authError) {
         debugPrint('Auth error: $authError');
+        final errorStr = authError.toString().toLowerCase();
+        if (errorStr.contains('usercanceled') || errorStr.contains('usercancel')) {
+          // User intentionally dismissed the biometric prompt — no error needed.
+          return;
+        }
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Error: $authError')),
+            const SnackBar(content: Text('No se pudo autenticar. Inténtalo de nuevo.')),
           );
         }
         return;
