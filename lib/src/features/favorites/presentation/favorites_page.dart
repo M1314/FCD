@@ -278,11 +278,42 @@ class _FavoritesPageState extends State<FavoritesPage> {
             child: _FavoriteCard(
               entry: entryItem.entry,
               onTap: () => _openLesson(entryItem.entry),
+              onRemove: () => _removeFavorite(entryItem.entry),
             ),
           );
         },
       ),
     );
+  }
+
+  Future<void> _removeFavorite(_FavoriteEntry entry) async {
+    final session = context.read<SessionController>();
+    final user = session.user;
+    if (user == null) return;
+
+    try {
+      await _favoritesStorage.toggleFavorite(user.id, entry.lesson.id);
+      if (!mounted) return;
+      setState(() {
+        _favorites = _favorites
+            .where((e) => e.lesson.id != entry.lesson.id)
+            .toList();
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Leccion eliminada de favoritos.'),
+          duration: Duration(seconds: 2),
+        ),
+      );
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('No se pudo eliminar de favoritos. Intenta de nuevo.'),
+          duration: Duration(seconds: 2),
+        ),
+      );
+    }
   }
 
   Future<void> _openLesson(_FavoriteEntry entry) async {
@@ -349,10 +380,15 @@ class _FavoriteEntry {
 }
 
 class _FavoriteCard extends StatelessWidget {
-  const _FavoriteCard({required this.entry, required this.onTap});
+  const _FavoriteCard({
+    required this.entry,
+    required this.onTap,
+    required this.onRemove,
+  });
 
   final _FavoriteEntry entry;
   final VoidCallback onTap;
+  final VoidCallback onRemove;
 
   @override
   Widget build(BuildContext context) {
@@ -373,10 +409,16 @@ class _FavoriteCard extends StatelessWidget {
           padding: const EdgeInsets.all(14),
           child: Row(
             children: <Widget>[
-              const Icon(
-                Icons.bookmark_rounded,
-                color: AppTheme.deepBrown,
-                size: 28,
+              IconButton(
+                onPressed: onRemove,
+                icon: const Icon(
+                  Icons.bookmark_rounded,
+                  color: AppTheme.deepBrown,
+                  size: 28,
+                ),
+                tooltip: 'Quitar de favoritos',
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(),
               ),
               const SizedBox(width: 14),
               Expanded(
