@@ -9,8 +9,8 @@ import 'package:fcd_app/src/state/session_controller.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-class AnimatedFavoriteItem extends StatefulWidget {
-  const AnimatedFavoriteItem({
+class _AnimatedFavoriteItem extends StatefulWidget {
+  const _AnimatedFavoriteItem({
     super.key,
     required this.child,
   });
@@ -18,10 +18,10 @@ class AnimatedFavoriteItem extends StatefulWidget {
   final Widget child;
 
   @override
-  State<AnimatedFavoriteItem> createState() => _AnimatedFavoriteItemState();
+  State<_AnimatedFavoriteItem> createState() => _AnimatedFavoriteItemState();
 }
 
-class _AnimatedFavoriteItemState extends State<AnimatedFavoriteItem>
+class _AnimatedFavoriteItemState extends State<_AnimatedFavoriteItem>
     with SingleTickerProviderStateMixin {
   late AnimationController _controller;
   late Animation<Offset> _slideAnimation;
@@ -81,8 +81,8 @@ class FavoritesPage extends StatefulWidget {
 
 class _FavoritesPageState extends State<FavoritesPage> {
   final FavoritesStorage _favoritesStorage = FavoritesStorage();
-  final Map<int, GlobalKey<_AnimatedFavoriteItemState>> _itemKeys = {};
   final FavoritesCacheStorage _favoritesCacheStorage = FavoritesCacheStorage();
+  final Map<int, GlobalKey<_AnimatedFavoriteItemState>> _itemKeys = {};
 
   bool _loading = true;
   bool _isRefreshing = false;
@@ -118,6 +118,7 @@ class _FavoritesPageState extends State<FavoritesPage> {
         if (!mounted) return;
         setState(() {
           _favorites = <_FavoriteEntry>[];
+          _itemKeys.clear();
           _loading = false;
           _isRefreshing = false;
           _notice = null;
@@ -142,6 +143,9 @@ class _FavoritesPageState extends State<FavoritesPage> {
         _notice = null;
         if (cachedEntries.isNotEmpty) {
           _favorites = cachedEntries;
+          _itemKeys.removeWhere(
+            (id, _) => !cachedEntries.any((e) => e.lesson.id == id),
+          );
         }
       });
 
@@ -195,6 +199,9 @@ class _FavoritesPageState extends State<FavoritesPage> {
       if (!mounted) return;
       setState(() {
         _favorites = entries;
+        _itemKeys.removeWhere(
+          (id, _) => !entries.any((e) => e.lesson.id == id),
+        );
         _loading = false;
         _isRefreshing = false;
         _error = entries.isEmpty && failedCount == courses.length
@@ -341,7 +348,7 @@ class _FavoritesPageState extends State<FavoritesPage> {
             entryItem.entry.lesson.id,
             () => GlobalKey<_AnimatedFavoriteItemState>(),
           );
-          return AnimatedFavoriteItem(
+          return _AnimatedFavoriteItem(
             key: itemKey,
             child: Padding(
               padding: const EdgeInsets.only(bottom: 10),
@@ -358,25 +365,26 @@ class _FavoritesPageState extends State<FavoritesPage> {
   }
 
   Future<void> _removeFavorite(_FavoriteEntry entry) async {
-    // Trigger animation first
-    final itemKey = _itemKeys[entry.lesson.id];
-    if (itemKey?.currentState != null) {
-      await itemKey!.currentState!.dismiss();
-    }
-
-    if (!mounted) return;
-
     final session = context.read<SessionController>();
     final user = session.user;
     if (user == null) return;
 
     try {
-      await _favoritesStorage.toggleFavorite(user.id, entry.lesson.id);
+      // Persist first; animate only on success.
+      await _favoritesStorage.removeFavorite(user.id, entry.lesson.id);
       if (!mounted) return;
+
+      final itemKey = _itemKeys[entry.lesson.id];
+      if (itemKey?.currentState != null) {
+        await itemKey!.currentState!.dismiss();
+      }
+      if (!mounted) return;
+
       setState(() {
         _favorites = _favorites
             .where((e) => e.lesson.id != entry.lesson.id)
             .toList();
+        _itemKeys.remove(entry.lesson.id);
       });
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(

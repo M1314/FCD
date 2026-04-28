@@ -21,6 +21,17 @@ class FavoritesStorage {
     }
   }
 
+  /// Removes [lessonId] from favourites. No-op if it is not currently favourited.
+  Future<void> removeFavorite(int userId, int lessonId) async {
+    final favorites = await getFavorites(userId);
+    if (!favorites.remove(lessonId)) return;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(
+      '$_prefix$userId',
+      jsonEncode(favorites.toList()),
+    );
+  }
+
   /// Toggles the favourite state for [lessonId] and returns the new state.
   Future<bool> toggleFavorite(int userId, int lessonId) async {
     final favorites = await getFavorites(userId);

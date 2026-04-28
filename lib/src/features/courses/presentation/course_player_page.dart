@@ -66,6 +66,8 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
   final Set<int> _completedLessonIds = <int>{};
   Set<int> _favoriteIds = <int>{};
 
+  SessionController? _cachedSession;
+
   @override
   void initState() {
     super.initState();
@@ -79,7 +81,11 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    context.read<SessionController>().addListener(_onSessionChanged);
+    final session = context.read<SessionController>();
+    if (_cachedSession == null) {
+      session.addListener(_onSessionChanged);
+      _cachedSession = session;
+    }
   }
 
   @override
@@ -88,11 +94,7 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
     _saveProgressOnDispose();
     _videoController?.dispose();
     _audioPlayer?.dispose();
-    try {
-      context.read<SessionController>().removeListener(_onSessionChanged);
-    } catch (_) {
-      // Widget may be deactivated
-    }
+    _cachedSession?.removeListener(_onSessionChanged);
     super.dispose();
   }
 
