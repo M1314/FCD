@@ -380,7 +380,7 @@ class _FavoritesPageState extends State<FavoritesPage> {
       });
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Leccion eliminada de favoritos.'),
+          content: Text('Lección eliminada de favoritos.'),
           duration: Duration(seconds: 2),
         ),
       );
