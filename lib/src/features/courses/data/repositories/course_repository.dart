@@ -44,7 +44,7 @@ class CourseRepository {
     final result = asMap(payload['Result']);
     final courseRaw = asMap(result['curso']);
     if (courseRaw.isEmpty) {
-      throw const AppException('No se encontro informacion del curso.');
+      throw const AppException('No se encontró información del curso.');
     }
 
     return Course.fromJson(courseRaw);
@@ -106,7 +106,7 @@ class CourseRepository {
     if (status != 200) {
       throw AppException(
         payload['strAnswer']?.toString() ??
-            'No se pudo actualizar el estado de la leccion.',
+            'No se pudo actualizar el estado de la lección.',
         statusCode: status,
       );
     }

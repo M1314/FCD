@@ -278,7 +278,7 @@ class ApiClient {
 
     if (error.type == DioExceptionType.connectionTimeout ||
         error.type == DioExceptionType.receiveTimeout) {
-      message = 'La conexion tardo demasiado. Revisa tu internet.';
+      message = 'La conexión tardó demasiado. Revisa tu internet.';
     }
 
     if (error.type == DioExceptionType.connectionError) {

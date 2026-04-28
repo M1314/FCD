@@ -66,6 +66,8 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
   final Set<int> _completedLessonIds = <int>{};
   Set<int> _favoriteIds = <int>{};
 
+  SessionController? _cachedSession;
+
   @override
   void initState() {
     super.initState();
@@ -79,7 +81,11 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    context.read<SessionController>().addListener(_onSessionChanged);
+    final session = context.read<SessionController>();
+    if (_cachedSession == null) {
+      session.addListener(_onSessionChanged);
+      _cachedSession = session;
+    }
   }
 
   @override
@@ -88,7 +94,7 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
     _saveProgressOnDispose();
     _videoController?.dispose();
     _audioPlayer?.dispose();
-    context.read<SessionController>().removeListener(_onSessionChanged);
+    _cachedSession?.removeListener(_onSessionChanged);
     super.dispose();
   }
 
@@ -126,7 +132,7 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
       }
       setState(() {
         _isLoading = false;
-        _initializationError = 'Este curso aun no tiene lecciones disponibles.';
+        _initializationError = 'Este curso aún no tiene lecciones disponibles.';
       });
       return;
     }
@@ -139,7 +145,7 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
       }
       setState(() {
         _isLoading = false;
-        _initializationError = 'Sesion no valida. Vuelve a iniciar sesion.';
+        _initializationError = 'Sesión no válida. Vuelve a iniciar sesión.';
       });
       return;
     }
@@ -490,7 +496,7 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
     final resource = currentResource;
     if (resource == null) {
       return _buildEmptyViewer(
-        'Esta leccion aun no tiene recursos disponibles.',
+        'Esta lección aún no tiene recursos disponibles.',
       );
     }
 
@@ -573,7 +579,7 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
           ),
           const SizedBox(height: 10),
           Text(
-            'Recursos de la leccion',
+            'Recursos de la lección',
             style: Theme.of(
               context,
             ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w700),
