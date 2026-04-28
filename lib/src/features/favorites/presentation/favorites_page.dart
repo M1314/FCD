@@ -264,7 +264,7 @@ class _FavoritesPageState extends State<FavoritesPage> {
     if (_favorites.isEmpty) {
       return _MessageView(
         icon: Icons.bookmark_border_rounded,
-        title: 'Sin favoritos aun',
+        title: 'Sin favoritos aún',
         message:
             'Guarda lecciones como favoritas desde el reproductor y aparecerán aquí.',
         actionLabel: 'Actualizar',
