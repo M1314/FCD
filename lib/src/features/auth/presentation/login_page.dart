@@ -6,8 +6,26 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:local_auth/local_auth.dart';
 import 'package:provider/provider.dart';
 
+/// Validates a login password for the manual login form.
+///
+/// Returns `null` (valid) when [value] is null or empty — empty passwords are
+/// permitted so that users without a device passcode can still submit the form
+/// and let the server reject invalid credentials. Returns an error message when
+/// [value] is non-empty but shorter than 8 characters.
+@visibleForTesting
+String? validateLoginPassword(String? value) {
+  final text = value ?? '';
+  if (text.isNotEmpty && text.length < 8) {
+    return 'Mínimo 8 caracteres.';
+  }
+  return null;
+}
+
 class LoginPage extends StatefulWidget {
-  const LoginPage({super.key});
+  const LoginPage({super.key, this.localAuth});
+
+  @visibleForTesting
+  final LocalAuthentication? localAuth;
 
   @override
   State<LoginPage> createState() => _LoginPageState();
@@ -19,7 +37,7 @@ class _LoginPageState extends State<LoginPage> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _formKey = GlobalKey<FormState>();
-  final _localAuth = LocalAuthentication();
+  late final LocalAuthentication _localAuth;
 
   bool _obscurePassword = true;
   bool _isSubmitting = false;
@@ -29,6 +47,7 @@ class _LoginPageState extends State<LoginPage> {
   @override
   void initState() {
     super.initState();
+    _localAuth = widget.localAuth ?? LocalAuthentication();
     _checkBiometrics();
   }
 
@@ -320,13 +339,7 @@ class _LoginPageState extends State<LoginPage> {
     return null;
   }
 
-  String? _validatePassword(String? value) {
-    final text = value ?? '';
-    if (text.isNotEmpty && text.length < 8) {
-      return 'Mínimo 8 caracteres.';
-    }
-    return null;
-  }
+  String? _validatePassword(String? value) => validateLoginPassword(value);
 
   Future<void> _submit() async {
     if (_isSubmitting) {
