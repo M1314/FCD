@@ -41,6 +41,38 @@ void main() {
     });
   });
 
+  // ─── Fix 3: form submission with empty password (end-to-end) ─────────────
+
+  group('LoginPage password field — form submission', () {
+    testWidgets(
+      'form submits normally with valid email and empty password (no client-side block)',
+      (tester) async {
+        final session = SessionController.forTesting(
+          apiClient: _FakeApiClient(),
+        );
+
+        await tester.pumpWidget(
+          _wrap(session, LoginPage(localAuth: _FakeLocalAuth(biometricsAvailable: false))),
+        );
+        await tester.pumpAndSettle();
+
+        // Fill in a valid email, leave password empty (default empty).
+        await tester.enterText(find.byType(TextFormField).first, 'user@example.com');
+
+        // Tap the submit button.
+        await tester.tap(find.text('Ingresar'));
+        await tester.pumpAndSettle();
+
+        // No client-side password validation error should be shown.
+        expect(find.text('Mínimo 8 caracteres.'), findsNothing);
+        // The request must have reached the (fake) server — proof that the form
+        // did not block submission. The fake server returns {} which causes the
+        // repository to surface a generic server error.
+        expect(find.text('No se pudo iniciar sesión.'), findsOneWidget);
+      },
+    );
+  });
+
   // ─── Fix 1: biometric button visibility ──────────────────────────────────
 
   group('LoginPage biometric button', () {
