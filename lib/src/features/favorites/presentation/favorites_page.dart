@@ -497,7 +497,10 @@ class _FavoriteCard extends StatelessWidget {
                 ),
                 tooltip: 'Quitar de favoritos',
                 padding: EdgeInsets.zero,
-                constraints: const BoxConstraints(),
+                constraints: const BoxConstraints(
+                  minWidth: 48,
+                  minHeight: 48,
+                ),
               ),
               const SizedBox(width: 14),
               Expanded(
