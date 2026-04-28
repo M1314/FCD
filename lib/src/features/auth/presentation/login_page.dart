@@ -1,7 +1,6 @@
 import 'package:fcd_app/src/core/theme/app_theme.dart';
 import 'package:fcd_app/src/features/auth/presentation/register_page.dart';
 import 'package:fcd_app/src/state/session_controller.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:local_auth/local_auth.dart';
@@ -44,6 +43,7 @@ class _LoginPageState extends State<LoginPage> {
         debugPrint('Biometrics not available on device');
         return;
       }
+      if (!mounted) return;
       final controller = context.read<SessionController>();
       final storage = controller.apiClient.storage;
       final storedEmail = await storage.getUserEmail();
@@ -212,6 +212,8 @@ class _LoginPageState extends State<LoginPage> {
                 controller: _emailController,
                 keyboardType: TextInputType.emailAddress,
                 textInputAction: TextInputAction.next,
+                autocorrect: false,
+                enableSuggestions: false,
                 onTapOutside: (_) => FocusScope.of(context).unfocus(),
                 decoration: const InputDecoration(
                   labelText: 'Correo',
@@ -224,6 +226,8 @@ class _LoginPageState extends State<LoginPage> {
                 controller: _passwordController,
                 obscureText: _obscurePassword,
                 textInputAction: TextInputAction.done,
+                autocorrect: false,
+                enableSuggestions: false,
                 onFieldSubmitted: (_) => _submit(),
                 onTapOutside: (_) => FocusScope.of(context).unfocus(),
                 decoration: InputDecoration(

@@ -88,7 +88,11 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
     _saveProgressOnDispose();
     _videoController?.dispose();
     _audioPlayer?.dispose();
-    context.read<SessionController>().removeListener(_onSessionChanged);
+    try {
+      context.read<SessionController>().removeListener(_onSessionChanged);
+    } catch (_) {
+      // Widget may be deactivated
+    }
     super.dispose();
   }
 
@@ -126,7 +130,7 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
       }
       setState(() {
         _isLoading = false;
-        _initializationError = 'Este curso aun no tiene lecciones disponibles.';
+        _initializationError = 'Este curso aún no tiene lecciones disponibles.';
       });
       return;
     }
@@ -139,7 +143,7 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
       }
       setState(() {
         _isLoading = false;
-        _initializationError = 'Sesion no valida. Vuelve a iniciar sesion.';
+        _initializationError = 'Sesión no válida. Vuelve a iniciar sesión.';
       });
       return;
     }
@@ -490,7 +494,7 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
     final resource = currentResource;
     if (resource == null) {
       return _buildEmptyViewer(
-        'Esta leccion aun no tiene recursos disponibles.',
+        'Esta lección aún no tiene recursos disponibles.',
       );
     }
 
@@ -573,7 +577,7 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
           ),
           const SizedBox(height: 10),
           Text(
-            'Recursos de la leccion',
+            'Recursos de la lección',
             style: Theme.of(
               context,
             ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w700),

@@ -218,7 +218,7 @@ class _AiChatPageState extends State<AiChatPage> {
         _checkingAccess = false;
         _hasAccess = false;
         _accessCheckFailed = true;
-        _accessError = 'Sesion no valida. Vuelve a iniciar sesion.';
+        _accessError = 'Sesión no válida. Vuelve a iniciar sesión.';
       });
       return;
     }

@@ -326,7 +326,7 @@ class _DownloadsEmpty extends StatelessWidget {
             ),
             const SizedBox(height: 8),
             Text(
-              'Cuando descargues archivos desde una leccion apareceran aqui.',
+              'Cuando descargues archivos desde una lección aparecerán aquí.',
               textAlign: TextAlign.center,
               style: Theme.of(context).textTheme.bodyMedium,
             ),

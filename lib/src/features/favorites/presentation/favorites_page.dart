@@ -9,6 +9,69 @@ import 'package:fcd_app/src/state/session_controller.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+class AnimatedFavoriteItem extends StatefulWidget {
+  const AnimatedFavoriteItem({
+    super.key,
+    required this.child,
+  });
+
+  final Widget child;
+
+  @override
+  State<AnimatedFavoriteItem> createState() => _AnimatedFavoriteItemState();
+}
+
+class _AnimatedFavoriteItemState extends State<AnimatedFavoriteItem>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  late Animation<Offset> _slideAnimation;
+  late Animation<double> _fadeAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      duration: const Duration(milliseconds: 300),
+      vsync: this,
+    );
+    _slideAnimation = Tween<Offset>(
+      begin: Offset.zero,
+      end: const Offset(1, 0),
+    ).animate(CurvedAnimation(
+      parent: _controller,
+      curve: Curves.easeInOut,
+    ));
+    _fadeAnimation = Tween<double>(
+      begin: 1.0,
+      end: 0.0,
+    ).animate(CurvedAnimation(
+      parent: _controller,
+      curve: Curves.easeInOut,
+    ));
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  Future<void> dismiss() async {
+    await _controller.forward();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SlideTransition(
+      position: _slideAnimation,
+      child: FadeTransition(
+        opacity: _fadeAnimation,
+        child: widget.child,
+      ),
+    );
+  }
+}
+
 class FavoritesPage extends StatefulWidget {
   const FavoritesPage({super.key});
 
@@ -18,6 +81,7 @@ class FavoritesPage extends StatefulWidget {
 
 class _FavoritesPageState extends State<FavoritesPage> {
   final FavoritesStorage _favoritesStorage = FavoritesStorage();
+  final Map<int, GlobalKey<_AnimatedFavoriteItemState>> _itemKeys = {};
   final FavoritesCacheStorage _favoritesCacheStorage = FavoritesCacheStorage();
 
   bool _loading = true;
@@ -41,7 +105,7 @@ class _FavoritesPageState extends State<FavoritesPage> {
     if (user == null) {
       setState(() {
         _loading = false;
-        _error = 'Sesion no valida. Vuelve a iniciar sesion.';
+        _error = 'Sesión no válida. Vuelve a iniciar sesión.';
       });
       return;
     }
@@ -202,7 +266,7 @@ class _FavoritesPageState extends State<FavoritesPage> {
         icon: Icons.bookmark_border_rounded,
         title: 'Sin favoritos aun',
         message:
-            'Guarda lecciones como favoritas desde el reproductor y apareceran aqui.',
+            'Guarda lecciones como favoritas desde el reproductor y aparecerán aquí.',
         actionLabel: 'Actualizar',
         onAction: _loadFavorites,
       );
@@ -273,12 +337,19 @@ class _FavoritesPageState extends State<FavoritesPage> {
             );
           }
           final entryItem = item as _EntryItem;
-          return Padding(
-            padding: const EdgeInsets.only(bottom: 10),
-            child: _FavoriteCard(
-              entry: entryItem.entry,
-              onTap: () => _openLesson(entryItem.entry),
-              onRemove: () => _removeFavorite(entryItem.entry),
+          final itemKey = _itemKeys.putIfAbsent(
+            entryItem.entry.lesson.id,
+            () => GlobalKey<_AnimatedFavoriteItemState>(),
+          );
+          return AnimatedFavoriteItem(
+            key: itemKey,
+            child: Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: _FavoriteCard(
+                entry: entryItem.entry,
+                onTap: () => _openLesson(entryItem.entry),
+                onRemove: () => _removeFavorite(entryItem.entry),
+              ),
             ),
           );
         },
@@ -287,6 +358,14 @@ class _FavoritesPageState extends State<FavoritesPage> {
   }
 
   Future<void> _removeFavorite(_FavoriteEntry entry) async {
+    // Trigger animation first
+    final itemKey = _itemKeys[entry.lesson.id];
+    if (itemKey?.currentState != null) {
+      await itemKey!.currentState!.dismiss();
+    }
+
+    if (!mounted) return;
+
     final session = context.read<SessionController>();
     final user = session.user;
     if (user == null) return;
@@ -323,7 +402,7 @@ class _FavoritesPageState extends State<FavoritesPage> {
       }
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Esta leccion ya no tiene contenido disponible.'),
+          content: Text('Esta lección ya no tiene contenido disponible.'),
         ),
       );
       return;

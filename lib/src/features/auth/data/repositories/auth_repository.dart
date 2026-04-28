@@ -23,7 +23,7 @@ class AuthRepository {
     final statusCode = payload['intResponse'] as int? ?? 500;
     if (statusCode != 200) {
       throw AppException(
-        payload['strAnswer']?.toString() ?? 'No se pudo iniciar sesion.',
+        payload['strAnswer']?.toString() ?? 'No se pudo iniciar sesión.',
         statusCode: statusCode,
       );
     }
@@ -33,7 +33,7 @@ class AuthRepository {
     final user = AuthUser.fromLoginResponse(payload);
 
     if (accessToken.isEmpty || refreshToken.isEmpty || user.id == 0) {
-      throw const AppException('La sesion recibida es invalida.');
+      throw const AppException('La sesión recibida es inválida.');
     }
 
     final session = AuthSession(
