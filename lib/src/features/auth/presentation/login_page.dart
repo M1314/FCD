@@ -386,8 +386,8 @@ class _LoginPageState extends State<LoginPage> {
         debugPrint('Auth result: $authenticated');
       } catch (authError) {
         debugPrint('Auth error: $authError');
-        final errorStr = authError.toString().toLowerCase();
-        if (errorStr.contains('usercanceled') || errorStr.contains('usercancel')) {
+        if (authError is LocalAuthException &&
+            authError.code == LocalAuthExceptionCode.userCanceled) {
           // User intentionally dismissed the biometric prompt — no error needed.
           return;
         }
