@@ -1112,12 +1112,18 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
     int requestId, {
     required int restorePositionMs,
   }) {
+    _debugVideoInitLog(
+      'start requestId=$requestId resource=$_currentMediaResourceKey restoreMs=$restorePositionMs',
+    );
     int attempts = 0;
     const maxAttempts = 120;
     Timer.periodic(const Duration(milliseconds: 100), (timer) {
       if (!mounted ||
           requestId != _resourcePreparationRequestId ||
           _videoController != controller) {
+        _debugVideoInitLog(
+          'cancel requestId=$requestId mounted=$mounted activeRequest=$_resourcePreparationRequestId controllerChanged=${_videoController != controller}',
+        );
         timer.cancel();
         return;
       }
@@ -1128,13 +1134,27 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
       final hasDuration = duration != null && duration > Duration.zero;
       final isReady = value != null && value.initialized && hasDuration;
 
+      // Debug-only telemetry to understand readiness timing differences across
+      // devices/simulators without flooding release logs.
+      if (attempts == 0 || attempts % 10 == 0) {
+        _debugVideoInitLog(
+          'poll requestId=$requestId attempt=$attempts initialized=${value?.initialized} duration=$duration',
+        );
+      }
+
       if (isReady) {
         timer.cancel();
+        _debugVideoInitLog(
+          'ready requestId=$requestId attempt=$attempts duration=$duration',
+        );
         if (restorePositionMs > 0) {
           final durationMs = duration.inMilliseconds;
           final clampedPositionMs = restorePositionMs.clamp(0, durationMs);
           try {
             controller.seekTo(Duration(milliseconds: clampedPositionMs));
+            _debugVideoInitLog(
+              'seek requestId=$requestId targetMs=$clampedPositionMs durationMs=$durationMs',
+            );
           } catch (_) {}
         }
         if (mounted && requestId == _resourcePreparationRequestId) {
@@ -1148,6 +1168,9 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
       attempts++;
       if (attempts >= maxAttempts) {
         timer.cancel();
+        _debugVideoInitLog(
+          'timeout requestId=$requestId attempts=$attempts initialized=${value?.initialized} duration=$duration',
+        );
         if (mounted && requestId == _resourcePreparationRequestId) {
           setState(() {
             _videoInitFailed = true;
@@ -1155,6 +1178,15 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
         }
       }
     });
+  }
+
+  // Purpose: provide deep diagnostics for video initialization races in debug
+  // builds only. Using assert keeps logs out of release/profile builds.
+  void _debugVideoInitLog(String message) {
+    assert(() {
+      debugPrint('[CoursePlayer:VideoInit] $message');
+      return true;
+    }());
   }
 
   void _setupDocument(String url) {
