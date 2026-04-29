@@ -2,7 +2,6 @@ import 'package:fcd_app/src/core/theme/app_theme.dart';
 import 'package:fcd_app/src/features/auth/presentation/register_page.dart';
 import 'package:fcd_app/src/state/session_controller.dart';
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:local_auth/local_auth.dart';
 import 'package:provider/provider.dart';
 
@@ -210,7 +209,7 @@ class _LoginPageState extends State<LoginPage> {
         Text(
           'Bienvenido de nuevo',
           textAlign: TextAlign.center,
-          style: GoogleFonts.cormorantGaramond(
+          style: Theme.of(context).textTheme.titleLarge?.copyWith(
             fontSize: 34,
             fontWeight: FontWeight.w700,
             color: AppTheme.deepBrown,
