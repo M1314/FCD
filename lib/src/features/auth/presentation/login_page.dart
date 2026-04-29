@@ -401,12 +401,11 @@ class _LoginPageState extends State<LoginPage> {
     }
   }
 
-  /// Logs in using the stored account.
+  /// Logs in using the stored account via device authentication.
   ///
-  /// If the device supports biometric authentication, the user is asked to
-  /// verify their identity first. Otherwise, stored credentials are used
-  /// directly — the biometric check is only a security gate, not the source
-  /// of the credentials themselves.
+  /// Requires device auth to be available ([_canUseDeviceAuth]). If device
+  /// auth is unavailable, the call is a no-op. When device auth succeeds, the
+  /// stored credentials are used to complete the login.
   Future<void> _loginWithStoredAccount() async {
     if (_isSubmitting || _storedEmail == null) return;
     if (!_canUseDeviceAuth) return;
@@ -443,14 +442,9 @@ class _LoginPageState extends State<LoginPage> {
         return;
       }
 
-      if (!authenticated) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Autenticación cancelada o fallida')),
-          );
-        }
-        return;
-      }
+      // authenticate() returning false means the user cancelled or dismissed
+      // the prompt without an exception — treat it as a silent cancel.
+      if (!authenticated) return;
       if (!mounted) return;
 
       setState(() {

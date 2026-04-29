@@ -237,6 +237,27 @@ void main() {
     );
 
     testWidgets(
+      'no snackbar when authenticate() returns false (silent cancel)',
+      (tester) async {
+        final session = SessionController.forTesting(
+          apiClient: _FakeApiClient(storedEmail: 'user@example.com'),
+        );
+        final fakeAuth = _FakeLocalAuth(
+          biometricsAvailable: true,
+          authenticateResult: false,
+        );
+
+        await tester.pumpWidget(_wrap(session, LoginPage(localAuth: fakeAuth)));
+        await tester.pumpAndSettle();
+
+        await tester.tap(find.byIcon(Icons.face));
+        await tester.pumpAndSettle();
+
+        expect(find.byType(SnackBar), findsNothing);
+      },
+    );
+
+    testWidgets(
       'generic error snackbar shown for non-cancel biometric errors',
       (tester) async {
         final session = SessionController.forTesting(
