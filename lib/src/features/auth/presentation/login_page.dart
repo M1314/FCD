@@ -55,21 +55,25 @@ class _LoginPageState extends State<LoginPage> {
     try {
       await Future<void>.delayed(const Duration(milliseconds: 100));
       if (!mounted) return;
-      final canCheck = await _localAuth.canCheckBiometrics;
-      final isDeviceSupported = await _localAuth.isDeviceSupported();
-      debugPrint('canCheckBiometrics: $canCheck, isDeviceSupported: $isDeviceSupported');
-      if (!canCheck || !isDeviceSupported) {
-        debugPrint('Biometrics not available on device');
-        return;
-      }
-      if (!mounted) return;
+
+      // Load the stored email first — it is needed regardless of whether
+      // biometrics are available, because the quick-login button is shown
+      // whenever a stored account exists.
       final controller = context.read<SessionController>();
       final storage = controller.apiClient.storage;
       final storedEmail = await storage.getUserEmail();
-      if (storedEmail != null && storedEmail.isNotEmpty && mounted) {
+      if (storedEmail == null || storedEmail.isEmpty) return;
+
+      if (!mounted) return;
+
+      final canCheck = await _localAuth.canCheckBiometrics;
+      final isDeviceSupported = await _localAuth.isDeviceSupported();
+      debugPrint('canCheckBiometrics: $canCheck, isDeviceSupported: $isDeviceSupported');
+
+      if (mounted) {
         setState(() {
           _storedEmail = storedEmail;
-          _canUseBiometrics = true;
+          _canUseBiometrics = canCheck && isDeviceSupported;
         });
       }
     } catch (e) {
@@ -246,7 +250,18 @@ class _LoginPageState extends State<LoginPage> {
                 textInputAction: TextInputAction.done,
                 autocorrect: false,
                 enableSuggestions: false,
-                onFieldSubmitted: (_) => _submit(),
+                onFieldSubmitted: (_) {
+                  // If both fields are empty and a stored account is available,
+                  // use stored credentials directly (with biometric gate if
+                  // the device supports it).
+                  if (_emailController.text.trim().isEmpty &&
+                      _passwordController.text.isEmpty &&
+                      _storedEmail != null) {
+                    _loginWithStoredAccount();
+                  } else {
+                    _submit();
+                  }
+                },
                 onTapOutside: (_) => FocusScope.of(context).unfocus(),
                 decoration: InputDecoration(
                   labelText: 'Contraseña',
@@ -267,12 +282,12 @@ class _LoginPageState extends State<LoginPage> {
                 validator: _validatePassword,
               ),
               const SizedBox(height: 18),
-              if (_canUseBiometrics && _storedEmail != null)
+              if (_storedEmail != null)
                 Padding(
                   padding: const EdgeInsets.only(bottom: 12),
                   child: OutlinedButton.icon(
-                    onPressed: _isSubmitting ? null : _loginWithBiometrics,
-                    icon: const Icon(Icons.face),
+                    onPressed: _isSubmitting ? null : _loginWithStoredAccount,
+                    icon: Icon(_canUseBiometrics ? Icons.face : Icons.person_outline),
                     label: Text('Ingresar con: $_storedEmail'),
                     style: OutlinedButton.styleFrom(
                       foregroundColor: AppTheme.deepBrown,
@@ -379,6 +394,36 @@ class _LoginPageState extends State<LoginPage> {
       setState(() {
         _isSubmitting = false;
       });
+    }
+  }
+
+  /// Logs in using the stored account.
+  ///
+  /// If the device supports biometric authentication, the user is asked to
+  /// verify their identity first. Otherwise, stored credentials are used
+  /// directly — the biometric check is only a security gate, not the source
+  /// of the credentials themselves.
+  Future<void> _loginWithStoredAccount() async {
+    if (_isSubmitting || _storedEmail == null) return;
+
+    if (_canUseBiometrics) {
+      await _loginWithBiometrics();
+      return;
+    }
+
+    // No biometric gate — proceed directly with stored credentials.
+    FocusScope.of(context).unfocus();
+    setState(() => _isSubmitting = true);
+
+    try {
+      final sessionController = context.read<SessionController>();
+      sessionController.clearError();
+      sessionController.clearSessionExpired();
+      await sessionController.loginWithStoredCredentials();
+    } catch (_) {
+      // Error is surfaced via SessionController.errorMessage.
+    } finally {
+      if (mounted) setState(() => _isSubmitting = false);
     }
   }
 

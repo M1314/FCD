@@ -25,7 +25,7 @@ SessionController()
   }
 
 SessionController.forTesting({required ApiClient apiClient})
-      : _storage = AppStorage(),
+      : _storage = apiClient.storage,
         _apiClient = apiClient,
         _status = SessionStatus.checking {
     _authRepository = AuthRepository(apiClient: _apiClient, storage: _storage);

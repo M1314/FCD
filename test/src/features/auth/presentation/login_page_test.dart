@@ -75,9 +75,9 @@ void main() {
 
   // ─── Fix 1: biometric button visibility ──────────────────────────────────
 
-  group('LoginPage biometric button', () {
+  group('LoginPage quick-login button', () {
     testWidgets(
-      'is not shown when device biometrics are unavailable',
+      'face icon not shown when biometrics unavailable; person icon shown instead',
       (tester) async {
         final session = SessionController.forTesting(
           apiClient: _FakeApiClient(storedEmail: 'user@example.com'),
@@ -87,12 +87,31 @@ void main() {
         await tester.pumpWidget(_wrap(session, LoginPage(localAuth: fakeAuth)));
         await tester.pumpAndSettle();
 
+        // No biometric (face) icon.
         expect(find.byIcon(Icons.face), findsNothing);
+        // Person icon IS shown because stored credentials exist.
+        expect(find.byIcon(Icons.person_outline), findsOneWidget);
       },
     );
 
     testWidgets(
-      'is shown when biometrics available and email is stored',
+      'no quick-login button shown when there is no stored account',
+      (tester) async {
+        final session = SessionController.forTesting(
+          apiClient: _FakeApiClient(), // storedEmail is null
+        );
+        final fakeAuth = _FakeLocalAuth(biometricsAvailable: false);
+
+        await tester.pumpWidget(_wrap(session, LoginPage(localAuth: fakeAuth)));
+        await tester.pumpAndSettle();
+
+        expect(find.byIcon(Icons.face), findsNothing);
+        expect(find.byIcon(Icons.person_outline), findsNothing);
+      },
+    );
+
+    testWidgets(
+      'face icon is shown when biometrics available and email is stored',
       (tester) async {
         final session = SessionController.forTesting(
           apiClient: _FakeApiClient(storedEmail: 'user@example.com'),
@@ -103,6 +122,55 @@ void main() {
         await tester.pumpAndSettle();
 
         expect(find.byIcon(Icons.face), findsOneWidget);
+      },
+    );
+
+    testWidgets(
+      'tapping person button when no biometrics uses stored credentials directly',
+      (tester) async {
+        final session = SessionController.forTesting(
+          apiClient: _FakeApiClient(storedEmail: 'user@example.com'),
+          // _FakeStorage.getPassword() returns null → loginWithStoredCredentials
+          // surfaces 'No se encontraron credenciales guardadas.'
+        );
+        final fakeAuth = _FakeLocalAuth(biometricsAvailable: false);
+
+        await tester.pumpWidget(_wrap(session, LoginPage(localAuth: fakeAuth)));
+        await tester.pumpAndSettle();
+
+        await tester.tap(find.byIcon(Icons.person_outline));
+        await tester.pumpAndSettle();
+
+        // No biometric prompt was shown; the stored-credentials path was taken.
+        expect(
+          find.text('No se encontraron credenciales guardadas.'),
+          findsOneWidget,
+        );
+      },
+    );
+
+    testWidgets(
+      'pressing enter on empty password field uses stored credentials when no biometrics',
+      (tester) async {
+        final session = SessionController.forTesting(
+          apiClient: _FakeApiClient(storedEmail: 'user@example.com'),
+        );
+        final fakeAuth = _FakeLocalAuth(biometricsAvailable: false);
+
+        await tester.pumpWidget(_wrap(session, LoginPage(localAuth: fakeAuth)));
+        await tester.pumpAndSettle();
+
+        // Both fields are empty; focus the password field and submit.
+        await tester.showKeyboard(find.byType(TextFormField).last);
+        await tester.testTextInput.receiveAction(TextInputAction.done);
+        await tester.pumpAndSettle();
+
+        // Stored-credentials path was taken (no manual-form validation error).
+        expect(find.text('Ingresa tu correo.'), findsNothing);
+        expect(
+          find.text('No se encontraron credenciales guardadas.'),
+          findsOneWidget,
+        );
       },
     );
   });
