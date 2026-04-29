@@ -290,7 +290,10 @@ void main() {
 Widget _wrap(SessionController session, Widget child) {
   return ChangeNotifierProvider<SessionController>.value(
     value: session,
-    child: MaterialApp(home: child),
+    child: MaterialApp(
+      theme: ThemeData(splashFactory: NoSplash.splashFactory),
+      home: child,
+    ),
   );
 }
 

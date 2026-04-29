@@ -206,7 +206,7 @@ class _LoginPageState extends State<LoginPage> {
           child: Image.asset(
             'assets/images/logo.jpg',
             fit: BoxFit.cover,
-            errorBuilder: (_, __, ___) => const ColoredBox(
+            errorBuilder: (context, error, stackTrace) => const ColoredBox(
               color: Color(0xFFE6D7C5),
               child: Icon(Icons.self_improvement, color: AppTheme.deepBrown),
             ),
