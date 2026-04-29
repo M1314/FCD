@@ -42,9 +42,6 @@ class CoursePlayerPage extends StatefulWidget {
 
 class _CoursePlayerPageState extends State<CoursePlayerPage>
     with WidgetsBindingObserver {
-  // Delay needed so Better Player is ready to accept seek operations.
-  static const Duration _videoRestoreDelay = Duration(milliseconds: 350);
-
   final ProgressStorage _progressStorage = ProgressStorage();
   final FavoritesStorage _favoritesStorage = FavoritesStorage();
 
@@ -54,6 +51,8 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
   bool _isCompleted = false;
   bool _isCurrentFavorite = false;
   String? _initializationError;
+  bool _isVideoReady = false;
+  bool _videoInitFailed = false;
   int _savedMediaPositionMs = 0;
   int _resourcePreparationRequestId = 0;
   String? _activeMediaResourceKey;
@@ -619,6 +618,15 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
       return _buildEmptyViewer('No se pudo cargar el video.');
     }
 
+    if (!_isVideoReady) {
+      if (_videoInitFailed) {
+        return _buildEmptyViewer(
+          'No se pudo inicializar el video. Toca el recurso de nuevo para reintentar.',
+        );
+      }
+      return _buildLoadingViewer();
+    }
+
     return SizedBox(
       height: 240,
       child: Container(
@@ -702,6 +710,22 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
               style: Theme.of(context).textTheme.bodyMedium,
             ),
           ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildLoadingViewer() {
+    return SizedBox(
+      height: 240,
+      child: Container(
+        margin: const EdgeInsets.symmetric(horizontal: 14),
+        decoration: BoxDecoration(
+          color: Colors.black,
+          borderRadius: BorderRadius.circular(14),
+        ),
+        child: const Center(
+          child: CircularProgressIndicator(color: Color(0xFFFFD700)),
         ),
       ),
     );
@@ -991,16 +1015,20 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
     }
 
     if (resource.isVideo) {
-      final videoController = _buildVideoController(
-        resource.url,
-        requestId: requestId,
-      );
+      final videoController = _buildVideoController(resource.url);
       if (!mounted || requestId != _resourcePreparationRequestId) {
         videoController.dispose();
         return;
       }
       _videoController = videoController;
       _activeMediaResourceKey = _currentMediaResourceKey;
+      _isVideoReady = false;
+      _videoInitFailed = false;
+      _startVideoInitializationCheck(
+        videoController,
+        requestId,
+        restorePositionMs: _savedMediaPositionMs,
+      );
       return;
     }
     if (resource.isAudio) {
@@ -1037,11 +1065,7 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
     _setupDocument(resource.url);
   }
 
-  BetterPlayerController _buildVideoController(
-    String url, {
-    required int requestId,
-  }) {
-    final restorePositionMs = _savedMediaPositionMs;
+  BetterPlayerController _buildVideoController(String url) {
     final dataSource = BetterPlayerDataSource(
       BetterPlayerDataSourceType.network,
       url,
@@ -1074,23 +1098,63 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
           loadingColor: AppTheme.gold,
           progressBarBackgroundColor: Color(0x44FFFFFF),
           progressBarPlayedColor: AppTheme.gold,
+          playerTheme: BetterPlayerTheme.material,
         ),
       ),
       betterPlayerDataSource: dataSource,
     );
 
-    if (restorePositionMs > 0) {
-      // Better Player may ignore immediate seeks until the first frame is ready.
-      Future<void>.delayed(_videoRestoreDelay, () {
-        if (!mounted ||
-            requestId != _resourcePreparationRequestId ||
-            _videoController != videoController) {
-          return;
-        }
-        videoController.seekTo(Duration(milliseconds: restorePositionMs));
-      });
-    }
     return videoController;
+  }
+
+  void _startVideoInitializationCheck(
+    BetterPlayerController controller,
+    int requestId, {
+    required int restorePositionMs,
+  }) {
+    int attempts = 0;
+    const maxAttempts = 120;
+    Timer.periodic(const Duration(milliseconds: 100), (timer) {
+      if (!mounted ||
+          requestId != _resourcePreparationRequestId ||
+          _videoController != controller) {
+        timer.cancel();
+        return;
+      }
+
+      final videoPlayerController = controller.videoPlayerController;
+      final value = videoPlayerController?.value;
+      final duration = value?.duration;
+      final hasDuration = duration != null && duration > Duration.zero;
+      final isReady = value != null && value.initialized && hasDuration;
+
+      if (isReady) {
+        timer.cancel();
+        if (restorePositionMs > 0) {
+          final durationMs = duration.inMilliseconds;
+          final clampedPositionMs = restorePositionMs.clamp(0, durationMs);
+          try {
+            controller.seekTo(Duration(milliseconds: clampedPositionMs));
+          } catch (_) {}
+        }
+        if (mounted && requestId == _resourcePreparationRequestId) {
+          setState(() {
+            _isVideoReady = true;
+            _videoInitFailed = false;
+          });
+        }
+        return;
+      }
+      attempts++;
+      if (attempts >= maxAttempts) {
+        timer.cancel();
+        if (mounted && requestId == _resourcePreparationRequestId) {
+          setState(() {
+            _videoInitFailed = true;
+          });
+        }
+      }
+    });
   }
 
   void _setupDocument(String url) {
