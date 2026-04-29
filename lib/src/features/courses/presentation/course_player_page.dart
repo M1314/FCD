@@ -725,7 +725,7 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
           borderRadius: BorderRadius.circular(14),
         ),
         child: const Center(
-          child: CircularProgressIndicator(color: Color(0xFFFFD700)),
+          child: CircularProgressIndicator(color: AppTheme.gold),
         ),
       ),
     );
