@@ -203,7 +203,14 @@ class _LoginPageState extends State<LoginPage> {
           height: 84,
           decoration: const BoxDecoration(shape: BoxShape.circle),
           clipBehavior: Clip.antiAlias,
-          child: Image.asset('assets/images/logo.jpg', fit: BoxFit.cover),
+          child: Image.asset(
+            'assets/images/logo.jpg',
+            fit: BoxFit.cover,
+            errorBuilder: (_, __, ___) => const ColoredBox(
+              color: Color(0xFFE6D7C5),
+              child: Icon(Icons.self_improvement, color: AppTheme.deepBrown),
+            ),
+          ),
         ),
         const SizedBox(height: 14),
         Text(
