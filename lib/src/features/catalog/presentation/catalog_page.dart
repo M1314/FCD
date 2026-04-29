@@ -320,17 +320,6 @@ class _CatalogCard extends StatelessWidget {
                               ?.copyWith(color: AppTheme.mutedText),
                         ),
                       ],
-                      const SizedBox(height: 8),
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: 6,
-                        children: <Widget>[
-                          _Chip(
-                            icon: Icons.menu_book_rounded,
-                            text: '${course.lessonsCount} lecciones',
-                          ),
-                        ],
-                      ),
                     ],
                   ),
                 ),
@@ -380,38 +369,6 @@ class _CatalogCard extends StatelessWidget {
     return Uri.https('circulo-dorado.org', '/', <String, String>{
       's': course.name,
     });
-  }
-}
-
-class _Chip extends StatelessWidget {
-  const _Chip({required this.icon, required this.text});
-
-  final IconData icon;
-  final String text;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF2E4D1),
-        borderRadius: BorderRadius.circular(999),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: <Widget>[
-          Icon(icon, size: 15, color: AppTheme.deepBrown),
-          const SizedBox(width: 5),
-          Text(
-            text,
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-              color: AppTheme.deepBrown,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ],
-      ),
-    );
   }
 }
 
