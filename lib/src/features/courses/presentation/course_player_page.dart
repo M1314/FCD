@@ -53,6 +53,7 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
   String? _initializationError;
   bool _isVideoReady = false;
   bool _videoInitFailed = false;
+  bool _isAudioLoading = false;
   int _savedMediaPositionMs = 0;
   int _resourcePreparationRequestId = 0;
   String? _activeMediaResourceKey;
@@ -643,8 +644,33 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
 
   Widget _buildAudioViewer(LessonResource resource) {
     final player = _audioPlayer;
-    if (player == null) {
-      return _buildEmptyViewer('No se pudo cargar el audio.');
+    if (player == null || _isAudioLoading) {
+      return Container(
+        margin: const EdgeInsets.symmetric(horizontal: 16),
+        padding: const EdgeInsets.all(18),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(16),
+          gradient: const LinearGradient(
+            colors: <Color>[Color(0xFFF6E7D2), Color(0xFFEDD0A6)],
+          ),
+        ),
+        child: Center(
+          child: Column(
+            children: <Widget>[
+              const SizedBox(
+                width: 24,
+                height: 24,
+                child: CircularProgressIndicator(strokeWidth: 2.2),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                'Cargando audio...',
+                style: Theme.of(context).textTheme.bodyMedium,
+              ),
+            ],
+          ),
+        ),
+      );
     }
 
     return Container(
@@ -1032,13 +1058,17 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
       return;
     }
     if (resource.isAudio) {
+      _isAudioLoading = true;
+      setState(() {});
       final audioPlayer = AudioPlayer();
       await audioPlayer.setUrl(resource.url);
       if (!mounted || requestId != _resourcePreparationRequestId) {
         await audioPlayer.dispose();
+        _isAudioLoading = false;
         return;
       }
       _audioPlayer = audioPlayer;
+      _isAudioLoading = false;
       _activeMediaResourceKey = _currentMediaResourceKey;
       if (_savedMediaPositionMs > 0) {
         try {
@@ -1055,6 +1085,8 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
       }
       if (_audioPlayer == audioPlayer) {
         _audioPlayer = null;
+        _isAudioLoading = false;
+        setState(() {});
       }
       _activeMediaResourceKey = null;
       await audioPlayer.stop();
