@@ -92,7 +92,7 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _saveProgressOnDispose();
-    _videoController?.dispose();
+    _videoController?.dispose(forceDispose: true);
     _audioPlayer?.dispose();
     _cachedSession?.removeListener(_onSessionChanged);
     super.dispose();
@@ -1025,7 +1025,7 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
     _webViewController = null;
     _activeMediaResourceKey = null;
 
-    previousVideoController?.dispose();
+    previousVideoController?.dispose(forceDispose: true);
     if (previousAudioPlayer != null) {
       await previousAudioPlayer.stop();
       await previousAudioPlayer.dispose();
@@ -1043,7 +1043,7 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
     if (resource.isVideo) {
       final videoController = _buildVideoController(resource.url);
       if (!mounted || requestId != _resourcePreparationRequestId) {
-        videoController.dispose();
+        videoController.dispose(forceDispose: true);
         return;
       }
       _videoController = videoController;
