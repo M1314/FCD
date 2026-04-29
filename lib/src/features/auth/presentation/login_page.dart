@@ -42,6 +42,7 @@ class _LoginPageState extends State<LoginPage> {
   bool _obscurePassword = true;
   bool _isSubmitting = false;
   bool _canUseBiometrics = false;
+  bool _canUseDeviceAuth = false;
   String? _storedEmail;
 
   @override
@@ -66,14 +67,15 @@ class _LoginPageState extends State<LoginPage> {
 
       if (!mounted) return;
 
-      final canCheck = await _localAuth.canCheckBiometrics;
-      final isDeviceSupported = await _localAuth.isDeviceSupported();
-      debugPrint('canCheckBiometrics: $canCheck, isDeviceSupported: $isDeviceSupported');
+      final availableBiometrics = await _localAuth.getAvailableBiometrics();
+      final canUseBiometrics = availableBiometrics.isNotEmpty;
+      final canUseDeviceAuth = await _localAuth.isDeviceSupported();
 
       if (mounted) {
         setState(() {
           _storedEmail = storedEmail;
-          _canUseBiometrics = canCheck && isDeviceSupported;
+          _canUseBiometrics = canUseBiometrics;
+          _canUseDeviceAuth = canUseDeviceAuth;
         });
       }
     } catch (e) {
@@ -251,12 +253,12 @@ class _LoginPageState extends State<LoginPage> {
                 autocorrect: false,
                 enableSuggestions: false,
                 onFieldSubmitted: (_) {
-                  // If both fields are empty and a stored account is available,
-                  // use stored credentials directly (with biometric gate if
-                  // the device supports it).
+                  // If both fields are empty and biometric quick-login is
+                  // available, use the stored account flow.
                   if (_emailController.text.trim().isEmpty &&
                       _passwordController.text.isEmpty &&
-                      _storedEmail != null) {
+                      _storedEmail != null &&
+                      _canUseDeviceAuth) {
                     _loginWithStoredAccount();
                   } else {
                     _submit();
@@ -282,13 +284,15 @@ class _LoginPageState extends State<LoginPage> {
                 validator: _validatePassword,
               ),
               const SizedBox(height: 18),
-              if (_storedEmail != null)
+              if (_storedEmail != null && _canUseDeviceAuth)
                 Padding(
                   padding: const EdgeInsets.only(bottom: 12),
                   child: OutlinedButton.icon(
                     onPressed: _isSubmitting ? null : _loginWithStoredAccount,
-                    icon: Icon(_canUseBiometrics ? Icons.face : Icons.person_outline),
-                    label: Text('Ingresar con: $_storedEmail'),
+                    icon: Icon(
+                      _canUseBiometrics ? Icons.face : Icons.lock_outline,
+                    ),
+                    label: Text('Ingresar como $_storedEmail'),
                     style: OutlinedButton.styleFrom(
                       foregroundColor: AppTheme.deepBrown,
                     ),
@@ -405,35 +409,17 @@ class _LoginPageState extends State<LoginPage> {
   /// of the credentials themselves.
   Future<void> _loginWithStoredAccount() async {
     if (_isSubmitting || _storedEmail == null) return;
-
-    if (_canUseBiometrics) {
-      await _loginWithBiometrics();
-      return;
-    }
-
-    // No biometric gate — proceed directly with stored credentials.
-    FocusScope.of(context).unfocus();
-    setState(() => _isSubmitting = true);
-
-    try {
-      final sessionController = context.read<SessionController>();
-      sessionController.clearError();
-      sessionController.clearSessionExpired();
-      await sessionController.loginWithStoredCredentials();
-    } catch (_) {
-      // Error is surfaced via SessionController.errorMessage.
-    } finally {
-      if (mounted) setState(() => _isSubmitting = false);
-    }
+    if (!_canUseDeviceAuth) return;
+    await _loginWithDeviceAuth();
   }
 
-  Future<void> _loginWithBiometrics() async {
+  Future<void> _loginWithDeviceAuth() async {
     if (_isSubmitting || _storedEmail == null) {
       return;
     }
 
     try {
-      debugPrint('Starting biometric auth...');
+      debugPrint('Starting device auth...');
       bool authenticated = false;
       try {
         authenticated = await _localAuth.authenticate(
@@ -480,9 +466,12 @@ class _LoginPageState extends State<LoginPage> {
       if (!mounted) {
         return;
       }
-      setState(() {
-        _isSubmitting = false;
-      });
+    } finally {
+      if (mounted && _isSubmitting) {
+        setState(() {
+          _isSubmitting = false;
+        });
+      }
     }
   }
 }

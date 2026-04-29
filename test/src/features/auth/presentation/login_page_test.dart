@@ -77,20 +77,54 @@ void main() {
 
   group('LoginPage quick-login button', () {
     testWidgets(
-      'face icon not shown when biometrics unavailable; person icon shown instead',
+      'lock icon is shown when biometrics unavailable but device auth is supported',
       (tester) async {
         final session = SessionController.forTesting(
           apiClient: _FakeApiClient(storedEmail: 'user@example.com'),
         );
-        final fakeAuth = _FakeLocalAuth(biometricsAvailable: false);
+        final fakeAuth = _FakeLocalAuth(
+          biometricsAvailable: false,
+          deviceSupported: true,
+        );
 
         await tester.pumpWidget(_wrap(session, LoginPage(localAuth: fakeAuth)));
         await tester.pumpAndSettle();
 
+        final quickLoginButton = find.widgetWithText(
+          OutlinedButton,
+          'Ingresar como user@example.com',
+        );
+
         // No biometric (face) icon.
         expect(find.byIcon(Icons.face), findsNothing);
-        // Person icon IS shown because stored credentials exist.
-        expect(find.byIcon(Icons.person_outline), findsOneWidget);
+        // Device auth quick-login button is shown with lock icon.
+        expect(quickLoginButton, findsOneWidget);
+        expect(
+          find.descendant(of: quickLoginButton, matching: find.byIcon(Icons.lock_outline)),
+          findsOneWidget,
+        );
+      },
+    );
+
+    testWidgets(
+      'quick-login button is hidden when biometrics unavailable and device auth unsupported',
+      (tester) async {
+        final session = SessionController.forTesting(
+          apiClient: _FakeApiClient(storedEmail: 'user@example.com'),
+        );
+        final fakeAuth = _FakeLocalAuth(
+          biometricsAvailable: false,
+          deviceSupported: false,
+        );
+
+        await tester.pumpWidget(_wrap(session, LoginPage(localAuth: fakeAuth)));
+        await tester.pumpAndSettle();
+
+        expect(find.byIcon(Icons.face), findsNothing);
+        expect(
+          find.widgetWithText(OutlinedButton, 'Ingresar como user@example.com'),
+          findsNothing,
+        );
       },
     );
 
@@ -126,36 +160,15 @@ void main() {
     );
 
     testWidgets(
-      'tapping person button when no biometrics uses stored credentials directly',
-      (tester) async {
-        final session = SessionController.forTesting(
-          apiClient: _FakeApiClient(storedEmail: 'user@example.com'),
-          // _FakeStorage.getPassword() returns null → loginWithStoredCredentials
-          // surfaces 'No se encontraron credenciales guardadas.'
-        );
-        final fakeAuth = _FakeLocalAuth(biometricsAvailable: false);
-
-        await tester.pumpWidget(_wrap(session, LoginPage(localAuth: fakeAuth)));
-        await tester.pumpAndSettle();
-
-        await tester.tap(find.byIcon(Icons.person_outline));
-        await tester.pumpAndSettle();
-
-        // No biometric prompt was shown; the stored-credentials path was taken.
-        expect(
-          find.text('No se encontraron credenciales guardadas.'),
-          findsOneWidget,
-        );
-      },
-    );
-
-    testWidgets(
-      'pressing enter on empty password field uses stored credentials when no biometrics',
+      'pressing enter on empty password field without biometrics uses stored credentials when device auth is supported',
       (tester) async {
         final session = SessionController.forTesting(
           apiClient: _FakeApiClient(storedEmail: 'user@example.com'),
         );
-        final fakeAuth = _FakeLocalAuth(biometricsAvailable: false);
+        final fakeAuth = _FakeLocalAuth(
+          biometricsAvailable: false,
+          deviceSupported: true,
+        );
 
         await tester.pumpWidget(_wrap(session, LoginPage(localAuth: fakeAuth)));
         await tester.pumpAndSettle();
@@ -171,6 +184,28 @@ void main() {
           find.text('No se encontraron credenciales guardadas.'),
           findsOneWidget,
         );
+      },
+    );
+
+    testWidgets(
+      'pressing enter on empty password field uses normal form validation when device auth is unsupported',
+      (tester) async {
+        final session = SessionController.forTesting(
+          apiClient: _FakeApiClient(storedEmail: 'user@example.com'),
+        );
+        final fakeAuth = _FakeLocalAuth(
+          biometricsAvailable: false,
+          deviceSupported: false,
+        );
+
+        await tester.pumpWidget(_wrap(session, LoginPage(localAuth: fakeAuth)));
+        await tester.pumpAndSettle();
+
+        await tester.showKeyboard(find.byType(TextFormField).last);
+        await tester.testTextInput.receiveAction(TextInputAction.done);
+        await tester.pumpAndSettle();
+
+        expect(find.text('Ingresa tu correo.'), findsOneWidget);
       },
     );
   });
@@ -243,17 +278,30 @@ Widget _wrap(SessionController session, Widget child) {
 class _FakeLocalAuth extends LocalAuthentication {
   _FakeLocalAuth({
     required this.biometricsAvailable,
+    bool? deviceSupported,
+    bool? authenticateResult,
     this.throwOnAuthenticate,
-  });
+  })  : deviceSupported = deviceSupported ?? biometricsAvailable,
+        authenticateResult = authenticateResult ?? (deviceSupported ?? biometricsAvailable);
 
   final bool biometricsAvailable;
+  final bool deviceSupported;
+  final bool authenticateResult;
   final Object? throwOnAuthenticate;
 
   @override
   Future<bool> get canCheckBiometrics async => biometricsAvailable;
 
   @override
-  Future<bool> isDeviceSupported() async => biometricsAvailable;
+  Future<bool> isDeviceSupported() async => deviceSupported;
+
+  @override
+  Future<List<BiometricType>> getAvailableBiometrics() async {
+    if (!biometricsAvailable) {
+      return <BiometricType>[];
+    }
+    return <BiometricType>[BiometricType.face];
+  }
 
   @override
   Future<bool> authenticate({
@@ -264,7 +312,7 @@ class _FakeLocalAuth extends LocalAuthentication {
     bool persistAcrossBackgrounding = false,
   }) async {
     if (throwOnAuthenticate != null) throw throwOnAuthenticate!;
-    return biometricsAvailable;
+    return authenticateResult;
   }
 }
 
