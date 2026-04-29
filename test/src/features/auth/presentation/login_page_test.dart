@@ -382,4 +382,7 @@ class _FakeStorage extends AppStorage {
     required String userEmail,
     required String userType,
   }) async {}
+
+  @override
+  Future<void> clearCredentials() async {}
 }
