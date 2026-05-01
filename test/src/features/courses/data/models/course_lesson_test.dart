@@ -6,7 +6,7 @@ void main() {
     final lesson = CourseLesson.fromJson(<String, dynamic>{
       'idleccion': 11,
       'idcurso': 4,
-      'nombre': 'Leccion 1',
+      'nombre': 'Lección 1',
       'documento':
           '[{"url":"https://docs/doc.pdf","fileName":"Doc","order":"3"}]',
       'video': <Map<String, dynamic>>[

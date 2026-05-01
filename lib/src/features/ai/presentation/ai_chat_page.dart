@@ -21,6 +21,13 @@ class _AiChatPageState extends State<AiChatPage> {
     'Cursos',
   ];
 
+  static const Map<String, String> _chatLabels = <String, String>{
+    'Sabiduria': 'Sabiduría',
+    'Meditacion': 'Meditación',
+    'Oraculo': 'Oráculo',
+    'Guia Personal (ESH)': 'Guía Personal (ESH)',
+  };
+
   static const Map<String, int> _chatIds = <String, int>{
     'Sabiduria': 1,
     'Meditacion': 2,
@@ -110,7 +117,7 @@ class _AiChatPageState extends State<AiChatPage> {
           final selected = tab == _activeChat;
           return ChoiceChip(
             selected: selected,
-            label: Text(tab),
+            label: Text(_chatLabels[tab] ?? tab),
             onSelected: (_) => _changeChat(tab),
           );
         },
@@ -126,7 +133,7 @@ class _AiChatPageState extends State<AiChatPage> {
         child: Padding(
           padding: const EdgeInsets.all(24),
           child: Text(
-            'Inicia una conversacion con ESH para resolver dudas sobre tus cursos.',
+            'Inicia una conversación con ESH para resolver dudas sobre tus cursos.',
             textAlign: TextAlign.center,
             style: Theme.of(context).textTheme.bodyMedium,
           ),
@@ -259,7 +266,7 @@ class _AiChatPageState extends State<AiChatPage> {
         _accessError = userMessageFromError(
           error,
           fallbackMessage:
-              'No pudimos validar tu acceso a IA. Verifica tu conexion e intenta de nuevo.',
+              'No pudimos validar tu acceso a IA. Verifica tu conexión e intenta de nuevo.',
         );
       });
     }
@@ -305,7 +312,7 @@ class _AiChatPageState extends State<AiChatPage> {
           const ChatMessage(
             sender: 'system',
             content:
-                'Soy ESH. Te acompano en tu estudio. Puedes preguntarme sobre contenido del curso.',
+                'Soy ESH. Te acompaño en tu estudio. Puedes preguntarme sobre contenido del curso.',
           ),
           ...history,
         ];

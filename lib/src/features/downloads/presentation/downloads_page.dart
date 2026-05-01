@@ -320,7 +320,7 @@ class _DownloadsEmpty extends StatelessWidget {
             ),
             const SizedBox(height: 10),
             Text(
-              'Aun no tienes descargas',
+              'Aún no tienes descargas',
               style: Theme.of(context).textTheme.titleMedium,
               textAlign: TextAlign.center,
             ),

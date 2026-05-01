@@ -31,7 +31,7 @@ void main() {
           CourseLesson(
             id: 99,
             courseId: 7,
-            name: 'Leccion 1',
+            name: 'Lección 1',
             month: 1,
             resources: <LessonResource>[
               LessonResource(

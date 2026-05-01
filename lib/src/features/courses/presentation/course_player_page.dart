@@ -356,7 +356,7 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  'Leccion ${_lessonIndex + 1} de ${widget.lessons.length}',
+                  'Lección ${_lessonIndex + 1} de ${widget.lessons.length}',
                   style: Theme.of(
                     context,
                   ).textTheme.bodySmall?.copyWith(color: AppTheme.mutedText),
@@ -550,8 +550,8 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
           const SizedBox(height: 4),
           Text(
             currentLesson.hasEvaluation
-                ? 'Incluye evaluacion al final.'
-                : 'Leccion de estudio y practica.',
+                ? 'Incluye evaluación al final.'
+                : 'Lección de estudio y práctica.',
             style: Theme.of(
               context,
             ).textTheme.bodySmall?.copyWith(color: AppTheme.mutedText),
@@ -574,7 +574,7 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
             label: Text(
               downloadController.isDownloading
                   ? 'Descargando ${(downloadController.progress * 100).toStringAsFixed(0)}%'
-                  : 'Descargar al telefono',
+                  : 'Descargar al teléfono',
             ),
           ),
           const SizedBox(height: 10),
@@ -688,7 +688,7 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
           const Icon(Icons.multitrack_audio_rounded, size: 36),
           const SizedBox(height: 10),
           Text(
-            resource.name.isEmpty ? 'Audio de la leccion' : resource.name,
+            resource.name.isEmpty ? 'Audio de la lección' : resource.name,
             style: Theme.of(context).textTheme.titleMedium,
           ),
           const SizedBox(height: 14),
@@ -778,7 +778,7 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Leccion marcada como completada.')),
+          const SnackBar(content: Text('Lección marcada como completada.')),
         );
       }
     } catch (error) {
@@ -985,8 +985,8 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
         SnackBar(
           content: Text(
             nowFav
-                ? 'Leccion guardada en favoritos.'
-                : 'Leccion eliminada de favoritos.',
+                ? 'Lección guardada en favoritos.'
+                : 'Lección eliminada de favoritos.',
           ),
           duration: const Duration(seconds: 2),
         ),

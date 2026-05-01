@@ -87,7 +87,7 @@ class _CourseSummaryPageState extends State<CourseSummaryPage> {
                   const SizedBox(height: 12),
                   Text(
                     widget.course.description.isEmpty
-                        ? 'Este curso esta disponible en tu membresia.'
+                        ? 'Este curso está disponible en tu membresía.'
                         : widget.course.description,
                     style: Theme.of(context).textTheme.bodyMedium,
                   ),

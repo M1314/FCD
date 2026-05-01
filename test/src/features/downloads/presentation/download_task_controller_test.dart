@@ -60,7 +60,7 @@ LessonResource _resource() {
   return const LessonResource(
     type: LessonResourceType.document,
     url: 'https://example.com/files/guide.pdf',
-    name: 'Guia',
+    name: 'Guía',
     order: 1,
   );
 }
