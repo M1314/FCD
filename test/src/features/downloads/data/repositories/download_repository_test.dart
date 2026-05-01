@@ -152,7 +152,7 @@ void main() {
     test('downloadResource downloads and records history when missing', () async {
       final resource = _resource();
       const courseName = 'Curso de Ventas';
-      const lessonName = 'Leccion 1';
+      const lessonName = 'Lección 1';
 
       final file = await repository.downloadResource(
         resource,
@@ -227,7 +227,7 @@ LessonResource _resource() {
   return const LessonResource(
     type: LessonResourceType.document,
     url: 'https://example.com/files/guide.pdf',
-    name: 'Guia',
+    name: 'Guía',
     order: 1,
   );
 }

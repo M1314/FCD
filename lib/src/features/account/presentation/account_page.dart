@@ -161,7 +161,7 @@ class _AccountPageState extends State<AccountPage> {
         OutlinedButton.icon(
           onPressed: () => context.read<SessionController>().logout(),
           icon: const Icon(Icons.logout_rounded),
-          label: const Text('Cerrar sesion'),
+          label: const Text('Cerrar sesión'),
           style: OutlinedButton.styleFrom(
             foregroundColor: Colors.red.shade700,
             side: BorderSide(color: Colors.red.shade200),
