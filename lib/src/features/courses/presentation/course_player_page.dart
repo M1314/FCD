@@ -5,6 +5,7 @@ import 'package:fcd_app/src/core/config/api_config.dart';
 import 'package:fcd_app/src/core/storage/favorites_storage.dart';
 import 'package:fcd_app/src/core/storage/progress_storage.dart';
 import 'package:fcd_app/src/core/theme/app_theme.dart';
+import 'package:fcd_app/src/core/utils/file_type_utils.dart';
 import 'package:fcd_app/src/features/courses/data/models/course.dart';
 import 'package:fcd_app/src/features/courses/data/models/course_lesson.dart';
 import 'package:fcd_app/src/features/courses/data/models/lesson_resource.dart';
@@ -833,7 +834,11 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
           ).showSnackBar(const SnackBar(content: Text('Archivo descargado.')));
           return;
         }
-        final openResult = await OpenFilex.open(file.path);
+        final openResult = await OpenFilex.open(
+          file.path,
+          type: mimeTypeForPath(file.path),
+          uti: utiForPath(file.path),
+        );
         if (!mounted) {
           return;
         }

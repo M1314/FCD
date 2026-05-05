@@ -171,6 +171,27 @@ void main() {
       expect(downloads.first.lessonName, lessonName);
     });
 
+    test('downloadResource updates extension from response headers', () async {
+      const resource = LessonResource(
+        type: LessonResourceType.video,
+        url: 'https://example.com/files/video',
+        name: 'Video',
+        order: 1,
+      );
+      apiClient.responseHeaders = <String, List<String>>{
+        'content-disposition': <String>['attachment; filename="video.mov"'],
+      };
+
+      final file = await repository.downloadResource(
+        resource,
+        onProgress: (received, total) {},
+      );
+
+      expect(file.path, endsWith('.mov'));
+      final downloads = await repository.getDownloads();
+      expect(downloads.first.localPath, file.path);
+    });
+
     test('downloadResource accepts legacy hash-based ids for existing files', () async {
       final resource = _resource();
       final existingPath = '${tempDir.path}/downloads/existing-legacy.pdf';
@@ -242,6 +263,7 @@ String _legacyResourceId(LessonResource resource) {
 
 class _FakeDownloadApiClient extends FakeApiClient {
   int downloadCalls = 0;
+  Map<String, List<String>> responseHeaders = <String, List<String>>{};
 
   @override
   Future<Response<dynamic>> download(
@@ -259,6 +281,7 @@ class _FakeDownloadApiClient extends FakeApiClient {
       requestOptions: RequestOptions(path: url),
       statusCode: 200,
       data: null,
+      headers: Headers.fromMap(responseHeaders),
     );
   }
 }

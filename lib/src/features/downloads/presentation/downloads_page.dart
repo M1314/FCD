@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:fcd_app/src/core/theme/app_theme.dart';
+import 'package:fcd_app/src/core/utils/file_type_utils.dart';
 import 'package:fcd_app/src/features/downloads/data/models/downloaded_file.dart';
 import 'package:fcd_app/src/features/downloads/data/repositories/download_repository.dart';
 import 'package:fcd_app/src/state/session_controller.dart';
@@ -190,7 +191,11 @@ class _DownloadsPageState extends State<DownloadsPage> {
       return;
     }
 
-    final result = await OpenFilex.open(file.localPath);
+    final result = await OpenFilex.open(
+      file.localPath,
+      type: mimeTypeForPath(file.localPath),
+      uti: utiForPath(file.localPath),
+    );
     if (!mounted) {
       return;
     }
