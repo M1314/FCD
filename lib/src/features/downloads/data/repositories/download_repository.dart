@@ -250,8 +250,10 @@ class DownloadRepository {
       return null;
     }
     filename = filename.replaceAll('"', '');
-    filename = filename.replaceFirst(RegExp(r"^UTF-8''", caseSensitive: false), '');
-    return _extensionFromPath(filename, maxLength: 12);
+    if (filename.toLowerCase().startsWith("utf-8''")) {
+      filename = Uri.decodeFull(filename.substring(7));
+    }
+    return _extensionFromPath(filename, maxLength: 8);
   }
 
   String _replaceExtension(String path, String extension) {
