@@ -179,8 +179,7 @@ class DownloadRepository {
   String _extensionFromResource(LessonResource resource) {
     final uri = Uri.tryParse(resource.url);
     final path = uri?.path ?? resource.url;
-    final extension =
-        _extensionFromPath(path) ?? _extensionFromPath(resource.name);
+    final extension = extensionFromPath(path) ?? extensionFromPath(resource.name);
     if (extension != null) {
       return extension;
     }
@@ -250,10 +249,11 @@ class DownloadRepository {
       return null;
     }
     filename = filename.replaceAll('"', '');
-    if (filename.toLowerCase().startsWith("utf-8''")) {
-      filename = Uri.decodeFull(filename.substring(7));
+    const rfc5987Prefix = "utf-8''";
+    if (filename.toLowerCase().startsWith(rfc5987Prefix)) {
+      filename = Uri.decodeFull(filename.substring(rfc5987Prefix.length));
     }
-    return _extensionFromPath(filename, maxLength: 8);
+    return extensionFromPath(filename, maxLength: 8);
   }
 
   String _replaceExtension(String path, String extension) {
@@ -263,18 +263,6 @@ class DownloadRepository {
       return '$path.$extension';
     }
     return '${path.substring(0, dot + 1)}${extension.toLowerCase()}';
-  }
-
-  String? _extensionFromPath(String path, {int maxLength = 8}) {
-    final dot = path.lastIndexOf('.');
-    if (dot == -1 || dot >= path.length - 1) {
-      return null;
-    }
-    final extension = path.substring(dot + 1).toLowerCase();
-    if (extension.isEmpty || extension.length > maxLength) {
-      return null;
-    }
-    return extension;
   }
 
   String _safeFileName(String name, String prefix, String extension) {

@@ -7,7 +7,7 @@ String? extensionFromContentType(String? contentType) {
 }
 
 String? mimeTypeForPath(String path) {
-  final extension = _extensionFromPath(path);
+  final extension = extensionFromPath(path);
   if (extension == null) {
     return null;
   }
@@ -15,14 +15,14 @@ String? mimeTypeForPath(String path) {
 }
 
 String? utiForPath(String path) {
-  final extension = _extensionFromPath(path);
+  final extension = extensionFromPath(path);
   if (extension == null) {
     return null;
   }
   return _extensionToUti[extension];
 }
 
-String? _extensionFromPath(String path) {
+String? extensionFromPath(String path, {int maxLength = 8}) {
   final sanitized = path.trim();
   if (sanitized.isEmpty) {
     return null;
@@ -31,7 +31,11 @@ String? _extensionFromPath(String path) {
   if (dot == -1 || dot == sanitized.length - 1) {
     return null;
   }
-  return sanitized.substring(dot + 1).toLowerCase();
+  final extension = sanitized.substring(dot + 1).toLowerCase();
+  if (extension.isEmpty || extension.length > maxLength) {
+    return null;
+  }
+  return extension;
 }
 
 const Map<String, String> _extensionToMimeType = <String, String>{
