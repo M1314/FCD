@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:dio/dio.dart';
 import 'package:fcd_app/src/core/http/api_client.dart';
+import 'package:fcd_app/src/core/utils/file_type_utils.dart';
 import 'package:fcd_app/src/features/courses/data/models/lesson_resource.dart';
 import 'package:fcd_app/src/features/downloads/data/models/downloaded_file.dart';
 import 'package:path_provider/path_provider.dart';
@@ -47,14 +48,15 @@ class DownloadRepository {
       resource.type.name,
       extension,
     );
-    final file = File('${folder.path}/$filename');
+    var file = File('${folder.path}/$filename');
 
-    await _apiClient.download(
+    final response = await _apiClient.download(
       resource.url,
       file.path,
       onReceiveProgress: onProgress,
       cancelToken: cancelToken,
     );
+    file = await _renameDownloadedFile(file, extension, response);
 
     await _saveToHistory(
       DownloadedFile(
@@ -177,13 +179,10 @@ class DownloadRepository {
   String _extensionFromResource(LessonResource resource) {
     final uri = Uri.tryParse(resource.url);
     final path = uri?.path ?? resource.url;
-
-    final dot = path.lastIndexOf('.');
-    if (dot != -1 && dot < path.length - 1) {
-      final extension = path.substring(dot + 1).toLowerCase();
-      if (extension.length <= 5) {
-        return extension;
-      }
+    final extension =
+        _extensionFromPath(path) ?? _extensionFromPath(resource.name);
+    if (extension != null) {
+      return extension;
     }
 
     switch (resource.type) {
@@ -194,6 +193,86 @@ class DownloadRepository {
       case LessonResourceType.document:
         return 'pdf';
     }
+  }
+
+  Future<File> _renameDownloadedFile(
+    File file,
+    String defaultExtension,
+    Response<dynamic> response,
+  ) async {
+    final headerExtension = _extensionFromResponseHeaders(response.headers);
+    if (headerExtension == null ||
+        headerExtension.toLowerCase() == defaultExtension.toLowerCase()) {
+      return file;
+    }
+
+    final newPath = _replaceExtension(file.path, headerExtension);
+    if (newPath == file.path) {
+      return file;
+    }
+
+    final renamedTarget = File(newPath);
+    if (await renamedTarget.exists()) {
+      return file;
+    }
+
+    try {
+      return await file.rename(newPath);
+    } catch (_) {
+      return file;
+    }
+  }
+
+  String? _extensionFromResponseHeaders(Headers headers) {
+    final disposition = headers.value('content-disposition');
+    final fromDisposition = _extensionFromContentDisposition(disposition);
+    if (fromDisposition != null) {
+      return fromDisposition;
+    }
+    return extensionFromContentType(headers.value('content-type'));
+  }
+
+  String? _extensionFromContentDisposition(String? contentDisposition) {
+    if (contentDisposition == null || contentDisposition.trim().isEmpty) {
+      return null;
+    }
+
+    final match = RegExp(
+      r'filename\*?=([^;]+)',
+      caseSensitive: false,
+    ).firstMatch(contentDisposition);
+    if (match == null) {
+      return null;
+    }
+
+    var filename = match.group(1)?.trim();
+    if (filename == null || filename.isEmpty) {
+      return null;
+    }
+    filename = filename.replaceAll('"', '');
+    filename = filename.replaceFirst(RegExp(r"^UTF-8''", caseSensitive: false), '');
+    return _extensionFromPath(filename, maxLength: 12);
+  }
+
+  String _replaceExtension(String path, String extension) {
+    final dot = path.lastIndexOf('.');
+    final separator = path.lastIndexOf(Platform.pathSeparator);
+    if (dot == -1 || dot < separator) {
+      return '$path.$extension';
+    }
+    return '${path.substring(0, dot + 1)}${extension.toLowerCase()}';
+  }
+
+  String? _extensionFromPath(String path, {int maxLength = 8}) {
+    final dot = path.lastIndexOf('.');
+    if (dot == -1 || dot >= path.length - 1) {
+      return null;
+    }
+    final extension = path.substring(dot + 1).toLowerCase();
+    if (extension.isEmpty || extension.length > maxLength) {
+      return null;
+    }
+    return extension;
   }
 
   String _safeFileName(String name, String prefix, String extension) {
