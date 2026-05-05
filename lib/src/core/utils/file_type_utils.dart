@@ -22,6 +22,8 @@ String? utiForPath(String path) {
   return _extensionToUti[extension];
 }
 
+/// Returns the lowercase file extension from [path], ignoring overly long
+/// suffixes by limiting results to [maxLength] characters.
 String? extensionFromPath(String path, {int maxLength = 8}) {
   final sanitized = path.trim();
   if (sanitized.isEmpty) {

@@ -200,12 +200,16 @@ class DownloadRepository {
     Response<dynamic> response,
   ) async {
     final headerExtension = _extensionFromResponseHeaders(response.headers);
-    if (headerExtension == null ||
-        headerExtension.toLowerCase() == defaultExtension.toLowerCase()) {
+    if (headerExtension == null) {
       return file;
     }
 
-    final newPath = _replaceExtension(file.path, headerExtension);
+    final normalizedHeaderExtension = headerExtension.toLowerCase();
+    if (normalizedHeaderExtension == defaultExtension.toLowerCase()) {
+      return file;
+    }
+
+    final newPath = _replaceExtension(file.path, normalizedHeaderExtension);
     if (newPath == file.path) {
       return file;
     }
