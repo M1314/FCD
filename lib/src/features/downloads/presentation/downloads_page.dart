@@ -3,6 +3,8 @@ import 'dart:io';
 import 'package:fcd_app/src/core/theme/app_theme.dart';
 import 'package:fcd_app/src/features/downloads/data/models/downloaded_file.dart';
 import 'package:fcd_app/src/features/downloads/data/repositories/download_repository.dart';
+import 'package:fcd_app/src/features/downloads/presentation/downloaded_audio_page.dart';
+import 'package:fcd_app/src/features/downloads/presentation/downloaded_video_page.dart';
 import 'package:fcd_app/src/state/session_controller.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
@@ -143,6 +145,8 @@ class _DownloadsPageState extends State<DownloadsPage> {
                   padding: const EdgeInsets.only(bottom: 10),
                   child: _DownloadCard(
                     file: entryItem.file,
+                    onPlayAudio: () => _openAudio(entryItem.file),
+                    onPlayVideo: () => _playVideo(entryItem.file),
                     onOpen: () => _open(entryItem.file),
                   ),
                 );
@@ -202,6 +206,52 @@ class _DownloadsPageState extends State<DownloadsPage> {
     }
   }
 
+  Future<void> _openAudio(DownloadedFile file) async {
+    final localFile = File(file.localPath);
+    if (!await localFile.exists()) {
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('El archivo ya no existe en el almacenamiento local.'),
+        ),
+      );
+      return;
+    }
+
+    if (!mounted) {
+      return;
+    }
+
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(builder: (_) => DownloadedAudioPage(file: file)),
+    );
+  }
+
+  Future<void> _playVideo(DownloadedFile file) async {
+    final localFile = File(file.localPath);
+    if (!await localFile.exists()) {
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('El archivo ya no existe en el almacenamiento local.'),
+        ),
+      );
+      return;
+    }
+
+    if (!mounted) {
+      return;
+    }
+
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(builder: (_) => DownloadedVideoPage(file: file)),
+    );
+  }
+
   Future<void> _clear() async {
     await _downloadRepository.clearHistory();
     if (!mounted) {
@@ -212,10 +262,17 @@ class _DownloadsPageState extends State<DownloadsPage> {
 }
 
 class _DownloadCard extends StatelessWidget {
-  const _DownloadCard({required this.file, required this.onOpen});
+  const _DownloadCard({
+    required this.file,
+    required this.onOpen,
+    required this.onPlayAudio,
+    required this.onPlayVideo,
+  });
 
   final DownloadedFile file;
   final VoidCallback onOpen;
+  final VoidCallback onPlayAudio;
+  final VoidCallback onPlayVideo;
 
   @override
   Widget build(BuildContext context) {
@@ -226,7 +283,7 @@ class _DownloadCard extends StatelessWidget {
       borderRadius: BorderRadius.circular(14),
       child: InkWell(
         borderRadius: BorderRadius.circular(14),
-        onTap: onOpen,
+        onTap: _tapHandler(),
         child: Padding(
           padding: const EdgeInsets.all(12),
           child: Row(
@@ -263,12 +320,33 @@ class _DownloadCard extends StatelessWidget {
                   ],
                 ),
               ),
-              const Icon(Icons.open_in_new_rounded, color: AppTheme.deepBrown),
+              if (file.type == 'audio')
+                const Icon(Icons.play_arrow_rounded, color: AppTheme.deepBrown)
+              else if (file.type == 'video')
+                const Icon(
+                  Icons.play_circle_fill_rounded,
+                  color: AppTheme.deepBrown,
+                )
+              else
+                const Icon(
+                  Icons.open_in_new_rounded,
+                  color: AppTheme.deepBrown,
+                ),
             ],
           ),
         ),
       ),
     );
+  }
+
+  VoidCallback _tapHandler() {
+    if (file.type == 'audio') {
+      return onPlayAudio;
+    }
+    if (file.type == 'video') {
+      return onPlayVideo;
+    }
+    return onOpen;
   }
 
   IconData _iconFor(String type) {
@@ -281,7 +359,6 @@ class _DownloadCard extends StatelessWidget {
         return Icons.description_rounded;
     }
   }
-
 }
 
 abstract class _DownloadListItem {

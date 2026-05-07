@@ -66,6 +66,8 @@ class DownloadRepository {
         downloadedAt: DateTime.now(),
         courseName: courseName,
         lessonName: lessonName,
+        courseBannerUrl: resource.courseBannerUrl,
+        courseIconUrl: resource.courseIconUrl,
       ),
     );
 

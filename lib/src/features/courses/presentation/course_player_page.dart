@@ -5,14 +5,19 @@ import 'package:fcd_app/src/core/config/api_config.dart';
 import 'package:fcd_app/src/core/storage/favorites_storage.dart';
 import 'package:fcd_app/src/core/storage/progress_storage.dart';
 import 'package:fcd_app/src/core/theme/app_theme.dart';
+import 'package:fcd_app/src/core/widgets/audio_player_widget.dart';
 import 'package:fcd_app/src/features/courses/data/models/course.dart';
 import 'package:fcd_app/src/features/courses/data/models/course_lesson.dart';
 import 'package:fcd_app/src/features/courses/data/models/lesson_resource.dart';
+import 'package:fcd_app/src/features/downloads/data/models/downloaded_file.dart';
+import 'package:fcd_app/src/features/downloads/presentation/downloaded_audio_page.dart';
 import 'package:fcd_app/src/features/downloads/presentation/download_task_controller.dart';
+import 'package:fcd_app/src/features/downloads/presentation/downloaded_video_page.dart';
 import 'package:fcd_app/src/state/session_controller.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:just_audio/just_audio.dart';
+import 'package:just_audio_background/just_audio_background.dart';
 import 'package:open_filex/open_filex.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -622,7 +627,7 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
     if (!_isVideoReady) {
       if (_videoInitFailed) {
         return _buildEmptyViewer(
-          'No se pudo inicializar el video. Toca el recurso de nuevo para reintentar.',
+          'No se pudo inicializar el video. Verifica tener buena conexión a internet y toca el recurso de nuevo para reintentar.',
         );
       }
       return _buildLoadingViewer();
@@ -643,36 +648,6 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
   }
 
   Widget _buildAudioViewer(LessonResource resource) {
-    final player = _audioPlayer;
-    if (player == null || _isAudioLoading) {
-      return Container(
-        margin: const EdgeInsets.symmetric(horizontal: 16),
-        padding: const EdgeInsets.all(18),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(16),
-          gradient: const LinearGradient(
-            colors: <Color>[Color(0xFFF6E7D2), Color(0xFFEDD0A6)],
-          ),
-        ),
-        child: Center(
-          child: Column(
-            children: <Widget>[
-              const SizedBox(
-                width: 24,
-                height: 24,
-                child: CircularProgressIndicator(strokeWidth: 2.2),
-              ),
-              const SizedBox(height: 12),
-              Text(
-                'Cargando audio...',
-                style: Theme.of(context).textTheme.bodyMedium,
-              ),
-            ],
-          ),
-        ),
-      );
-    }
-
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16),
       padding: const EdgeInsets.all(18),
@@ -692,7 +667,23 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
             style: Theme.of(context).textTheme.titleMedium,
           ),
           const SizedBox(height: 14),
-          _AudioWidget(player: player),
+          if (_isAudioLoading || _audioPlayer == null)
+            Row(
+              children: <Widget>[
+                const SizedBox(
+                  width: 24,
+                  height: 24,
+                  child: CircularProgressIndicator(strokeWidth: 2.2),
+                ),
+                const SizedBox(width: 12),
+                Text(
+                  'Cargando audio...',
+                  style: Theme.of(context).textTheme.bodyMedium,
+                ),
+              ],
+            )
+          else
+            AudioPlayerWidget(player: _audioPlayer!),
         ],
       ),
     );
@@ -797,9 +788,14 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
       return;
     }
 
+    final downloadResource = resource.copyWithCourseMedia(
+      courseBannerUrl: widget.course.bannerUrl,
+      courseIconUrl: widget.course.iconUrl,
+    );
+
     final downloadController = context.read<DownloadTaskController>();
     final result = await downloadController.downloadResource(
-      resource,
+      downloadResource,
       courseName: widget.course.name,
       lessonName: currentLesson.name,
     );
@@ -831,6 +827,17 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
           ScaffoldMessenger.of(
             context,
           ).showSnackBar(const SnackBar(content: Text('Archivo descargado.')));
+          return;
+        }
+        if (resource.isAudio || resource.isVideo) {
+          if (!mounted) {
+            return;
+          }
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Archivo descargado. Disponible en Descargas.'),
+            ),
+          );
           return;
         }
         final openResult = await OpenFilex.open(file.path);
@@ -1041,7 +1048,14 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
     }
 
     if (resource.isVideo) {
-      final videoController = _buildVideoController(resource.url);
+      final artworkUrl = widget.course.iconUrl.isNotEmpty
+          ? widget.course.iconUrl
+          : widget.course.bannerUrl;
+      final videoController = _buildVideoController(
+        resource.url,
+        title: resource.name.isEmpty ? 'Video de la lección' : resource.name,
+        imageUrl: artworkUrl.isNotEmpty ? artworkUrl : null,
+      );
       if (!mounted || requestId != _resourcePreparationRequestId) {
         videoController.dispose(forceDispose: true);
         return;
@@ -1061,7 +1075,20 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
       _isAudioLoading = true;
       setState(() {});
       final audioPlayer = AudioPlayer();
-      await audioPlayer.setUrl(resource.url);
+      final artworkUrl = widget.course.iconUrl.isNotEmpty
+          ? widget.course.iconUrl
+          : widget.course.bannerUrl;
+      await audioPlayer.setAudioSource(
+        AudioSource.uri(
+          Uri.parse(resource.url),
+          tag: MediaItem(
+            id: resource.url,
+            title: resource.name.isEmpty ? 'Audio de la lección' : resource.name,
+            artist: widget.course.name,
+            artUri: artworkUrl.isNotEmpty ? Uri.parse(artworkUrl) : null,
+          ),
+        ),
+      );
       if (!mounted || requestId != _resourcePreparationRequestId) {
         await audioPlayer.dispose();
         _isAudioLoading = false;
@@ -1097,7 +1124,11 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
     _setupDocument(resource.url);
   }
 
-  BetterPlayerController _buildVideoController(String url) {
+  BetterPlayerController _buildVideoController(
+    String url, {
+    String? title,
+    String? imageUrl,
+  }) {
     final dataSource = BetterPlayerDataSource(
       BetterPlayerDataSourceType.network,
       url,
@@ -1111,8 +1142,10 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
         bufferForPlaybackMs: 3000,
         bufferForPlaybackAfterRebufferMs: 5000,
       ),
-      notificationConfiguration: const BetterPlayerNotificationConfiguration(
+      notificationConfiguration: BetterPlayerNotificationConfiguration(
         showNotification: true,
+        title: title ?? 'Video de la lección',
+        imageUrl: imageUrl,
       ),
     );
 
@@ -1309,144 +1342,5 @@ class _ResourceTile extends StatelessWidget {
       case LessonResourceType.document:
         return 'Documento';
     }
-  }
-}
-
-class _AudioWidget extends StatefulWidget {
-  const _AudioWidget({required this.player});
-
-  final AudioPlayer player;
-
-  @override
-  State<_AudioWidget> createState() => _AudioWidgetState();
-}
-
-class _AudioWidgetState extends State<_AudioWidget> {
-  double? _dragValueMs;
-
-  @override
-  Widget build(BuildContext context) {
-    return StreamBuilder<PlayerState>(
-      stream: widget.player.playerStateStream,
-      builder: (context, snapshot) {
-        final playerState = snapshot.data;
-        final processing = playerState?.processingState;
-        final playing = playerState?.playing ?? false;
-
-        final isBuffering =
-            processing == ProcessingState.loading ||
-            processing == ProcessingState.buffering;
-
-        return Column(
-          children: <Widget>[
-            Row(
-              children: <Widget>[
-                IconButton.filled(
-                  onPressed: isBuffering ? null : _toggle,
-                  icon: isBuffering
-                      ? const SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: Colors.white,
-                          ),
-                        )
-                      : Icon(
-                          playing
-                              ? Icons.pause_rounded
-                              : Icons.play_arrow_rounded,
-                        ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    playing ? 'Reproduciendo...' : 'Pausado',
-                    style: Theme.of(context).textTheme.bodyMedium,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            StreamBuilder<Duration>(
-              stream: widget.player.positionStream,
-              builder: (context, positionSnapshot) {
-                final position = positionSnapshot.data ?? Duration.zero;
-                final total = widget.player.duration ?? Duration.zero;
-                final canSeek = total.inMilliseconds > 0;
-                final max = total.inMilliseconds <= 0
-                    ? 1.0
-                    : total.inMilliseconds.toDouble();
-                final liveValue = position.inMilliseconds
-                    .clamp(0, max.toInt())
-                    .toDouble();
-                final sliderValue = (_dragValueMs ?? liveValue).clamp(0.0, max);
-                final displayPosition = _dragValueMs == null
-                    ? position
-                    : Duration(milliseconds: sliderValue.round());
-
-                return Column(
-                  children: <Widget>[
-                    Slider(
-                      value: sliderValue,
-                      max: max,
-                      onChangeStart: canSeek
-                          ? (newValue) {
-                              setState(() => _dragValueMs = newValue);
-                            }
-                          : null,
-                      onChanged: canSeek
-                          ? (newValue) {
-                              setState(() => _dragValueMs = newValue);
-                            }
-                          : null,
-                      onChangeEnd: canSeek
-                          ? (newValue) async {
-                              setState(() => _dragValueMs = null);
-                              await widget.player.seek(
-                                Duration(milliseconds: newValue.round()),
-                              );
-                            }
-                          : null,
-                    ),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: <Widget>[
-                        Text(
-                          _formatDuration(displayPosition),
-                          style: Theme.of(context).textTheme.bodySmall,
-                        ),
-                        Text(
-                          _formatDuration(total),
-                          style: Theme.of(context).textTheme.bodySmall,
-                        ),
-                      ],
-                    ),
-                  ],
-                );
-              },
-            ),
-          ],
-        );
-      },
-    );
-  }
-
-  Future<void> _toggle() async {
-    if (widget.player.playing) {
-      await widget.player.pause();
-      return;
-    }
-    await widget.player.play();
-  }
-
-  String _formatDuration(Duration duration) {
-    final minutes = duration.inMinutes.remainder(60).toString().padLeft(2, '0');
-    final seconds = duration.inSeconds.remainder(60).toString().padLeft(2, '0');
-    final hours = duration.inHours;
-    if (hours > 0) {
-      return '$hours:$minutes:$seconds';
-    }
-    return '$minutes:$seconds';
   }
 }
