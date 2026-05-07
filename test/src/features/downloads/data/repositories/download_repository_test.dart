@@ -169,6 +169,8 @@ void main() {
       expect(downloads.first.id, _stableResourceId(resource));
       expect(downloads.first.courseName, courseName);
       expect(downloads.first.lessonName, lessonName);
+      expect(downloads.first.courseBannerUrl, isEmpty);
+      expect(downloads.first.courseIconUrl, isEmpty);
     });
 
     test('downloadResource accepts legacy hash-based ids for existing files', () async {
