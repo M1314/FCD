@@ -12,7 +12,7 @@ class DownloadedFile {
     this.lessonName = '',
     this.courseBannerUrl = '',
     this.courseIconUrl = '',
-    this.localArtworkPath = '',
+    required this.localArtworkPath,
   });
 
   final String id;
@@ -60,7 +60,7 @@ class DownloadedFile {
       lessonName: json['lessonName']?.toString() ?? '',
       courseBannerUrl: json['courseBannerUrl']?.toString() ?? '',
       courseIconUrl: json['courseIconUrl']?.toString() ?? '',
-      localArtworkPath: json['localArtworkPath']?.toString() ?? '',
+      localArtworkPath: json['localArtworkPath'] as String,
     );
   }
 

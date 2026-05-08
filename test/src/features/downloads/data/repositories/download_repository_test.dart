@@ -24,6 +24,7 @@ void main() {
         type: 'document',
         localPath: existingFile.path,
         downloadedAt: DateTime(2024, 1, 1),
+        localArtworkPath: '',
       );
       final missing = DownloadedFile(
         id: '2',
@@ -32,6 +33,7 @@ void main() {
         type: 'document',
         localPath: missingPath,
         downloadedAt: DateTime(2024, 1, 2),
+        localArtworkPath: '',
       );
 
       SharedPreferences.setMockInitialValues(<String, Object>{
@@ -68,6 +70,7 @@ void main() {
         type: 'document',
         localPath: existingFile.path,
         downloadedAt: DateTime(2024, 1, 1),
+        localArtworkPath: '',
       );
 
       SharedPreferences.setMockInitialValues(<String, Object>{
@@ -127,6 +130,7 @@ void main() {
           type: resource.type.name,
           localPath: existingPath,
           downloadedAt: DateTime.now(),
+          localArtworkPath: '',
         ).toRawJson(),
       ]);
 
@@ -264,6 +268,7 @@ void main() {
           type: resource.type.name,
           localPath: existingPath,
           downloadedAt: DateTime.now(),
+          localArtworkPath: '',
         ).toRawJson(),
       ]);
 
@@ -288,6 +293,7 @@ void main() {
           type: resource.type.name,
           localPath: stalePath,
           downloadedAt: DateTime.now(),
+          localArtworkPath: '',
         ).toRawJson(),
       ]);
 
