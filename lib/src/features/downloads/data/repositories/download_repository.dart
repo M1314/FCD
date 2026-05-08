@@ -239,7 +239,8 @@ class DownloadRepository {
     }
   }
 
-  String _safeFileName(String name, String prefix, String extension) {    final normalized = name.trim().isEmpty ? prefix : name.trim();
+  String _safeFileName(String name, String prefix, String extension) {
+    final normalized = name.trim().isEmpty ? prefix : name.trim();
     final sanitized = normalized
         .replaceAll(RegExp(r'[\\/:*?"<>|]'), '_')
         .replaceAll(RegExp(r'\s+'), '_');
