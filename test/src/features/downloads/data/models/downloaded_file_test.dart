@@ -15,6 +15,7 @@ void main() {
         lessonName: 'Sesión 1',
         courseBannerUrl: 'https://example.com/banner.jpg',
         courseIconUrl: 'https://example.com/icon.png',
+        localArtworkPath: '/path/to/artwork.jpg',
       );
 
       expect(file.id, 'audio:https://example.com/audio.mp3');
@@ -27,6 +28,7 @@ void main() {
       expect(file.lessonName, 'Sesión 1');
       expect(file.courseBannerUrl, 'https://example.com/banner.jpg');
       expect(file.courseIconUrl, 'https://example.com/icon.png');
+      expect(file.localArtworkPath, '/path/to/artwork.jpg');
     });
 
     test('creates with default empty artwork fields', () {
@@ -41,6 +43,7 @@ void main() {
 
       expect(file.courseBannerUrl, isEmpty);
       expect(file.courseIconUrl, isEmpty);
+      expect(file.localArtworkPath, isEmpty);
     });
 
     test('toJson serializes all fields', () {
@@ -55,6 +58,7 @@ void main() {
         lessonName: 'Lección 1',
         courseBannerUrl: 'https://example.com/banner.jpg',
         courseIconUrl: 'https://example.com/icon.png',
+        localArtworkPath: '/path/to/artwork.jpg',
       );
 
       final json = file.toJson();
@@ -68,6 +72,7 @@ void main() {
       expect(json['lessonName'], 'Lección 1');
       expect(json['courseBannerUrl'], 'https://example.com/banner.jpg');
       expect(json['courseIconUrl'], 'https://example.com/icon.png');
+      expect(json['localArtworkPath'], '/path/to/artwork.jpg');
     });
 
     test('fromJson deserializes all fields', () {
@@ -82,6 +87,7 @@ void main() {
         'lessonName': 'Session 1',
         'courseBannerUrl': 'https://example.com/banner.jpg',
         'courseIconUrl': 'https://example.com/icon.png',
+        'localArtworkPath': '/path/to/artwork.jpg',
       };
 
       final file = DownloadedFile.fromJson(json);
@@ -92,6 +98,7 @@ void main() {
       expect(file.courseName, 'Mindfulness');
       expect(file.courseBannerUrl, 'https://example.com/banner.jpg');
       expect(file.courseIconUrl, 'https://example.com/icon.png');
+      expect(file.localArtworkPath, '/path/to/artwork.jpg');
     });
 
     test('fromJson handles missing artwork fields gracefully', () {
@@ -108,6 +115,7 @@ void main() {
 
       expect(file.courseBannerUrl, isEmpty);
       expect(file.courseIconUrl, isEmpty);
+      expect(file.localArtworkPath, isEmpty);
     });
 
     test('toRawJson roundtrip preserves data', () {
@@ -122,6 +130,7 @@ void main() {
         lessonName: 'Test Lesson',
         courseBannerUrl: 'https://example.com/banner.jpg',
         courseIconUrl: 'https://example.com/icon.png',
+        localArtworkPath: '/test/artwork.jpg',
       );
 
       final restored = DownloadedFile.fromRawJson(original.toRawJson());
@@ -135,6 +144,7 @@ void main() {
       expect(restored.lessonName, original.lessonName);
       expect(restored.courseBannerUrl, original.courseBannerUrl);
       expect(restored.courseIconUrl, original.courseIconUrl);
+      expect(restored.localArtworkPath, original.localArtworkPath);
     });
   });
 }

@@ -171,6 +171,81 @@ void main() {
       expect(downloads.first.lessonName, lessonName);
       expect(downloads.first.courseBannerUrl, isEmpty);
       expect(downloads.first.courseIconUrl, isEmpty);
+      // No artwork URL → localArtworkPath stays empty
+      expect(downloads.first.localArtworkPath, isEmpty);
+    });
+
+    test('downloadResource downloads artwork locally when courseIconUrl is set', () async {
+      const iconUrl = 'https://example.com/icon.png';
+      final resource = LessonResource(
+        type: LessonResourceType.audio,
+        url: 'https://example.com/files/lesson.mp3',
+        name: 'Lección',
+        order: 1,
+        courseIconUrl: iconUrl,
+      );
+
+      await repository.downloadResource(
+        resource,
+        onProgress: (received, total) {},
+      );
+      final downloads = await repository.getDownloads();
+
+      // Two download calls: one for the resource, one for the artwork
+      expect(apiClient.downloadCalls, 2);
+      expect(downloads.first.localArtworkPath, isNotEmpty);
+      expect(await File(downloads.first.localArtworkPath).exists(), isTrue);
+    });
+
+    test('downloadResource reuses already-downloaded artwork on second call', () async {
+      const iconUrl = 'https://example.com/icon2.png';
+      final resource = LessonResource(
+        type: LessonResourceType.audio,
+        url: 'https://example.com/files/lesson2.mp3',
+        name: 'Lección 2',
+        order: 1,
+        courseIconUrl: iconUrl,
+      );
+
+      // First download: downloads resource + artwork (2 calls)
+      await repository.downloadResource(
+        resource,
+        onProgress: (received, total) {},
+      );
+      final callsAfterFirst = apiClient.downloadCalls;
+      expect(callsAfterFirst, 2);
+
+      // Clear history so the resource is re-downloaded (simulates a re-download scenario)
+      await repository.clearHistory();
+
+      // Second download: artwork file already exists on disk → only 1 new API call for resource
+      await repository.downloadResource(
+        resource,
+        onProgress: (received, total) {},
+      );
+      expect(apiClient.downloadCalls, 3);
+    });
+
+    test('downloadResource still succeeds even if artwork download fails', () async {
+      const iconUrl = 'https://example.com/failing-icon.png';
+      final resource = LessonResource(
+        type: LessonResourceType.audio,
+        url: 'https://example.com/files/lesson3.mp3',
+        name: 'Lección 3',
+        order: 1,
+        courseIconUrl: iconUrl,
+      );
+
+      apiClient.failArtworkUrls.add(iconUrl);
+
+      final file = await repository.downloadResource(
+        resource,
+        onProgress: (received, total) {},
+      );
+      final downloads = await repository.getDownloads();
+
+      expect(await file.exists(), isTrue);
+      expect(downloads.first.localArtworkPath, isEmpty);
     });
 
     test('downloadResource accepts legacy hash-based ids for existing files', () async {
@@ -244,6 +319,7 @@ String _legacyResourceId(LessonResource resource) {
 
 class _FakeDownloadApiClient extends FakeApiClient {
   int downloadCalls = 0;
+  final Set<String> failArtworkUrls = {};
 
   @override
   Future<Response<dynamic>> download(
@@ -253,6 +329,9 @@ class _FakeDownloadApiClient extends FakeApiClient {
     CancelToken? cancelToken,
   }) async {
     downloadCalls += 1;
+    if (failArtworkUrls.contains(url)) {
+      throw Exception('Simulated artwork download failure');
+    }
     final file = File(savePath);
     await file.create(recursive: true);
     await file.writeAsString('downloaded');

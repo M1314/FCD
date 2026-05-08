@@ -56,6 +56,11 @@ class DownloadRepository {
       cancelToken: cancelToken,
     );
 
+    final artworkUrl = resource.courseIconUrl.isNotEmpty
+        ? resource.courseIconUrl
+        : resource.courseBannerUrl;
+    final localArtworkPath = await _downloadArtwork(artworkUrl, baseDir);
+
     await _saveToHistory(
       DownloadedFile(
         id: _resourceId(resource),
@@ -68,6 +73,7 @@ class DownloadRepository {
         lessonName: lessonName,
         courseBannerUrl: resource.courseBannerUrl,
         courseIconUrl: resource.courseIconUrl,
+        localArtworkPath: localArtworkPath,
       ),
     );
 
@@ -198,8 +204,42 @@ class DownloadRepository {
     }
   }
 
-  String _safeFileName(String name, String prefix, String extension) {
-    final normalized = name.trim().isEmpty ? prefix : name.trim();
+  /// Downloads [artworkUrl] to a local file and returns its path.
+  /// Returns an empty string if the URL is empty or download fails.
+  Future<String> _downloadArtwork(String artworkUrl, Directory baseDir) async {
+    if (artworkUrl.isEmpty) {
+      return '';
+    }
+
+    try {
+      final uri = Uri.tryParse(artworkUrl);
+      final uriPath = uri?.path ?? artworkUrl;
+      final dot = uriPath.lastIndexOf('.');
+      final ext =
+          (dot != -1 && dot < uriPath.length - 1 && uriPath.length - dot <= 6)
+              ? uriPath.substring(dot)
+              : '.jpg';
+
+      final artworkDir = Directory('${baseDir.path}/artwork');
+      if (!await artworkDir.exists()) {
+        await artworkDir.create(recursive: true);
+      }
+
+      final filename = 'artwork_${artworkUrl.hashCode}$ext';
+      final artworkFile = File('${artworkDir.path}/$filename');
+
+      if (await artworkFile.exists()) {
+        return artworkFile.path;
+      }
+
+      await _apiClient.download(artworkUrl, artworkFile.path);
+      return artworkFile.path;
+    } catch (_) {
+      return '';
+    }
+  }
+
+  String _safeFileName(String name, String prefix, String extension) {    final normalized = name.trim().isEmpty ? prefix : name.trim();
     final sanitized = normalized
         .replaceAll(RegExp(r'[\\/:*?"<>|]'), '_')
         .replaceAll(RegExp(r'\s+'), '_');
