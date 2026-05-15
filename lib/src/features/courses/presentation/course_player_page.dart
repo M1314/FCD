@@ -55,6 +55,7 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
   String? _initializationError;
   bool _isVideoReady = false;
   bool _videoInitFailed = false;
+  bool _showVideoDurationWarning = false;
   bool _isAudioLoading = false;
   int _savedMediaPositionMs = 0;
   int _resourcePreparationRequestId = 0;
@@ -399,6 +400,31 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
                 style: Theme.of(context).textTheme.titleLarge,
               ),
             ),
+            if (_showVideoDurationWarning)
+              Container(
+                margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: Colors.orange.shade100,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.orange.shade300),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.warning_amber_rounded, color: Colors.orange.shade800, size: 20),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Video sin duración. Recarga para reintentar.',
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: Colors.orange.shade900,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             Expanded(
               child: ListView.builder(
                 itemCount: widget.lessons.length,
@@ -599,6 +625,7 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
                 onTap: () async {
                   setState(() {
                     _resourceIndex = index;
+                    _showVideoDurationWarning = false;
                   });
                   _savedMediaPositionMs = 0;
                   await _saveProgress();
@@ -882,6 +909,7 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
       _resourceIndex = 0;
       _isCompleted = _completedLessonIds.contains(currentLesson.id);
       _isCurrentFavorite = _favoriteIds.contains(currentLesson.id);
+      _showVideoDurationWarning = false;
     });
     _savedMediaPositionMs = 0;
 
@@ -1129,6 +1157,11 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
     final dataSource = BetterPlayerDataSource(
       BetterPlayerDataSourceType.network,
       url,
+      notificationConfiguration: BetterPlayerNotificationConfiguration(
+        showNotification: true,
+        title: title ?? 'Video de la lección',
+        imageUrl: imageUrl,
+      ),
       cacheConfiguration: const BetterPlayerCacheConfiguration(
         useCache: true,
         preCacheSize: 8 * 1024 * 1024,
@@ -1138,11 +1171,6 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
         maxBufferMs: 90000,
         bufferForPlaybackMs: 3000,
         bufferForPlaybackAfterRebufferMs: 5000,
-      ),
-      notificationConfiguration: BetterPlayerNotificationConfiguration(
-        showNotification: true,
-        title: title ?? 'Video de la lección',
-        imageUrl: imageUrl,
       ),
     );
 
@@ -1179,6 +1207,7 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
     );
     int attempts = 0;
     const maxAttempts = 120;
+    const fallbackAttempts = 70; // 7 seconds
     Timer.periodic(const Duration(milliseconds: 100), (timer) {
       if (!mounted ||
           requestId != _resourcePreparationRequestId ||
@@ -1209,7 +1238,7 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
         _debugVideoInitLog(
           'ready requestId=$requestId attempt=$attempts duration=$duration',
         );
-        if (restorePositionMs > 0) {
+        if (restorePositionMs > 0 && hasDuration) {
           final durationMs = duration.inMilliseconds;
           final clampedPositionMs = restorePositionMs.clamp(0, durationMs);
           try {
@@ -1223,10 +1252,34 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
           setState(() {
             _isVideoReady = true;
             _videoInitFailed = false;
+            _showVideoDurationWarning = false;
           });
         }
         return;
       }
+
+      // Fallback: show video after 7 seconds even without duration
+      if (attempts >= fallbackAttempts) {
+        timer.cancel();
+        _debugVideoInitLog(
+          'fallback requestId=$requestId attempt=$attempts showing without duration',
+        );
+        if (mounted && requestId == _resourcePreparationRequestId) {
+          setState(() {
+            _isVideoReady = true;
+            _showVideoDurationWarning = true;
+          });
+          Future.delayed(const Duration(seconds: 4), () {
+            if (mounted) {
+              setState(() {
+                _showVideoDurationWarning = false;
+              });
+            }
+          });
+        }
+        return;
+      }
+
       attempts++;
       if (attempts >= maxAttempts) {
         timer.cancel();
