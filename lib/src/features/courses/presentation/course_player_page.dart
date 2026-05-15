@@ -1172,6 +1172,11 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
         bufferForPlaybackMs: 3000,
         bufferForPlaybackAfterRebufferMs: 5000,
       ),
+      notificationConfiguration: BetterPlayerNotificationConfiguration(
+        showNotification: true,
+        title: title ?? 'Video de la lección',
+        imageUrl: imageUrl,
+      ),
     );
 
     final videoController = BetterPlayerController(
