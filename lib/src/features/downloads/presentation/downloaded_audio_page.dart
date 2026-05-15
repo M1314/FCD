@@ -8,9 +8,14 @@ import 'package:just_audio/just_audio.dart';
 import 'package:just_audio_background/just_audio_background.dart';
 
 class DownloadedAudioPage extends StatefulWidget {
-  const DownloadedAudioPage({super.key, required this.file});
+  const DownloadedAudioPage({
+    super.key,
+    required this.file,
+    this.playerOverride,
+  });
 
   final DownloadedFile file;
+  final AudioPlayer? playerOverride;
 
   @override
   State<DownloadedAudioPage> createState() => _DownloadedAudioPageState();
@@ -20,16 +25,25 @@ class _DownloadedAudioPageState extends State<DownloadedAudioPage> {
   AudioPlayer? _player;
   bool _loading = true;
   String? _error;
+  bool _ownsPlayer = false;
 
   @override
   void initState() {
     super.initState();
+    if (widget.playerOverride != null) {
+      _player = widget.playerOverride;
+      _loading = false;
+      return;
+    }
+    _ownsPlayer = true;
     _preparePlayer();
   }
 
   @override
   void dispose() {
-    _player?.dispose();
+    if (_ownsPlayer) {
+      _player?.dispose();
+    }
     super.dispose();
   }
 
@@ -65,7 +79,9 @@ class _DownloadedAudioPageState extends State<DownloadedAudioPage> {
           localFile.path,
           tag: MediaItem(
             id: widget.file.id,
-            title: widget.file.name.isEmpty ? 'Audio descargado' : widget.file.name,
+            title: widget.file.name.isEmpty
+                ? 'Audio descargado'
+                : widget.file.name,
             artist: widget.file.courseName,
             album: widget.file.lessonName,
             artUri: artUri,
@@ -94,9 +110,7 @@ class _DownloadedAudioPageState extends State<DownloadedAudioPage> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: _buildContent(context),
-    );
+    return Scaffold(body: _buildContent(context));
   }
 
   Widget _buildContent(BuildContext context) {
@@ -137,43 +151,60 @@ class _DownloadedAudioPageState extends State<DownloadedAudioPage> {
       ),
       child: LayoutBuilder(
         builder: (context, constraints) {
-          final controlsHeight =
-              (constraints.maxHeight * 0.33).clamp(220.0, 320.0);
+          final controlsHeight = (constraints.maxHeight * 0.33).clamp(
+            220.0,
+            320.0,
+          );
+          final topHeight = (constraints.maxHeight - controlsHeight).clamp(
+            0.0,
+            double.infinity,
+          );
           final topInset = MediaQuery.of(context).padding.top;
           return Column(
             children: <Widget>[
-              Expanded(
-                child: SingleChildScrollView(
+              SizedBox(
+                height: topHeight,
+                child: Padding(
                   padding: EdgeInsets.fromLTRB(24, topInset + 12, 24, 12),
                   child: Column(
                     children: <Widget>[
                       _buildTopBar(context),
-                      const SizedBox(height: 12),
-                      _buildCover(coverUrl, localArtworkPath),
-                      const SizedBox(height: 18),
-                      Text(
-                        widget.file.name.isEmpty
-                            ? 'Audio descargado'
-                            : widget.file.name,
-                        textAlign: TextAlign.center,
-                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                              color: AppTheme.deepBrown,
+                      const SizedBox(height: 8),
+                      Expanded(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: <Widget>[
+                            Flexible(
+                              child: _buildCover(coverUrl, localArtworkPath),
                             ),
-                      ),
-                      if (widget.file.courseName.trim().isNotEmpty)
-                        Padding(
-                          padding: const EdgeInsets.only(top: 6),
-                          child: Text(
-                            widget.file.courseName,
-                            style: Theme.of(context)
-                                .textTheme
-                                .bodyMedium
-                                ?.copyWith(
-                                  color: AppTheme.mutedText,
-                                  fontWeight: FontWeight.w600,
+                            const SizedBox(height: 12),
+                            Text(
+                              widget.file.name.isEmpty
+                                  ? 'Audio descargado'
+                                  : widget.file.name,
+                              textAlign: TextAlign.center,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: Theme.of(context).textTheme.titleSmall
+                                  ?.copyWith(color: AppTheme.deepBrown),
+                            ),
+                            if (widget.file.courseName.trim().isNotEmpty)
+                              Padding(
+                                padding: const EdgeInsets.only(top: 4),
+                                child: Text(
+                                  widget.file.courseName,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: Theme.of(context).textTheme.bodySmall
+                                      ?.copyWith(
+                                        color: AppTheme.mutedText,
+                                        fontWeight: FontWeight.w600,
+                                      ),
                                 ),
-                          ),
+                              ),
+                          ],
                         ),
+                      ),
                     ],
                   ),
                 ),
@@ -195,7 +226,12 @@ class _DownloadedAudioPageState extends State<DownloadedAudioPage> {
   Widget _buildCover(String url, String localArtworkPath) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        final size = constraints.maxWidth > 360 ? 360.0 : constraints.maxWidth;
+        final maxWidth = constraints.maxWidth;
+        final maxHeight = constraints.maxHeight;
+        var size = maxWidth > 320 ? 320.0 : maxWidth;
+        if (maxHeight.isFinite && maxHeight > 0) {
+          size = size < maxHeight ? size : maxHeight;
+        }
         return Align(
           child: SizedBox(
             width: size,
@@ -209,14 +245,15 @@ class _DownloadedAudioPageState extends State<DownloadedAudioPage> {
                         width: double.infinity,
                         height: double.infinity,
                         fit: BoxFit.cover,
-                        errorBuilder: (context, error, stackTrace) => NetworkImageTile(
-                          url: url,
-                          width: double.infinity,
-                          height: double.infinity,
-                          borderRadius: 0,
-                          fallbackIcon: Icons.headphones_rounded,
-                          fit: BoxFit.cover,
-                        ),
+                        errorBuilder: (context, error, stackTrace) =>
+                            NetworkImageTile(
+                              url: url,
+                              width: double.infinity,
+                              height: double.infinity,
+                              borderRadius: 0,
+                              fallbackIcon: Icons.headphones_rounded,
+                              fit: BoxFit.cover,
+                            ),
                       )
                     : NetworkImageTile(
                         url: url,
@@ -246,11 +283,11 @@ class _DownloadedAudioPageState extends State<DownloadedAudioPage> {
           child: Text(
             'Reproduciendo ahora',
             textAlign: TextAlign.center,
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: AppTheme.mutedText,
-                  fontWeight: FontWeight.w600,
-                  letterSpacing: 0.6,
-                ),
+            style: Theme.of(context).textTheme.labelSmall?.copyWith(
+              color: AppTheme.mutedText,
+              fontWeight: FontWeight.w600,
+              letterSpacing: 0.6,
+            ),
           ),
         ),
         const SizedBox(width: 48),
@@ -373,15 +410,15 @@ class _SpotifyControlsState extends State<_SpotifyControls> {
               children: <Widget>[
                 Text(
                   _formatDuration(displayPosition),
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: AppTheme.mutedText,
-                      ),
+                  style: Theme.of(
+                    context,
+                  ).textTheme.bodySmall?.copyWith(color: AppTheme.mutedText),
                 ),
                 Text(
                   _formatDuration(total),
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: AppTheme.mutedText,
-                      ),
+                  style: Theme.of(
+                    context,
+                  ).textTheme.bodySmall?.copyWith(color: AppTheme.mutedText),
                 ),
               ],
             ),
@@ -465,10 +502,7 @@ class _PlayButton extends StatelessWidget {
 }
 
 class _SeekButton extends StatelessWidget {
-  const _SeekButton({
-    required this.icon,
-    required this.onPressed,
-  });
+  const _SeekButton({required this.icon, required this.onPressed});
 
   final IconData icon;
   final VoidCallback onPressed;
@@ -503,9 +537,9 @@ class _SeekLabel extends StatelessWidget {
         text,
         textAlign: TextAlign.center,
         style: Theme.of(context).textTheme.bodySmall?.copyWith(
-              color: AppTheme.mutedText,
-              fontWeight: FontWeight.w600,
-            ),
+          color: AppTheme.mutedText,
+          fontWeight: FontWeight.w600,
+        ),
       ),
     );
   }
