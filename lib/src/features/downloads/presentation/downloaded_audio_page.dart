@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:fcd_app/src/core/theme/app_theme.dart';
 import 'package:fcd_app/src/core/widgets/network_image_tile.dart';
+import 'package:fcd_app/src/core/widgets/scrolling_text.dart';
 import 'package:fcd_app/src/features/downloads/data/models/downloaded_file.dart';
 import 'package:flutter/material.dart';
 import 'package:just_audio/just_audio.dart';
@@ -151,7 +152,7 @@ class _DownloadedAudioPageState extends State<DownloadedAudioPage> {
                       const SizedBox(height: 12),
                       _buildCover(coverUrl, localArtworkPath),
                       const SizedBox(height: 18),
-                      Text(
+                      ScrollingText(
                         widget.file.name.isEmpty
                             ? 'Audio descargado'
                             : widget.file.name,
