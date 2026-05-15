@@ -50,6 +50,14 @@ class _DownloadedAudioPageState extends State<DownloadedAudioPage> {
     final artworkUrl = widget.file.courseIconUrl.isNotEmpty
         ? widget.file.courseIconUrl
         : widget.file.courseBannerUrl;
+    final localArtworkPath = widget.file.localArtworkPath;
+
+    Uri? artUri;
+    if (localArtworkPath.isNotEmpty) {
+      artUri = Uri.file(localArtworkPath);
+    } else if (artworkUrl.isNotEmpty) {
+      artUri = Uri.parse(artworkUrl);
+    }
 
     try {
       await player.setAudioSource(
@@ -60,7 +68,7 @@ class _DownloadedAudioPageState extends State<DownloadedAudioPage> {
             title: widget.file.name.isEmpty ? 'Audio descargado' : widget.file.name,
             artist: widget.file.courseName,
             album: widget.file.lessonName,
-            artUri: artworkUrl.isNotEmpty ? Uri.parse(artworkUrl) : null,
+            artUri: artUri,
           ),
         ),
       );
@@ -115,6 +123,7 @@ class _DownloadedAudioPageState extends State<DownloadedAudioPage> {
     final coverUrl = iconUrl.isNotEmpty
         ? iconUrl
         : widget.file.courseBannerUrl.trim();
+    final localArtworkPath = widget.file.localArtworkPath.trim();
 
     return Container(
       width: double.infinity,
@@ -140,7 +149,7 @@ class _DownloadedAudioPageState extends State<DownloadedAudioPage> {
                     children: <Widget>[
                       _buildTopBar(context),
                       const SizedBox(height: 12),
-                      _buildCover(coverUrl),
+                      _buildCover(coverUrl, localArtworkPath),
                       const SizedBox(height: 18),
                       Text(
                         widget.file.name.isEmpty
@@ -183,7 +192,7 @@ class _DownloadedAudioPageState extends State<DownloadedAudioPage> {
     );
   }
 
-  Widget _buildCover(String url) {
+  Widget _buildCover(String url, String localArtworkPath) {
     return LayoutBuilder(
       builder: (context, constraints) {
         final size = constraints.maxWidth > 360 ? 360.0 : constraints.maxWidth;
@@ -192,13 +201,31 @@ class _DownloadedAudioPageState extends State<DownloadedAudioPage> {
             width: size,
             child: AspectRatio(
               aspectRatio: 1,
-              child: NetworkImageTile(
-                url: url,
-                width: double.infinity,
-                height: double.infinity,
-                borderRadius: 12,
-                fallbackIcon: Icons.headphones_rounded,
-                fit: BoxFit.cover,
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: localArtworkPath.isNotEmpty
+                    ? Image.file(
+                        File(localArtworkPath),
+                        width: double.infinity,
+                        height: double.infinity,
+                        fit: BoxFit.cover,
+                        errorBuilder: (context, error, stackTrace) => NetworkImageTile(
+                          url: url,
+                          width: double.infinity,
+                          height: double.infinity,
+                          borderRadius: 0,
+                          fallbackIcon: Icons.headphones_rounded,
+                          fit: BoxFit.cover,
+                        ),
+                      )
+                    : NetworkImageTile(
+                        url: url,
+                        width: double.infinity,
+                        height: double.infinity,
+                        borderRadius: 0,
+                        fallbackIcon: Icons.headphones_rounded,
+                        fit: BoxFit.cover,
+                      ),
               ),
             ),
           ),

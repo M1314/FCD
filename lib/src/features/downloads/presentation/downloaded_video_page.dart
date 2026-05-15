@@ -57,6 +57,10 @@ class _DownloadedVideoPageState extends State<DownloadedVideoPage> {
     final artworkUrl = widget.file.courseIconUrl.isNotEmpty
         ? widget.file.courseIconUrl
         : widget.file.courseBannerUrl;
+    final localArtworkPath = widget.file.localArtworkPath;
+    final notificationImageUrl = localArtworkPath.isNotEmpty
+        ? 'file://$localArtworkPath'
+        : (artworkUrl.isNotEmpty ? artworkUrl : null);
 
     final dataSource = BetterPlayerDataSource(
       BetterPlayerDataSourceType.file,
@@ -64,7 +68,7 @@ class _DownloadedVideoPageState extends State<DownloadedVideoPage> {
       notificationConfiguration: BetterPlayerNotificationConfiguration(
         showNotification: true,
         title: widget.file.name,
-        imageUrl: artworkUrl.isNotEmpty ? artworkUrl : null,
+        imageUrl: notificationImageUrl,
       ),
     );
 
