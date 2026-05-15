@@ -52,33 +52,46 @@ class _LoginPageState extends State<LoginPage> {
   }
 
   Future<void> _checkBiometrics() async {
+    await Future<void>.delayed(const Duration(milliseconds: 100));
+    if (!mounted) return;
+
+    // Load the stored email first — it is needed regardless of whether
+    // biometrics are available, because the quick-login button is shown
+    // whenever a stored account exists.
+    final controller = context.read<SessionController>();
+    final storage = controller.apiClient.storage;
+    String? storedEmail;
     try {
-      await Future<void>.delayed(const Duration(milliseconds: 100));
-      if (!mounted) return;
+      storedEmail = await storage.getUserEmail();
+    } catch (_) {
+      return;
+    }
+    if (storedEmail == null || storedEmail.isEmpty) return;
+    if (!mounted) return;
 
-      // Load the stored email first — it is needed regardless of whether
-      // biometrics are available, because the quick-login button is shown
-      // whenever a stored account exists.
-      final controller = context.read<SessionController>();
-      final storage = controller.apiClient.storage;
-      final storedEmail = await storage.getUserEmail();
-      if (storedEmail == null || storedEmail.isEmpty) return;
+    bool canUseBiometrics = false;
+    bool canUseDeviceAuth = false;
 
-      if (!mounted) return;
+    try {
+      canUseDeviceAuth = await _localAuth.isDeviceSupported();
+    } catch (_) {
+    }
 
-      final availableBiometrics = await _localAuth.getAvailableBiometrics();
-      final canUseBiometrics = availableBiometrics.isNotEmpty;
-      final canUseDeviceAuth = await _localAuth.isDeviceSupported();
-
-      if (mounted) {
-        setState(() {
-          _storedEmail = storedEmail;
-          _canUseBiometrics = canUseBiometrics;
-          _canUseDeviceAuth = canUseDeviceAuth;
-        });
+    try {
+      final canCheckBiometrics = await _localAuth.canCheckBiometrics;
+      if (canCheckBiometrics) {
+        final availableBiometrics = await _localAuth.getAvailableBiometrics();
+        canUseBiometrics = availableBiometrics.isNotEmpty;
       }
-    } catch (e) {
-      // Silently fail - button won't show
+    } catch (_) {
+    }
+
+    if (mounted) {
+      setState(() {
+        _storedEmail = storedEmail;
+        _canUseBiometrics = canUseBiometrics;
+        _canUseDeviceAuth = canUseDeviceAuth || canUseBiometrics;
+      });
     }
   }
 
