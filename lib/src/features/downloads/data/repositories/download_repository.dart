@@ -29,7 +29,11 @@ class DownloadRepository {
     String courseName = '',
     String lessonName = '',
   }) async {
-    final existingFile = await getExistingDownloadedFile(resource);
+    final existingFile = await getExistingDownloadedFile(
+      resource,
+      courseName: courseName,
+      lessonName: lessonName,
+    );
     if (existingFile != null) {
       onAlreadyDownloaded?.call();
       return existingFile;
@@ -80,7 +84,11 @@ class DownloadRepository {
     return file;
   }
 
-  Future<File?> getExistingDownloadedFile(LessonResource resource) async {
+  Future<File?> getExistingDownloadedFile(
+    LessonResource resource, {
+    String courseName = '',
+    String lessonName = '',
+  }) async {
     final downloads = await getDownloads();
     for (final existing in downloads) {
       if (!_matchesResource(existing, resource)) {
@@ -94,7 +102,45 @@ class DownloadRepository {
       }
       return file;
     }
-    return null;
+
+    final file = await _findDownloadedFileOnDisk(resource);
+    if (file == null) {
+      return null;
+    }
+
+    DownloadedFile? existingEntry;
+    for (final entry in downloads) {
+      if (entry.localPath == file.path) {
+        existingEntry = entry;
+        break;
+      }
+    }
+
+    await _saveToHistory(
+      DownloadedFile(
+        id: _resourceId(resource),
+        url: resource.url,
+        name: resource.name,
+        type: resource.type.name,
+        localPath: file.path,
+        downloadedAt: existingEntry?.downloadedAt ?? DateTime.now(),
+        courseName:
+            courseName.isNotEmpty ? courseName : existingEntry?.courseName ?? '',
+        lessonName:
+            lessonName.isNotEmpty ? lessonName : existingEntry?.lessonName ?? '',
+        courseBannerUrl:
+            resource.courseBannerUrl.isNotEmpty
+                ? resource.courseBannerUrl
+                : existingEntry?.courseBannerUrl ?? '',
+        courseIconUrl:
+            resource.courseIconUrl.isNotEmpty
+                ? resource.courseIconUrl
+                : existingEntry?.courseIconUrl ?? '',
+        localArtworkPath: existingEntry?.localArtworkPath ?? '',
+      ),
+    );
+
+    return file;
   }
 
   Future<List<DownloadedFile>> getDownloads() async {
@@ -171,7 +217,9 @@ class DownloadRepository {
   }
 
   bool _isSameResourceEntry(DownloadedFile a, DownloadedFile b) {
-    return a.id == b.id || (a.type == b.type && a.url == b.url);
+    return a.id == b.id ||
+        (a.type == b.type && a.url == b.url) ||
+        a.localPath == b.localPath;
   }
 
   String _legacyResourceId(LessonResource resource) {
@@ -250,6 +298,56 @@ class DownloadRepository {
       return withTime;
     }
     return '$withTime.$extension';
+  }
+
+  String _normalizedResourceName(LessonResource resource) {
+    final normalized =
+        resource.name.trim().isEmpty ? resource.type.name : resource.name.trim();
+    return normalized
+        .replaceAll(RegExp(r'[\\/:*?"<>|]'), '_')
+        .replaceAll(RegExp(r'\s+'), '_');
+  }
+
+  String _resourceFileSuffix(LessonResource resource) {
+    final extension = _extensionFromResource(resource);
+    final normalized = _normalizedResourceName(resource);
+    final normalizedLower = normalized.toLowerCase();
+    final filename =
+        normalizedLower.endsWith('.$extension')
+            ? normalized
+            : '$normalized.$extension';
+    return '_$filename';
+  }
+
+  Future<File?> _findDownloadedFileOnDisk(LessonResource resource) async {
+    final baseDir = await getBaseDirectory();
+    final folder = Directory('${baseDir.path}/downloads');
+    if (!await folder.exists()) {
+      return null;
+    }
+
+    final suffix = _resourceFileSuffix(resource).toLowerCase();
+    File? match;
+    DateTime? matchModified;
+
+    await for (final entity in folder.list()) {
+      if (entity is! File) {
+        continue;
+      }
+      final filename =
+          entity.path.split(Platform.pathSeparator).last.toLowerCase();
+      if (!filename.endsWith(suffix)) {
+        continue;
+      }
+
+      final modified = await entity.lastModified();
+      if (match == null || modified.isAfter(matchModified!)) {
+        match = entity;
+        matchModified = modified;
+      }
+    }
+
+    return match;
   }
 }
 
