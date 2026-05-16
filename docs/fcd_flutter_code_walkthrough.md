@@ -512,7 +512,8 @@ sequenceDiagram
 
 ## 37) assets
 
-- `assets/images/logo.jpg` / `.png` / `.ico`: logo principal usado en Splash y launcher icon.
+- `assets/images/logo.jpg` / `.png` / `.ico`: logo principal usado en Splash.
+- `assets/images/logo_launcher.png`: imagen usada para el launcher icon.
 
 ## 38) lib (código productivo)
 
