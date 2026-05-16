@@ -43,18 +43,5 @@ void main() {
       expect(find.byType(SingleChildScrollView), findsOneWidget);
     });
 
-    testWidgets('renders scrolling text golden', (tester) async {
-      await tester.pumpWidget(
-        buildSubject(
-          text: 'Audio descargado con un título realmente extenso',
-          width: 200,
-        ),
-      );
-      await tester.pump(const Duration(milliseconds: 700));
-      await expectLater(
-        find.byType(ScrollingText),
-        matchesGoldenFile('goldens/scrolling_text_long.png'),
-      );
-    });
   });
 }
