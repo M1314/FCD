@@ -116,6 +116,17 @@ flutter run --dart-define=FCD_API_BASE_URL=https://tu-backend/api
 
 ## Requisitos
 
+### Requisitos mínimos del sistema (ejecución)
+
+- Android 5.0 (API 21) o superior.
+- iOS/iPadOS 13.0 o superior.
+- CPU ARM de 64 bits.
+- 2 GB de RAM (4 GB recomendado).
+- 300 MB de almacenamiento libre, más espacio adicional para descargas.
+- Conexión a internet para autenticación y contenido en streaming.
+
+### Requisitos de desarrollo
+
 - Flutter stable (compatible con `Dart ^3.11.4`).
 - Android Studio / Xcode para build nativo.
 - Dispositivo físico o emulador con conexión a internet.
