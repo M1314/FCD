@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:audio_service/audio_service.dart';
 import 'package:better_player_plus/better_player_plus.dart';
 import 'package:fcd_app/src/core/config/api_config.dart';
 import 'package:fcd_app/src/core/storage/favorites_storage.dart';
@@ -1157,11 +1158,6 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
     final dataSource = BetterPlayerDataSource(
       BetterPlayerDataSourceType.network,
       url,
-      notificationConfiguration: BetterPlayerNotificationConfiguration(
-        showNotification: true,
-        title: title ?? 'Video de la lección',
-        imageUrl: imageUrl,
-      ),
       cacheConfiguration: const BetterPlayerCacheConfiguration(
         useCache: true,
         preCacheSize: 8 * 1024 * 1024,

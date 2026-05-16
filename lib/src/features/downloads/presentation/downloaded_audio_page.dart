@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:audio_service/audio_service.dart';
 import 'package:fcd_app/src/core/theme/app_theme.dart';
 import 'package:fcd_app/src/core/widgets/network_image_tile.dart';
 import 'package:fcd_app/src/features/downloads/data/models/downloaded_file.dart';

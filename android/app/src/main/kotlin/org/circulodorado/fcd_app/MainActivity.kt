@@ -1,5 +1,5 @@
 package org.circulodorado.fcd_app
 
-import com.ryanheise.audioservice.AudioServiceActivity
+import com.ryanheise.audioservice.AudioServiceFragmentActivity
 
-class MainActivity : AudioServiceActivity()
+class MainActivity : AudioServiceFragmentActivity()
