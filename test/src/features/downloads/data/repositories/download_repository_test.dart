@@ -222,12 +222,12 @@ void main() {
       // Clear history so the resource is re-downloaded (simulates a re-download scenario)
       await repository.clearHistory();
 
-      // Second download: artwork file already exists on disk → only 1 new API call for resource
+      // Second download: file already exists on disk → no new API calls
       await repository.downloadResource(
         resource,
         onProgress: (received, total) {},
       );
-      expect(apiClient.downloadCalls, 3);
+      expect(apiClient.downloadCalls, 2);
     });
 
     test('downloadResource still succeeds even if artwork download fails', () async {
@@ -281,6 +281,37 @@ void main() {
       expect(apiClient.downloadCalls, 0);
     });
 
+    test('downloadResource reuses file already on disk even without history', () async {
+      final resource = _resource();
+      final downloadsDir = Directory('${tempDir.path}/downloads');
+      await downloadsDir.create(recursive: true);
+
+      final baseFilename = _resourceBaseFilename(resource);
+      final extension = _extensionForResource(resource);
+      final filename = baseFilename.toLowerCase().endsWith('.$extension')
+          ? '123_$baseFilename'
+          : '123_$baseFilename.$extension';
+      final existingFile = File('${downloadsDir.path}/$filename');
+      await existingFile.writeAsString('existing');
+
+      var alreadyDownloadedCalled = false;
+      final file = await repository.downloadResource(
+        resource,
+        onProgress: (received, total) {},
+        onAlreadyDownloaded: () {
+          alreadyDownloadedCalled = true;
+        },
+      );
+
+      expect(file.path, existingFile.path);
+      expect(apiClient.downloadCalls, 0);
+      expect(alreadyDownloadedCalled, isTrue);
+
+      final downloads = await repository.getDownloads();
+      expect(downloads, hasLength(1));
+      expect(downloads.first.localPath, existingFile.path);
+    });
+
     test('getExistingDownloadedFile removes stale history entries', () async {
       final resource = _resource();
       final stalePath = '${tempDir.path}/downloads/missing.pdf';
@@ -321,6 +352,36 @@ String _stableResourceId(LessonResource resource) {
 
 String _legacyResourceId(LessonResource resource) {
   return '${resource.type.name}:${resource.url.hashCode}';
+}
+
+String _resourceBaseFilename(LessonResource resource) {
+  final normalized =
+      resource.name.trim().isEmpty ? resource.type.name : resource.name.trim();
+  return normalized
+      .replaceAll(RegExp(r'[\\/:*?"<>|]'), '_')
+      .replaceAll(RegExp(r'\s+'), '_');
+}
+
+String _extensionForResource(LessonResource resource) {
+  final uri = Uri.tryParse(resource.url);
+  final path = uri?.path ?? resource.url;
+
+  final dot = path.lastIndexOf('.');
+  if (dot != -1 && dot < path.length - 1) {
+    final extension = path.substring(dot + 1).toLowerCase();
+    if (extension.length <= 5) {
+      return extension;
+    }
+  }
+
+  switch (resource.type) {
+    case LessonResourceType.audio:
+      return 'mp3';
+    case LessonResourceType.video:
+      return 'mp4';
+    case LessonResourceType.document:
+      return 'pdf';
+  }
 }
 
 class _FakeDownloadApiClient extends FakeApiClient {
