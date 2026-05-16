@@ -93,6 +93,276 @@ void main() {
     });
   });
 
+  group('DownloadRepository.getDownloads – recovery from disk', () {
+    late Directory tempDir;
+    late _TestDownloadRepository repository;
+
+    setUp(() async {
+      SharedPreferences.setMockInitialValues(<String, Object>{});
+      tempDir = await Directory.systemTemp.createTemp('download_recovery_test');
+      repository = _TestDownloadRepository(
+        apiClient: FakeApiClient(),
+        baseDirectory: tempDir,
+      );
+    });
+
+    tearDown(() async {
+      if (await tempDir.exists()) {
+        await tempDir.delete(recursive: true);
+      }
+    });
+
+    test('returns empty list when no prefs and no downloads directory', () async {
+      final downloads = await repository.getDownloads();
+      expect(downloads, isEmpty);
+    });
+
+    test('rebuilds history from disk when prefs are empty', () async {
+      final downloadsDir = Directory('${tempDir.path}/downloads');
+      await downloadsDir.create(recursive: true);
+      final file = File('${downloadsDir.path}/12345_my_lesson.pdf');
+      await file.writeAsString('content');
+
+      final downloads = await repository.getDownloads();
+
+      expect(downloads, hasLength(1));
+      expect(downloads.first.localPath, file.path);
+      expect(downloads.first.name, 'my lesson');
+      expect(downloads.first.type, 'document');
+      expect(downloads.first.id, 'recovered:12345_my_lesson.pdf');
+    });
+
+    test('persists recovered entries back to SharedPreferences', () async {
+      final downloadsDir = Directory('${tempDir.path}/downloads');
+      await downloadsDir.create(recursive: true);
+      await File('${downloadsDir.path}/99_audio_track.mp3').writeAsString('audio');
+
+      await repository.getDownloads();
+
+      final prefs = await SharedPreferences.getInstance();
+      final stored = prefs.getStringList('download_history_v1');
+      expect(stored, isNotNull);
+      expect(stored, hasLength(1));
+
+      final recovered = DownloadedFile.fromRawJson(stored!.first);
+      expect(recovered.type, 'audio');
+      expect(recovered.name, 'audio track');
+    });
+
+    test('detects audio type from mp3 filename', () async {
+      final downloadsDir = Directory('${tempDir.path}/downloads');
+      await downloadsDir.create(recursive: true);
+      await File('${downloadsDir.path}/1_track.mp3').writeAsString('audio');
+
+      final downloads = await repository.getDownloads();
+      expect(downloads.single.type, 'audio');
+    });
+
+    test('detects audio type from wav filename', () async {
+      final downloadsDir = Directory('${tempDir.path}/downloads');
+      await downloadsDir.create(recursive: true);
+      await File('${downloadsDir.path}/1_track.wav').writeAsString('audio');
+
+      final downloads = await repository.getDownloads();
+      expect(downloads.single.type, 'audio');
+    });
+
+    test('detects video type from mp4 filename', () async {
+      final downloadsDir = Directory('${tempDir.path}/downloads');
+      await downloadsDir.create(recursive: true);
+      await File('${downloadsDir.path}/1_video.mp4').writeAsString('video');
+
+      final downloads = await repository.getDownloads();
+      expect(downloads.single.type, 'video');
+    });
+
+    test('detects document type from pdf filename', () async {
+      final downloadsDir = Directory('${tempDir.path}/downloads');
+      await downloadsDir.create(recursive: true);
+      await File('${downloadsDir.path}/1_guide.pdf').writeAsString('doc');
+
+      final downloads = await repository.getDownloads();
+      expect(downloads.single.type, 'document');
+    });
+
+    test('skips disk rebuild when prefs are non-empty', () async {
+      final downloadsDir = Directory('${tempDir.path}/downloads');
+      await downloadsDir.create(recursive: true);
+      final diskFile = File('${downloadsDir.path}/1_extra.pdf');
+      await diskFile.writeAsString('extra');
+
+      final existingFile = File('${tempDir.path}/downloads/kept.pdf');
+      await existingFile.create(recursive: true);
+      await existingFile.writeAsString('kept');
+
+      final entry = DownloadedFile(
+        id: 'doc:https://example.com/kept.pdf',
+        url: 'https://example.com/kept.pdf',
+        name: 'Kept',
+        type: 'document',
+        localPath: existingFile.path,
+        downloadedAt: DateTime(2024, 6, 1),
+        localArtworkPath: '',
+      );
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setStringList('download_history_v1', [entry.toRawJson()]);
+
+      final downloads = await repository.getDownloads();
+
+      // Must only return the prefs entry, not the extra file on disk.
+      expect(downloads, hasLength(1));
+      expect(downloads.single.id, entry.id);
+    });
+
+    test('recovered entries are sorted newest first by file modification time', () async {
+      final downloadsDir = Directory('${tempDir.path}/downloads');
+      await downloadsDir.create(recursive: true);
+      final older = File('${downloadsDir.path}/1_older.pdf');
+      final newer = File('${downloadsDir.path}/2_newer.pdf');
+      await older.writeAsString('older');
+      // Ensure a different modification time by setting it explicitly.
+      await Future<void>.delayed(const Duration(milliseconds: 10));
+      await newer.writeAsString('newer');
+
+      final downloads = await repository.getDownloads();
+
+      expect(downloads, hasLength(2));
+      expect(
+        downloads.first.downloadedAt
+            .isAfter(downloads.last.downloadedAt) ||
+        downloads.first.downloadedAt
+            .isAtSameMomentAs(downloads.last.downloadedAt),
+        isTrue,
+      );
+    });
+  });
+
+  group('DownloadRepository.clearHistory', () {
+    late Directory tempDir;
+    late _TestDownloadRepository repository;
+
+    setUp(() async {
+      SharedPreferences.setMockInitialValues(<String, Object>{});
+      tempDir = await Directory.systemTemp.createTemp('clear_history_test');
+      repository = _TestDownloadRepository(
+        apiClient: FakeApiClient(),
+        baseDirectory: tempDir,
+      );
+    });
+
+    tearDown(() async {
+      if (await tempDir.exists()) {
+        await tempDir.delete(recursive: true);
+      }
+    });
+
+    test('deletes individual download files and artwork files', () async {
+      final downloadsDir = Directory('${tempDir.path}/downloads');
+      final artworkDir = Directory('${tempDir.path}/artwork');
+      await downloadsDir.create(recursive: true);
+      await artworkDir.create(recursive: true);
+
+      final audioFile = File('${downloadsDir.path}/lesson.mp3');
+      await audioFile.writeAsString('audio');
+      final artworkFile = File('${artworkDir.path}/cover.jpg');
+      await artworkFile.writeAsString('art');
+
+      final entry = DownloadedFile(
+        id: 'audio:https://example.com/lesson.mp3',
+        url: 'https://example.com/lesson.mp3',
+        name: 'Lesson',
+        type: 'audio',
+        localPath: audioFile.path,
+        downloadedAt: DateTime.now(),
+        localArtworkPath: artworkFile.path,
+      );
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setStringList('download_history_v1', [entry.toRawJson()]);
+
+      await repository.clearHistory();
+
+      expect(await audioFile.exists(), isFalse);
+      expect(await artworkFile.exists(), isFalse);
+    });
+
+    test('removes downloads and artwork directories', () async {
+      final downloadsDir = Directory('${tempDir.path}/downloads');
+      final artworkDir = Directory('${tempDir.path}/artwork');
+      await downloadsDir.create(recursive: true);
+      await artworkDir.create(recursive: true);
+      await File('${downloadsDir.path}/a.pdf').writeAsString('a');
+      await File('${artworkDir.path}/img.jpg').writeAsString('img');
+
+      final entry = DownloadedFile(
+        id: 'doc:https://example.com/a.pdf',
+        url: 'https://example.com/a.pdf',
+        name: 'A',
+        type: 'document',
+        localPath: '${downloadsDir.path}/a.pdf',
+        downloadedAt: DateTime.now(),
+        localArtworkPath: '${artworkDir.path}/img.jpg',
+      );
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setStringList('download_history_v1', [entry.toRawJson()]);
+
+      await repository.clearHistory();
+
+      expect(await downloadsDir.exists(), isFalse);
+      expect(await artworkDir.exists(), isFalse);
+    });
+
+    test('clears the download_history_v1 SharedPreferences key', () async {
+      final entry = DownloadedFile(
+        id: 'doc:https://example.com/b.pdf',
+        url: 'https://example.com/b.pdf',
+        name: 'B',
+        type: 'document',
+        localPath: '/nonexistent/b.pdf',
+        downloadedAt: DateTime.now(),
+        localArtworkPath: '',
+      );
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setStringList('download_history_v1', [entry.toRawJson()]);
+
+      await repository.clearHistory();
+
+      final stored = prefs.getStringList('download_history_v1');
+      expect(stored, isNull);
+    });
+
+    test('succeeds gracefully when history and directories are already empty', () async {
+      await expectLater(repository.clearHistory(), completes);
+
+      final prefs = await SharedPreferences.getInstance();
+      final stored = prefs.getStringList('download_history_v1');
+      expect(stored, isNull);
+    });
+
+    test('getDownloads returns empty after clearHistory', () async {
+      final downloadsDir = Directory('${tempDir.path}/downloads');
+      await downloadsDir.create(recursive: true);
+      final audioFile = File('${downloadsDir.path}/lesson.mp3');
+      await audioFile.writeAsString('audio');
+
+      final entry = DownloadedFile(
+        id: 'audio:https://example.com/lesson.mp3',
+        url: 'https://example.com/lesson.mp3',
+        name: 'Lesson',
+        type: 'audio',
+        localPath: audioFile.path,
+        downloadedAt: DateTime.now(),
+        localArtworkPath: '',
+      );
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setStringList('download_history_v1', [entry.toRawJson()]);
+
+      await repository.clearHistory();
+
+      final downloads = await repository.getDownloads();
+      expect(downloads, isEmpty);
+    });
+  });
+
   group('DownloadRepository.downloadResource', () {
     late Directory tempDir;
     late _FakeDownloadApiClient apiClient;
@@ -201,33 +471,36 @@ void main() {
       expect(await File(downloads.first.localArtworkPath).exists(), isTrue);
     });
 
-    test('downloadResource reuses already-downloaded artwork on second call', () async {
+    test('downloadResource reuses already-downloaded artwork across different resources', () async {
       const iconUrl = 'https://example.com/icon2.png';
-      final resource = LessonResource(
+      final resource1 = const LessonResource(
         type: LessonResourceType.audio,
         url: 'https://example.com/files/lesson2.mp3',
         name: 'Lección 2',
         order: 1,
         courseIconUrl: iconUrl,
       );
-
-      // First download: downloads resource + artwork (2 calls)
-      await repository.downloadResource(
-        resource,
-        onProgress: (received, total) {},
+      final resource2 = const LessonResource(
+        type: LessonResourceType.audio,
+        url: 'https://example.com/files/lesson3.mp3',
+        name: 'Lección 3',
+        order: 2,
+        courseIconUrl: iconUrl, // same artwork URL
       );
-      final callsAfterFirst = apiClient.downloadCalls;
-      expect(callsAfterFirst, 2);
 
-      // Clear history so the resource is re-downloaded (simulates a re-download scenario)
-      await repository.clearHistory();
-
-      // Second download: file already exists on disk → no new API calls
+      // First download: 2 calls — resource1 + artwork
       await repository.downloadResource(
-        resource,
+        resource1,
         onProgress: (received, total) {},
       );
       expect(apiClient.downloadCalls, 2);
+
+      // Second download with same artwork URL: 1 call — resource2 only, artwork reused
+      await repository.downloadResource(
+        resource2,
+        onProgress: (received, total) {},
+      );
+      expect(apiClient.downloadCalls, 3);
     });
 
     test('downloadResource still succeeds even if artwork download fails', () async {
