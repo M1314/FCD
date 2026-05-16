@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:audio_service/audio_service.dart';
 import 'package:better_player_plus/better_player_plus.dart';
 import 'package:fcd_app/src/core/config/api_config.dart';
 import 'package:fcd_app/src/core/storage/favorites_storage.dart';
