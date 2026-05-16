@@ -20,6 +20,7 @@ class HomeShell extends StatefulWidget {
 class _HomeShellState extends State<HomeShell> {
   int _selectedIndex = 0;
   late final List<ScrollController> _tabScrollControllers;
+  late final List<Widget> _defaultPages;
 
   static const List<NavigationDestination> _bottomDestinations =
       <NavigationDestination>[
@@ -55,11 +56,19 @@ class _HomeShellState extends State<HomeShell> {
         ),
       ];
 
-  List<Widget> get _pages => widget.pages ?? _defaultPages();
+  List<Widget> get _pages => widget.pages ?? _defaultPages;
 
   @override
   void initState() {
     super.initState();
+    _defaultPages = <Widget>[
+      const CoursesPage(),
+      const CatalogPage(),
+      const AiChatPage(),
+      const FavoritesPage(),
+      DownloadsPage(onGoToCourses: () => _onDestinationSelected(0)),
+      const AccountPage(),
+    ];
     assert(
       _pages.length == _bottomDestinations.length,
       'HomeShell pages length must match navigation destinations length.',
@@ -116,7 +125,7 @@ class _HomeShellState extends State<HomeShell> {
   @override
   Widget build(BuildContext context) {
     final isTablet = MediaQuery.sizeOf(context).shortestSide >= 600;
-    final pages = widget.pages ?? _defaultPages();
+    final pages = widget.pages ?? _defaultPages;
     final wrappedPages = List<Widget>.generate(pages.length, (index) {
       return PrimaryScrollController(
         controller: _tabScrollControllers[index],
@@ -239,16 +248,6 @@ class _HomeShellState extends State<HomeShell> {
     });
   }
 
-  List<Widget> _defaultPages() {
-    return <Widget>[
-      const CoursesPage(),
-      const CatalogPage(),
-      const AiChatPage(),
-      const FavoritesPage(),
-      DownloadsPage(onGoToCourses: () => _onDestinationSelected(0)),
-      const AccountPage(),
-    ];
-  }
 
   void _scrollTabToTop(int index) {
     if (index < 0 || index >= _tabScrollControllers.length) {
