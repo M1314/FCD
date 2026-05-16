@@ -179,30 +179,60 @@ class _DownloadedAudioPageState extends State<DownloadedAudioPage> {
                               child: _buildCover(coverUrl, localArtworkPath),
                             ),
                             const SizedBox(height: 12),
-                            Text(
-                              widget.file.name.isEmpty
-                                  ? 'Audio descargado'
-                                  : widget.file.name,
-                              textAlign: TextAlign.center,
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                              style: Theme.of(context).textTheme.titleSmall
-                                  ?.copyWith(color: AppTheme.deepBrown),
-                            ),
-                            if (widget.file.courseName.trim().isNotEmpty)
-                              Padding(
-                                padding: const EdgeInsets.only(top: 4),
-                                child: Text(
-                                  widget.file.courseName,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: Theme.of(context).textTheme.bodySmall
-                                      ?.copyWith(
-                                        color: AppTheme.mutedText,
-                                        fontWeight: FontWeight.w600,
+                            SizedBox(
+                              width: double.infinity,
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: <Widget>[
+                                  Text(
+                                    widget.file.name.isEmpty
+                                        ? 'Audio descargado'
+                                        : widget.file.name,
+                                    textAlign: TextAlign.left,
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .titleSmall
+                                        ?.copyWith(
+                                          color: AppTheme.deepBrown,
+                                          fontWeight: FontWeight.bold,
+                                          fontSize:
+                                              (Theme.of(context)
+                                                          .textTheme
+                                                          .titleSmall
+                                                          ?.fontSize ??
+                                                      16) +
+                                                  4,
+                                        ),
+                                  ),
+                                  if (widget.file.courseName.trim().isNotEmpty)
+                                    Padding(
+                                      padding: const EdgeInsets.only(top: 4),
+                                      child: Text(
+                                        widget.file.courseName,
+                                        textAlign: TextAlign.left,
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: Theme.of(context)
+                                            .textTheme
+                                            .bodySmall
+                                            ?.copyWith(
+                                              color: AppTheme.mutedText,
+                                              fontWeight: FontWeight.w600,
+                                              fontSize:
+                                                  (Theme.of(context)
+                                                              .textTheme
+                                                              .bodySmall
+                                                              ?.fontSize ??
+                                                          12) +
+                                                      2,
+                                            ),
                                       ),
-                                ),
+                                    ),
+                                ],
                               ),
+                            ),
                           ],
                         ),
                       ),
@@ -229,7 +259,7 @@ class _DownloadedAudioPageState extends State<DownloadedAudioPage> {
       builder: (context, constraints) {
         final maxWidth = constraints.maxWidth;
         final maxHeight = constraints.maxHeight;
-        var size = maxWidth > 320 ? 320.0 : maxWidth;
+        var size = maxWidth;
         if (maxHeight.isFinite && maxHeight > 0) {
           size = size < maxHeight ? size : maxHeight;
         }
@@ -288,6 +318,8 @@ class _DownloadedAudioPageState extends State<DownloadedAudioPage> {
               color: AppTheme.mutedText,
               fontWeight: FontWeight.w600,
               letterSpacing: 0.6,
+              fontSize:
+                  (Theme.of(context).textTheme.labelSmall?.fontSize ?? 11) + 2,
             ),
           ),
         ),
@@ -387,6 +419,7 @@ class _SpotifyControlsState extends State<_SpotifyControls> {
             : Duration(milliseconds: sliderValue.round());
 
         return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
             Slider(
               value: sliderValue,
@@ -411,15 +444,29 @@ class _SpotifyControlsState extends State<_SpotifyControls> {
               children: <Widget>[
                 Text(
                   _formatDuration(displayPosition),
+                  textAlign: TextAlign.left,
                   style: Theme.of(
                     context,
-                  ).textTheme.bodySmall?.copyWith(color: AppTheme.mutedText),
+                  ).textTheme.bodySmall?.copyWith(
+                        color: AppTheme.mutedText,
+                        fontSize:
+                            (Theme.of(context).textTheme.bodySmall?.fontSize ??
+                                    12) +
+                                2,
+                      ),
                 ),
                 Text(
                   _formatDuration(total),
+                  textAlign: TextAlign.right,
                   style: Theme.of(
                     context,
-                  ).textTheme.bodySmall?.copyWith(color: AppTheme.mutedText),
+                  ).textTheme.bodySmall?.copyWith(
+                        color: AppTheme.mutedText,
+                        fontSize:
+                            (Theme.of(context).textTheme.bodySmall?.fontSize ??
+                                    12) +
+                                2,
+                      ),
                 ),
               ],
             ),
@@ -485,7 +532,7 @@ class _PlayButton extends StatelessWidget {
       ),
       child: IconButton(
         onPressed: isBuffering ? null : onPressed,
-        iconSize: 34,
+        iconSize: 38,
         color: Colors.white,
         icon: isBuffering
             ? const SizedBox(
@@ -540,6 +587,8 @@ class _SeekLabel extends StatelessWidget {
         style: Theme.of(context).textTheme.bodySmall?.copyWith(
           color: AppTheme.mutedText,
           fontWeight: FontWeight.w600,
+          fontSize:
+              (Theme.of(context).textTheme.bodySmall?.fontSize ?? 12) + 2,
         ),
       ),
     );
