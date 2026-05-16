@@ -144,7 +144,10 @@ class DownloadRepository {
   }
 
   Future<List<DownloadedFile>> getDownloads() async {
-    final files = await _readHistory();
+    var files = await _readHistory();
+    if (files.isEmpty) {
+      files = await _rebuildHistoryFromDisk();
+    }
     files.sort((a, b) => b.downloadedAt.compareTo(a.downloadedAt));
     return files;
   }
@@ -163,10 +166,56 @@ class DownloadRepository {
     if (removed > 0) {
       await _setHistory(existing);
     }
+
+    if (existing.isEmpty) {
+      final recovered = await _rebuildHistoryFromDisk();
+      if (recovered.isNotEmpty) {
+        return DownloadCleanupResult(removed: removed, files: recovered);
+      }
+    }
+
     return DownloadCleanupResult(removed: removed, files: existing);
   }
 
   Future<void> clearHistory() async {
+    final files = await _readHistory();
+    for (final entry in files) {
+      final file = File(entry.localPath);
+      if (await file.exists()) {
+        try {
+          await file.delete();
+        } catch (_) {
+          // Ignore failures while cleaning up.
+        }
+      }
+      if (entry.localArtworkPath.isNotEmpty) {
+        final artwork = File(entry.localArtworkPath);
+        if (await artwork.exists()) {
+          try {
+            await artwork.delete();
+          } catch (_) {
+            // Ignore failures while cleaning up.
+          }
+        }
+      }
+    }
+    final baseDir = await getBaseDirectory();
+    final downloadsDir = Directory('${baseDir.path}/downloads');
+    if (await downloadsDir.exists()) {
+      try {
+        await downloadsDir.delete(recursive: true);
+      } catch (_) {
+        // Ignore failures while cleaning up.
+      }
+    }
+    final artworkDir = Directory('${baseDir.path}/artwork');
+    if (await artworkDir.exists()) {
+      try {
+        await artworkDir.delete(recursive: true);
+      } catch (_) {
+        // Ignore failures while cleaning up.
+      }
+    }
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_downloadHistoryKey);
   }
@@ -200,6 +249,64 @@ class DownloadRepository {
         })
         .whereType<DownloadedFile>()
         .toList();
+  }
+
+  Future<List<DownloadedFile>> _rebuildHistoryFromDisk() async {
+    final baseDir = await getBaseDirectory();
+    final folder = Directory('${baseDir.path}/downloads');
+    if (!await folder.exists()) {
+      return <DownloadedFile>[];
+    }
+
+    final recovered = <DownloadedFile>[];
+    await for (final entity in folder.list()) {
+      if (entity is! File) {
+        continue;
+      }
+      final filename = entity.path.split(Platform.pathSeparator).last;
+      final parsed = _parseRecoveredEntry(filename);
+      final modified = await entity.lastModified();
+      recovered.add(
+        DownloadedFile(
+          id: parsed.id,
+          url: parsed.url,
+          name: parsed.name,
+          type: parsed.type,
+          localPath: entity.path,
+          downloadedAt: modified,
+          localArtworkPath: '',
+        ),
+      );
+    }
+
+    if (recovered.isNotEmpty) {
+      await _setHistory(recovered);
+    }
+    return recovered;
+  }
+
+  _RecoveredDownload _parseRecoveredEntry(String filename) {
+    final pattern = RegExp(r'^(\d+)_(.+)$');
+    final match = pattern.firstMatch(filename);
+    var namePart = filename;
+    if (match != null && match.groupCount >= 2) {
+      namePart = match.group(2) ?? filename;
+    }
+    final dot = namePart.lastIndexOf('.');
+    final ext = dot != -1 ? namePart.substring(dot + 1).toLowerCase() : '';
+    var type = 'document';
+    if (ext == 'mp3' || ext == 'wav' || ext == 'm4a' || ext == 'aac') {
+      type = 'audio';
+    } else if (ext == 'mp4' || ext == 'mov' || ext == 'mkv') {
+      type = 'video';
+    }
+    final displayName = dot != -1 ? namePart.substring(0, dot) : namePart;
+    return _RecoveredDownload(
+      id: 'recovered:${filename.toLowerCase()}',
+      url: '',
+      name: displayName.replaceAll('_', ' '),
+      type: type,
+    );
   }
 
   Future<void> _removeResourceFromHistory(LessonResource resource) async {
@@ -356,4 +463,18 @@ class DownloadCleanupResult {
 
   final int removed;
   final List<DownloadedFile> files;
+}
+
+class _RecoveredDownload {
+  const _RecoveredDownload({
+    required this.id,
+    required this.url,
+    required this.name,
+    required this.type,
+  });
+
+  final String id;
+  final String url;
+  final String name;
+  final String type;
 }

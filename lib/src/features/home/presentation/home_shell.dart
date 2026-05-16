@@ -21,15 +21,6 @@ class _HomeShellState extends State<HomeShell> {
   int _selectedIndex = 0;
   late final List<ScrollController> _tabScrollControllers;
 
-  static const List<Widget> _defaultPages = <Widget>[
-    CoursesPage(),
-    CatalogPage(),
-    AiChatPage(),
-    FavoritesPage(),
-    DownloadsPage(),
-    AccountPage(),
-  ];
-
   static const List<NavigationDestination> _bottomDestinations =
       <NavigationDestination>[
         NavigationDestination(
@@ -64,7 +55,7 @@ class _HomeShellState extends State<HomeShell> {
         ),
       ];
 
-  List<Widget> get _pages => widget.pages ?? _defaultPages;
+  List<Widget> get _pages => widget.pages ?? _defaultPages();
 
   @override
   void initState() {
@@ -125,10 +116,11 @@ class _HomeShellState extends State<HomeShell> {
   @override
   Widget build(BuildContext context) {
     final isTablet = MediaQuery.sizeOf(context).shortestSide >= 600;
-    final wrappedPages = List<Widget>.generate(_pages.length, (index) {
+    final pages = widget.pages ?? _defaultPages();
+    final wrappedPages = List<Widget>.generate(pages.length, (index) {
       return PrimaryScrollController(
         controller: _tabScrollControllers[index],
-        child: _pages[index],
+        child: pages[index],
       );
     });
     final downloadController = context.watch<DownloadTaskController>();
@@ -245,6 +237,17 @@ class _HomeShellState extends State<HomeShell> {
     setState(() {
       _selectedIndex = index;
     });
+  }
+
+  List<Widget> _defaultPages() {
+    return <Widget>[
+      const CoursesPage(),
+      const CatalogPage(),
+      const AiChatPage(),
+      const FavoritesPage(),
+      DownloadsPage(onGoToCourses: () => _onDestinationSelected(0)),
+      const AccountPage(),
+    ];
   }
 
   void _scrollTabToTop(int index) {

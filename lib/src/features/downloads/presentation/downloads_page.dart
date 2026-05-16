@@ -5,6 +5,7 @@ import 'package:fcd_app/src/features/downloads/data/models/downloaded_file.dart'
 import 'package:fcd_app/src/features/downloads/data/repositories/download_repository.dart';
 import 'package:fcd_app/src/features/downloads/presentation/downloaded_audio_page.dart';
 import 'package:fcd_app/src/features/downloads/presentation/downloaded_video_page.dart';
+import 'package:fcd_app/src/features/downloads/presentation/download_task_controller.dart';
 import 'package:fcd_app/src/state/session_controller.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
@@ -28,7 +29,9 @@ String downloadsGroupHeadingFor(DownloadedFile file) {
 }
 
 class DownloadsPage extends StatefulWidget {
-  const DownloadsPage({super.key});
+  const DownloadsPage({super.key, this.onGoToCourses});
+
+  final VoidCallback? onGoToCourses;
 
   @override
   State<DownloadsPage> createState() => _DownloadsPageState();
@@ -36,8 +39,10 @@ class DownloadsPage extends StatefulWidget {
 
 class _DownloadsPageState extends State<DownloadsPage> {
   late final DownloadRepository _downloadRepository;
+  late final DownloadTaskController _downloadTaskController;
 
   bool _loading = true;
+  bool _wasDownloading = false;
   List<DownloadedFile> _files = <DownloadedFile>[];
   String? _info;
 
@@ -47,7 +52,16 @@ class _DownloadsPageState extends State<DownloadsPage> {
     _downloadRepository = DownloadRepository(
       apiClient: context.read<SessionController>().apiClient,
     );
+    _downloadTaskController = context.read<DownloadTaskController>();
+    _wasDownloading = _downloadTaskController.isDownloading;
+    _downloadTaskController.addListener(_handleDownloadTaskChange);
     _load();
+  }
+
+  @override
+  void dispose() {
+    _downloadTaskController.removeListener(_handleDownloadTaskChange);
+    super.dispose();
   }
 
   @override
@@ -57,7 +71,7 @@ class _DownloadsPageState extends State<DownloadsPage> {
     }
 
     if (_files.isEmpty) {
-      return _DownloadsEmpty(onRefresh: _load);
+      return _DownloadsEmpty(onGoToCourses: widget.onGoToCourses);
     }
 
     // Group downloads by course/lesson heading, preserving insertion order.
@@ -179,6 +193,14 @@ class _DownloadsPageState extends State<DownloadsPage> {
     });
   }
 
+  void _handleDownloadTaskChange() {
+    final isDownloading = _downloadTaskController.isDownloading;
+    if (_wasDownloading && !isDownloading && mounted) {
+      _load();
+    }
+    _wasDownloading = isDownloading;
+  }
+
   Future<void> _open(DownloadedFile file) async {
     final localFile = File(file.localPath);
     if (!await localFile.exists()) {
@@ -253,6 +275,32 @@ class _DownloadsPageState extends State<DownloadsPage> {
   }
 
   Future<void> _clear() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Eliminar descargas'),
+          content: const Text(
+            'Se eliminarán todos los archivos descargados. ¿Quieres continuar?',
+          ),
+          actions: <Widget>[
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('Cancelar'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              child: const Text('Eliminar'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirmed != true) {
+      return;
+    }
+
     await _downloadRepository.clearHistory();
     if (!mounted) {
       return;
@@ -378,9 +426,9 @@ class _DownloadEntryItem extends _DownloadListItem {
 }
 
 class _DownloadsEmpty extends StatelessWidget {
-  const _DownloadsEmpty({required this.onRefresh});
+  const _DownloadsEmpty({this.onGoToCourses});
 
-  final Future<void> Function() onRefresh;
+  final VoidCallback? onGoToCourses;
 
   @override
   Widget build(BuildContext context) {
@@ -389,6 +437,7 @@ class _DownloadsEmpty extends StatelessWidget {
         padding: const EdgeInsets.all(24),
         child: Column(
           mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: <Widget>[
             const Icon(
               Icons.download_done_rounded,
@@ -407,11 +456,14 @@ class _DownloadsEmpty extends StatelessWidget {
               textAlign: TextAlign.center,
               style: Theme.of(context).textTheme.bodyMedium,
             ),
-            const SizedBox(height: 16),
-            ElevatedButton(
-              onPressed: onRefresh,
-              child: const Text('Actualizar'),
-            ),
+            if (onGoToCourses != null) ...<Widget>[
+              const SizedBox(height: 16),
+              FilledButton.icon(
+                onPressed: onGoToCourses,
+                icon: const Icon(Icons.menu_book_rounded),
+                label: const Text('Ir a Mis Cursos'),
+              ),
+            ],
           ],
         ),
       ),
