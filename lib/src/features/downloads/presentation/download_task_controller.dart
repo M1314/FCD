@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:dio/dio.dart';
 import 'package:fcd_app/src/features/courses/data/models/lesson_resource.dart';
 import 'package:fcd_app/src/features/downloads/data/repositories/download_repository.dart';
 import 'package:flutter/foundation.dart';
@@ -14,6 +15,50 @@ class DownloadTaskResult {
   final Object? error;
 }
 
+class DownloadTaskSnapshot {
+  const DownloadTaskSnapshot({
+    required this.resourceId,
+    required this.resourceName,
+    required this.receivedBytes,
+    required this.totalBytes,
+    required this.progress,
+  });
+
+  final String resourceId;
+  final String resourceName;
+  final int receivedBytes;
+  final int totalBytes;
+  final double progress;
+}
+
+class _DownloadTaskState {
+  _DownloadTaskState({
+    required this.resourceId,
+    required this.resourceName,
+    required this.cancelToken,
+  })
+      : receivedBytes = 0,
+        totalBytes = 0,
+        progress = 0;
+
+  final String resourceId;
+  final String resourceName;
+  final CancelToken cancelToken;
+  int receivedBytes;
+  int totalBytes;
+  double progress;
+
+  DownloadTaskSnapshot toSnapshot() {
+    return DownloadTaskSnapshot(
+      resourceId: resourceId,
+      resourceName: resourceName,
+      receivedBytes: receivedBytes,
+      totalBytes: totalBytes,
+      progress: progress,
+    );
+  }
+}
+
 class DownloadTaskController extends ChangeNotifier {
   static const String _defaultResourceName = 'Archivo';
 
@@ -22,48 +67,91 @@ class DownloadTaskController extends ChangeNotifier {
 
   final DownloadRepository _downloadRepository;
 
-  bool _isDownloading = false;
-  double _progress = 0;
-  String _resourceName = '';
+  final Map<String, _DownloadTaskState> _activeDownloads =
+      <String, _DownloadTaskState>{};
 
-  bool get isDownloading => _isDownloading;
-  double get progress => _progress;
-  String get resourceName => _resourceName;
+  bool get hasActiveDownloads => _activeDownloads.isNotEmpty;
+  List<DownloadTaskSnapshot> get activeDownloads =>
+      _activeDownloads.values.map((entry) => entry.toSnapshot()).toList();
+
+  int get overallReceivedBytes {
+    var total = 0;
+    for (final entry in _activeDownloads.values) {
+      total += entry.receivedBytes;
+    }
+    return total;
+  }
+
+  int get overallTotalBytes {
+    var total = 0;
+    for (final entry in _activeDownloads.values) {
+      total += entry.totalBytes;
+    }
+    return total;
+  }
+
+  double get overallProgress {
+    final total = overallTotalBytes;
+    if (total <= 0) {
+      return 0;
+    }
+    final raw = overallReceivedBytes / total;
+    if (!raw.isFinite) {
+      return 0;
+    }
+    return raw.clamp(0.0, 1.0);
+  }
+
+  bool isDownloadingResource(LessonResource resource) {
+    return _activeDownloads.containsKey(_resourceId(resource));
+  }
 
   Future<DownloadTaskResult> downloadResource(
     LessonResource resource, {
     String courseName = '',
     String lessonName = '',
   }) async {
-    if (_isDownloading) {
+    final resourceId = _resourceId(resource);
+    if (_activeDownloads.containsKey(resourceId)) {
       return const DownloadTaskResult(status: DownloadTaskStatus.busy);
     }
 
-    _isDownloading = true;
-    _progress = 0;
-    _resourceName = resource.name.trim().isEmpty
+    final resourceName = resource.name.trim().isEmpty
         ? _defaultResourceName
         : resource.name;
-    notifyListeners();
+  _activeDownloads[resourceId] = _DownloadTaskState(
+    resourceId: resourceId,
+    resourceName: resourceName,
+    cancelToken: CancelToken(),
+  );
+  notifyListeners();
 
     try {
       var alreadyDownloaded = false;
+      final cancelToken = _activeDownloads[resourceId]?.cancelToken;
       final file = await _downloadRepository.downloadResource(
         resource,
         courseName: courseName,
         lessonName: lessonName,
+        cancelToken: cancelToken,
         onAlreadyDownloaded: () {
           alreadyDownloaded = true;
         },
         onProgress: (received, total) {
-          if (total <= 0) {
+          final entry = _activeDownloads[resourceId];
+          if (entry == null) {
             return;
           }
-          final raw = received / total;
-          if (!raw.isFinite) {
-            return;
+          final normalizedTotal = total > 0 ? total : 0;
+          final normalizedReceived = received < 0 ? 0 : received;
+          entry.totalBytes = normalizedTotal;
+          entry.receivedBytes = normalizedReceived;
+          if (normalizedTotal > 0) {
+            final raw = normalizedReceived / normalizedTotal;
+            entry.progress = raw.isFinite ? raw.clamp(0.0, 1.0) : 0;
+          } else {
+            entry.progress = 0;
           }
-          _progress = raw.clamp(0.0, 1.0);
           notifyListeners();
         },
       );
@@ -74,15 +162,32 @@ class DownloadTaskController extends ChangeNotifier {
             : DownloadTaskStatus.completed,
         file: file,
       );
+    } on DioException catch (error) {
+      if (error.type == DioExceptionType.cancel) {
+        return const DownloadTaskResult(status: DownloadTaskStatus.failed);
+      }
+      return DownloadTaskResult(
+        status: DownloadTaskStatus.failed,
+        error: error,
+      );
     } catch (error) {
       return DownloadTaskResult(
         status: DownloadTaskStatus.failed,
         error: error,
       );
     } finally {
-      _isDownloading = false;
-      _progress = 0;
+      _activeDownloads.remove(resourceId);
       notifyListeners();
     }
+  }
+
+  void cancelDownload(String resourceId) {
+    final entry = _activeDownloads.remove(resourceId);
+    entry?.cancelToken.cancel();
+    notifyListeners();
+  }
+
+  String _resourceId(LessonResource resource) {
+    return '${resource.type.name}:${resource.url}';
   }
 }

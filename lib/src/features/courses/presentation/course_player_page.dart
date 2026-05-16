@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:audio_service/audio_service.dart';
 import 'package:better_player_plus/better_player_plus.dart';
 import 'package:fcd_app/src/core/config/api_config.dart';
+import 'package:fcd_app/src/core/navigation/route_observer.dart';
 import 'package:fcd_app/src/core/storage/favorites_storage.dart';
 import 'package:fcd_app/src/core/storage/progress_storage.dart';
 import 'package:fcd_app/src/core/theme/app_theme.dart';
@@ -10,6 +11,8 @@ import 'package:fcd_app/src/core/widgets/audio_player_widget.dart';
 import 'package:fcd_app/src/features/courses/data/models/course.dart';
 import 'package:fcd_app/src/features/courses/data/models/course_lesson.dart';
 import 'package:fcd_app/src/features/courses/data/models/lesson_resource.dart';
+import 'package:fcd_app/src/features/downloads/data/repositories/download_repository.dart';
+import 'package:fcd_app/src/features/downloads/presentation/download_progress_banner.dart';
 import 'package:fcd_app/src/features/downloads/presentation/download_task_controller.dart';
 import 'package:fcd_app/src/state/session_controller.dart';
 import 'package:flutter/material.dart';
@@ -44,9 +47,10 @@ class CoursePlayerPage extends StatefulWidget {
 }
 
 class _CoursePlayerPageState extends State<CoursePlayerPage>
-    with WidgetsBindingObserver {
+    with WidgetsBindingObserver, RouteAware {
   final ProgressStorage _progressStorage = ProgressStorage();
   final FavoritesStorage _favoritesStorage = FavoritesStorage();
+  late final DownloadRepository _downloadRepository;
 
   int _lessonIndex = 0;
   int _resourceIndex = 0;
@@ -62,6 +66,8 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
   int _resourcePreparationRequestId = 0;
   String? _activeMediaResourceKey;
   bool _showSessionExpiredBanner = false;
+  bool _downloadsExpanded = false;
+  Set<String> _downloadedResourceKeys = <String>{};
 
   BetterPlayerController? _videoController;
   AudioPlayer? _audioPlayer;
@@ -76,7 +82,11 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    _downloadRepository = DownloadRepository(
+      apiClient: context.read<SessionController>().apiClient,
+    );
     _initializeProgress();
+    _refreshDownloadedResources();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _checkSessionStatus();
     });
@@ -85,15 +95,21 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
+    final route = ModalRoute.of(context);
+    if (route != null) {
+      routeObserver.subscribe(this, route);
+    }
     final session = context.read<SessionController>();
     if (_cachedSession == null) {
       session.addListener(_onSessionChanged);
       _cachedSession = session;
     }
+    _refreshDownloadedResources();
   }
 
   @override
   void dispose() {
+    routeObserver.unsubscribe(this);
     WidgetsBinding.instance.removeObserver(this);
     _saveProgressOnDispose();
     _videoController?.dispose(forceDispose: true);
@@ -127,6 +143,14 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
     if (state == AppLifecycleState.paused) {
       _saveProgress();
     }
+    if (state == AppLifecycleState.resumed) {
+      _refreshDownloadedResources();
+    }
+  }
+
+  @override
+  void didPopNext() {
+    _refreshDownloadedResources();
   }
 
   Future<void> _initializeProgress() async {
@@ -279,28 +303,82 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
       );
     }
 
+    final content = Column(
+      children: <Widget>[
+        if (_showSessionExpiredBanner) _buildSessionExpiredBanner(context),
+        _buildTopBar(context),
+        _buildProgressBanner(context),
+        Expanded(
+          child: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: <Widget>[
+                _buildViewer(context),
+                _buildBottomPanel(context),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+
     return Scaffold(
       drawer: _buildLessonsDrawer(context),
       body: SafeArea(
-        child: Column(
+        child: Stack(
           children: <Widget>[
-            if (_showSessionExpiredBanner) _buildSessionExpiredBanner(context),
-            _buildTopBar(context),
-            _buildProgressBanner(context),
-            Expanded(
-              child: SingleChildScrollView(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: <Widget>[
-                    _buildViewer(context),
-                    _buildBottomPanel(context),
-                  ],
+            NotificationListener<ScrollNotification>(
+              onNotification: (notification) {
+                if (_downloadsExpanded &&
+                    notification is ScrollStartNotification) {
+                  _collapseDownloadsBanner();
+                }
+                return false;
+              },
+              child: content,
+            ),
+            if (_downloadsExpanded)
+              Positioned.fill(
+                child: GestureDetector(
+                  onTap: _collapseDownloadsBanner,
+                  behavior: HitTestBehavior.translucent,
                 ),
               ),
+            Positioned(
+              top: 0,
+              left: 0,
+              right: 0,
+              child: _buildDownloadsBanner(context),
             ),
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildDownloadsBanner(BuildContext context) {
+    final downloadController = context.watch<DownloadTaskController>();
+    final hasDownloads = downloadController.hasActiveDownloads;
+    final isDownloadsExpanded = _downloadsExpanded && hasDownloads;
+
+    if (_downloadsExpanded && !hasDownloads) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          setState(() {
+            _downloadsExpanded = false;
+          });
+        }
+      });
+    }
+
+    if (!hasDownloads) {
+      return const SizedBox.shrink();
+    }
+
+    return DownloadProgressBanner(
+      controller: downloadController,
+      expanded: isDownloadsExpanded,
+      onToggle: _toggleDownloadsBanner,
     );
   }
 
@@ -540,6 +618,10 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
 
   Widget _buildBottomPanel(BuildContext context) {
     final downloadController = context.watch<DownloadTaskController>();
+    final resource = currentResource;
+    final isDownloading =
+        resource != null && downloadController.isDownloadingResource(resource);
+    final isDownloaded = resource != null && _isResourceDownloaded(resource);
 
     return Container(
       padding: const EdgeInsets.fromLTRB(14, 12, 14, 24),
@@ -587,23 +669,13 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
           ),
           const SizedBox(height: 12),
           ElevatedButton.icon(
-            onPressed: downloadController.isDownloading
-                ? null
-                : _downloadCurrentResource,
-            icon: downloadController.isDownloading
-                ? const SizedBox(
-                    width: 18,
-                    height: 18,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      color: Colors.white,
-                    ),
-                  )
-                : const Icon(Icons.download_rounded),
+            onPressed:
+                isDownloading || isDownloaded ? null : _downloadCurrentResource,
+            icon: const Icon(Icons.download_rounded),
             label: Text(
-              downloadController.isDownloading
-                  ? 'Descargando ${(downloadController.progress * 100).toStringAsFixed(0)}%'
-                  : 'Descargar al teléfono',
+              isDownloading
+                  ? 'Descargando'
+                  : (isDownloaded ? 'Ya descargado' : 'Descargar al teléfono'),
             ),
           ),
           const SizedBox(height: 10),
@@ -623,6 +695,7 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
               child: _ResourceTile(
                 resource: item,
                 selected: index == _resourceIndex,
+                downloaded: _isResourceDownloaded(item),
                 onTap: () async {
                   setState(() {
                     _resourceIndex = index;
@@ -813,6 +886,13 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
       return;
     }
 
+    if (_isResourceDownloaded(resource)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Este recurso ya está descargado.')),
+      );
+      return;
+    }
+
     final downloadResource = resource.copyWithCourseMedia(
       courseBannerUrl: widget.course.bannerUrl,
       courseIconUrl: widget.course.iconUrl,
@@ -831,10 +911,11 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
     switch (result.status) {
       case DownloadTaskStatus.busy:
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Ya hay una descarga en progreso.')),
+          const SnackBar(content: Text('Este recurso ya se está descargando.')),
         );
         return;
       case DownloadTaskStatus.alreadyDownloaded:
+        await _refreshDownloadedResources();
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Este recurso ya fue descargado previamente.'),
@@ -847,6 +928,7 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
         ).showSnackBar(const SnackBar(content: Text('No se pudo descargar.')));
         return;
       case DownloadTaskStatus.completed:
+        await _refreshDownloadedResources();
         final file = result.file;
         if (file == null) {
           ScaffoldMessenger.of(
@@ -881,6 +963,45 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
         return;
     }
   }
+
+  bool _isResourceDownloaded(LessonResource resource) {
+    return _downloadedResourceKeys.contains(_resourceKey(resource));
+  }
+
+  String _resourceKey(LessonResource resource) {
+    return '${resource.type.name}:${_normalizedResourceUrl(resource.url)}';
+  }
+
+  String _normalizedResourceUrl(String url) {
+    final uri = Uri.tryParse(url);
+    if (uri == null) {
+      return url;
+    }
+    if (uri.hasQuery || uri.fragment.isNotEmpty) {
+      return uri.replace(query: '', fragment: '').toString();
+    }
+    return uri.toString();
+  }
+
+  Future<void> _refreshDownloadedResources() async {
+    final cleanup = await _downloadRepository.removeMissingDownloads();
+    if (!mounted) {
+      return;
+    }
+    setState(() {
+      final keys = <String>{};
+      for (final file in cleanup.files) {
+        if (file.id.isNotEmpty) {
+          keys.add(file.id);
+        }
+        if (file.url.isNotEmpty) {
+          keys.add('${file.type}:${_normalizedResourceUrl(file.url)}');
+        }
+      }
+      _downloadedResourceKeys = keys;
+    });
+  }
+
 
   Future<void> _nextLesson() async {
     await _markCurrentAsSeen();
@@ -1054,14 +1175,12 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
     final previousAudioPlayer = _audioPlayer;
 
     _videoController = null;
-    _audioPlayer = null;
     _webViewController = null;
     _activeMediaResourceKey = null;
 
     previousVideoController?.dispose(forceDispose: true);
     if (previousAudioPlayer != null) {
       await previousAudioPlayer.stop();
-      await previousAudioPlayer.dispose();
     }
 
     if (!mounted || requestId != _resourcePreparationRequestId) {
@@ -1100,7 +1219,7 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
     if (resource.isAudio) {
       _isAudioLoading = true;
       setState(() {});
-      final audioPlayer = AudioPlayer();
+      final audioPlayer = _audioPlayer ??= AudioPlayer();
       final artworkUrl = widget.course.iconUrl.isNotEmpty
           ? widget.course.iconUrl
           : widget.course.bannerUrl;
@@ -1116,7 +1235,6 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
         ),
       );
       if (!mounted || requestId != _resourcePreparationRequestId) {
-        await audioPlayer.dispose();
         _isAudioLoading = false;
         return;
       }
@@ -1143,7 +1261,6 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
       }
       _activeMediaResourceKey = null;
       await audioPlayer.stop();
-      await audioPlayer.dispose();
       return;
     }
 
@@ -1305,6 +1422,21 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
     }());
   }
 
+  void _toggleDownloadsBanner() {
+    setState(() {
+      _downloadsExpanded = !_downloadsExpanded;
+    });
+  }
+
+  void _collapseDownloadsBanner() {
+    if (!_downloadsExpanded) {
+      return;
+    }
+    setState(() {
+      _downloadsExpanded = false;
+    });
+  }
+
   void _setupDocument(String url) {
     final viewerUrl =
         '${ApiConfig.googleViewerUrlPrefix}${Uri.encodeComponent(url)}';
@@ -1330,11 +1462,13 @@ class _ResourceTile extends StatelessWidget {
   const _ResourceTile({
     required this.resource,
     required this.selected,
+    required this.downloaded,
     required this.onTap,
   });
 
   final LessonResource resource;
   final bool selected;
+  final bool downloaded;
   final VoidCallback onTap;
 
   @override
@@ -1361,7 +1495,7 @@ class _ResourceTile extends StatelessWidget {
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
-              if (selected)
+              if (downloaded)
                 const Icon(
                   Icons.check_circle_rounded,
                   color: AppTheme.deepBrown,

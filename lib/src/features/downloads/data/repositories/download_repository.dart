@@ -220,6 +220,30 @@ class DownloadRepository {
     await prefs.remove(_downloadHistoryKey);
   }
 
+  Future<void> deleteDownload(DownloadedFile file) async {
+    final localFile = File(file.localPath);
+    if (await localFile.exists()) {
+      try {
+        await localFile.delete();
+      } catch (_) {
+        // Ignore failures while cleaning up.
+      }
+    }
+    if (file.localArtworkPath.isNotEmpty) {
+      final artwork = File(file.localArtworkPath);
+      if (await artwork.exists()) {
+        try {
+          await artwork.delete();
+        } catch (_) {
+          // Ignore failures while cleaning up.
+        }
+      }
+    }
+    final parsed = await _readHistory();
+    parsed.removeWhere((entry) => _isSameResourceEntry(entry, file));
+    await _setHistory(parsed);
+  }
+
   Future<void> _saveToHistory(DownloadedFile file) async {
     final parsed = await _readHistory();
     parsed.removeWhere((entry) => _isSameResourceEntry(entry, file));
