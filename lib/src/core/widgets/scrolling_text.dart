@@ -6,12 +6,14 @@ class ScrollingText extends StatefulWidget {
     super.key,
     this.style,
     this.textAlign,
+    this.maxLines = 1,
     this.velocity = 32,
   });
 
   final String text;
   final TextStyle? style;
   final TextAlign? textAlign;
+  final int maxLines;
   final double velocity;
 
   @override
@@ -83,7 +85,7 @@ class _ScrollingTextState extends State<ScrollingText>
     return LayoutBuilder(
       builder: (context, constraints) {
         final textScaler = MediaQuery.textScalerOf(context);
-        final textPainter = TextPainter(
+        final fullWidthPainter = TextPainter(
           text: TextSpan(text: widget.text, style: style),
           maxLines: 1,
           textScaler: textScaler,
@@ -91,16 +93,25 @@ class _ScrollingTextState extends State<ScrollingText>
         )..layout();
         final maxWidth = constraints.hasBoundedWidth
             ? constraints.maxWidth
-            : textPainter.size.width;
-        final shouldScroll = textPainter.size.width > maxWidth;
+            : fullWidthPainter.size.width;
+        var shouldScroll = fullWidthPainter.size.width > maxWidth;
+        if (widget.maxLines > 1) {
+          final constrainedPainter = TextPainter(
+            text: TextSpan(text: widget.text, style: style),
+            maxLines: widget.maxLines,
+            textScaler: textScaler,
+            textDirection: Directionality.of(context),
+          )..layout(maxWidth: maxWidth);
+          shouldScroll = constrainedPainter.didExceedMaxLines;
+        }
         if (!shouldScroll) {
           _stopScrolling();
           return Text(
             widget.text,
             style: style,
             textAlign: widget.textAlign,
-            maxLines: 1,
-            softWrap: false,
+            maxLines: widget.maxLines,
+            softWrap: widget.maxLines > 1,
             overflow: TextOverflow.ellipsis,
           );
         }
