@@ -149,7 +149,7 @@ Generar build iOS (requiere Xcode):
 flutter build ipa
 ```
 
-Actualizar íconos (usa `assets/images/logo_launcher.png`):
+Actualizar íconos (usa `assets/images/logo.jpg`):
 
 ```bash
 flutter pub run flutter_launcher_icons
