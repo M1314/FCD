@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "290013677932",
+    "project_id": "fcdmobile-3b0bf",
+    "storage_bucket": "fcdmobile-3b0bf.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:290013677932:android:5edf82b437a931557a4b49",
+        "android_client_info": {
+          "package_name": "org.circulodorado.fcd_app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAuA4YN5rgl3dQBU1NSRbFggFt-_l1bt-0"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

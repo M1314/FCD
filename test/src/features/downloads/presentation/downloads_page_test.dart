@@ -13,6 +13,7 @@ void main() {
       downloadedAt: DateTime(2026, 1, 1),
       courseName: courseName,
       lessonName: lessonName,
+      localArtworkPath: '',
     );
   }
 

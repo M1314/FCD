@@ -533,6 +533,7 @@ sequenceDiagram
 - `lib/src/core/storage/progress_storage.dart`: progreso de cursos.
 - `lib/src/core/theme/app_theme.dart`: tema y tipografías.
 - `lib/src/core/utils/json_utils.dart`: parseo defensivo.
+- `lib/src/core/widgets/audio_player_widget.dart`: controles reutilizables de audio.
 - `lib/src/core/widgets/network_image_tile.dart`: imagen de red con fallback.
 
 ### 38.3 Features
@@ -566,6 +567,8 @@ sequenceDiagram
 **Downloads**
 - `lib/src/features/downloads/data/models/downloaded_file.dart`: modelo historial.
 - `lib/src/features/downloads/data/repositories/download_repository.dart`: descargas.
+- `lib/src/features/downloads/presentation/downloaded_audio_page.dart`: reproducción local de audio.
+- `lib/src/features/downloads/presentation/downloaded_video_page.dart`: reproducción local de video.
 - `lib/src/features/downloads/presentation/downloads_page.dart`: UI historial.
 
 **Favorites**

@@ -4,6 +4,9 @@ import 'package:fcd_app/src/core/theme/app_theme.dart';
 import 'package:fcd_app/src/core/utils/file_type_utils.dart';
 import 'package:fcd_app/src/features/downloads/data/models/downloaded_file.dart';
 import 'package:fcd_app/src/features/downloads/data/repositories/download_repository.dart';
+import 'package:fcd_app/src/features/downloads/presentation/downloaded_audio_page.dart';
+import 'package:fcd_app/src/features/downloads/presentation/downloaded_video_page.dart';
+import 'package:fcd_app/src/features/downloads/presentation/download_task_controller.dart';
 import 'package:fcd_app/src/state/session_controller.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
@@ -27,7 +30,9 @@ String downloadsGroupHeadingFor(DownloadedFile file) {
 }
 
 class DownloadsPage extends StatefulWidget {
-  const DownloadsPage({super.key});
+  const DownloadsPage({super.key, this.onGoToCourses});
+
+  final VoidCallback? onGoToCourses;
 
   @override
   State<DownloadsPage> createState() => _DownloadsPageState();
@@ -35,8 +40,13 @@ class DownloadsPage extends StatefulWidget {
 
 class _DownloadsPageState extends State<DownloadsPage> {
   late final DownloadRepository _downloadRepository;
+  late final DownloadTaskController _downloadTaskController;
+  final List<DownloadedFile> _pendingDeletes = <DownloadedFile>[];
+  int _deleteSequence = 0;
+  ScaffoldMessengerState? _scaffoldMessenger;
 
   bool _loading = true;
+  bool _wasDownloading = false;
   List<DownloadedFile> _files = <DownloadedFile>[];
   String? _info;
 
@@ -46,7 +56,23 @@ class _DownloadsPageState extends State<DownloadsPage> {
     _downloadRepository = DownloadRepository(
       apiClient: context.read<SessionController>().apiClient,
     );
+    _downloadTaskController = context.read<DownloadTaskController>();
+    _wasDownloading = _downloadTaskController.hasActiveDownloads;
+    _downloadTaskController.addListener(_handleDownloadTaskChange);
     _load();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _scaffoldMessenger = ScaffoldMessenger.of(context);
+  }
+
+  @override
+  void dispose() {
+    _scaffoldMessenger?.clearSnackBars();
+    _downloadTaskController.removeListener(_handleDownloadTaskChange);
+    super.dispose();
   }
 
   @override
@@ -56,7 +82,7 @@ class _DownloadsPageState extends State<DownloadsPage> {
     }
 
     if (_files.isEmpty) {
-      return _DownloadsEmpty(onRefresh: _load);
+      return _DownloadsEmpty(onGoToCourses: widget.onGoToCourses);
     }
 
     // Group downloads by course/lesson heading, preserving insertion order.
@@ -144,7 +170,10 @@ class _DownloadsPageState extends State<DownloadsPage> {
                   padding: const EdgeInsets.only(bottom: 10),
                   child: _DownloadCard(
                     file: entryItem.file,
+                    onPlayAudio: () => _openAudio(entryItem.file),
+                    onPlayVideo: () => _playVideo(entryItem.file),
                     onOpen: () => _open(entryItem.file),
+                    onDelete: () => _deleteEntry(entryItem.file),
                   ),
                 );
               },
@@ -168,12 +197,24 @@ class _DownloadsPageState extends State<DownloadsPage> {
     }
 
     setState(() {
-      _files = cleanupResult.files;
+      // Filter out pending deletes to prevent reappearing during undo window
+      _files = cleanupResult.files
+          .where((file) => !_pendingDeletes.any(
+              (pending) => pending.localPath == file.localPath))
+          .toList();
       _loading = false;
       _info = cleanupResult.removed > 0
           ? 'Se limpiaron ${cleanupResult.removed} archivo(s) inexistente(s) del historial.'
           : null;
     });
+  }
+
+  void _handleDownloadTaskChange() {
+    final hasDownloads = _downloadTaskController.hasActiveDownloads;
+    if (_wasDownloading && !hasDownloads && mounted) {
+      _load();
+    }
+    _wasDownloading = hasDownloads;
   }
 
   Future<void> _open(DownloadedFile file) async {
@@ -207,8 +248,140 @@ class _DownloadsPageState extends State<DownloadsPage> {
     }
   }
 
+  Future<void> _openAudio(DownloadedFile file) async {
+    final localFile = File(file.localPath);
+    if (!await localFile.exists()) {
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('El archivo ya no existe en el almacenamiento local.'),
+        ),
+      );
+      return;
+    }
+
+    if (!mounted) {
+      return;
+    }
+
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(builder: (_) => DownloadedAudioPage(file: file)),
+    );
+  }
+
+  Future<void> _playVideo(DownloadedFile file) async {
+    final localFile = File(file.localPath);
+    if (!await localFile.exists()) {
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('El archivo ya no existe en el almacenamiento local.'),
+        ),
+      );
+      return;
+    }
+
+    if (!mounted) {
+      return;
+    }
+
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(builder: (_) => DownloadedVideoPage(file: file)),
+    );
+  }
+
   Future<void> _clear() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Eliminar descargas'),
+          content: const Text(
+            'Se eliminarán todos los archivos descargados. ¿Quieres continuar?',
+          ),
+          actions: <Widget>[
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('Cancelar'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              child: const Text('Eliminar'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirmed != true) {
+      return;
+    }
+
     await _downloadRepository.clearHistory();
+    if (!mounted) {
+      return;
+    }
+    await _load();
+  }
+
+  void _deleteEntry(DownloadedFile file) {
+    setState(() {
+      _files.removeWhere((entry) => entry.localPath == file.localPath);
+      _pendingDeletes.add(file);
+    });
+
+    final sequence = ++_deleteSequence;
+    final messenger = ScaffoldMessenger.of(context);
+    messenger.clearSnackBars();
+    messenger
+        .showSnackBar(
+          SnackBar(
+            content: Text(
+              _pendingDeletes.length == 1
+                  ? 'Descarga eliminada.'
+                  : 'Se eliminaron ${_pendingDeletes.length} descargas.',
+            ),
+            action: SnackBarAction(
+              label: 'Deshacer',
+              onPressed: _undoDelete,
+            ),
+            duration: const Duration(seconds: 4),
+          ),
+        )
+        .closed
+        .then((reason) {
+          if (reason == SnackBarClosedReason.action ||
+              sequence != _deleteSequence) {
+            return;
+          }
+          _commitPendingDelete();
+        });
+  }
+
+  void _undoDelete() {
+    if (_pendingDeletes.isEmpty) {
+      return;
+    }
+    setState(() {
+      _files.addAll(_pendingDeletes);
+      _files.sort((a, b) => b.downloadedAt.compareTo(a.downloadedAt));
+      _pendingDeletes.clear();
+    });
+  }
+
+  Future<void> _commitPendingDelete() async {
+    if (_pendingDeletes.isEmpty) {
+      return;
+    }
+    final pending = List<DownloadedFile>.from(_pendingDeletes);
+    _pendingDeletes.clear();
+    for (final entry in pending) {
+      await _downloadRepository.deleteDownload(entry);
+    }
     if (!mounted) {
       return;
     }
@@ -217,10 +390,19 @@ class _DownloadsPageState extends State<DownloadsPage> {
 }
 
 class _DownloadCard extends StatelessWidget {
-  const _DownloadCard({required this.file, required this.onOpen});
+  const _DownloadCard({
+    required this.file,
+    required this.onOpen,
+    required this.onPlayAudio,
+    required this.onPlayVideo,
+    required this.onDelete,
+  });
 
   final DownloadedFile file;
   final VoidCallback onOpen;
+  final VoidCallback onPlayAudio;
+  final VoidCallback onPlayVideo;
+  final VoidCallback onDelete;
 
   @override
   Widget build(BuildContext context) {
@@ -231,7 +413,7 @@ class _DownloadCard extends StatelessWidget {
       borderRadius: BorderRadius.circular(14),
       child: InkWell(
         borderRadius: BorderRadius.circular(14),
-        onTap: onOpen,
+        onTap: _tapHandler(),
         child: Padding(
           padding: const EdgeInsets.all(12),
           child: Row(
@@ -268,12 +450,52 @@ class _DownloadCard extends StatelessWidget {
                   ],
                 ),
               ),
-              const Icon(Icons.open_in_new_rounded, color: AppTheme.deepBrown),
+              Row(
+                children: <Widget>[
+                  IconButton(
+                    onPressed: onDelete,
+                    icon: const Icon(Icons.close_rounded),
+                    tooltip: 'Eliminar descarga',
+                    color: AppTheme.mutedText,
+                    visualDensity: VisualDensity.compact,
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(
+                      minWidth: 32,
+                      minHeight: 32,
+                    ),
+                  ),
+                  if (file.type == 'audio')
+                    const Icon(
+                      Icons.play_arrow_rounded,
+                      color: AppTheme.deepBrown,
+                    )
+                  else if (file.type == 'video')
+                    const Icon(
+                      Icons.play_circle_fill_rounded,
+                      color: AppTheme.deepBrown,
+                    )
+                  else
+                    const Icon(
+                      Icons.open_in_new_rounded,
+                      color: AppTheme.deepBrown,
+                    ),
+                ],
+              ),
             ],
           ),
         ),
       ),
     );
+  }
+
+  VoidCallback _tapHandler() {
+    if (file.type == 'audio') {
+      return onPlayAudio;
+    }
+    if (file.type == 'video') {
+      return onPlayVideo;
+    }
+    return onOpen;
   }
 
   IconData _iconFor(String type) {
@@ -286,7 +508,6 @@ class _DownloadCard extends StatelessWidget {
         return Icons.description_rounded;
     }
   }
-
 }
 
 abstract class _DownloadListItem {
@@ -306,9 +527,9 @@ class _DownloadEntryItem extends _DownloadListItem {
 }
 
 class _DownloadsEmpty extends StatelessWidget {
-  const _DownloadsEmpty({required this.onRefresh});
+  const _DownloadsEmpty({this.onGoToCourses});
 
-  final Future<void> Function() onRefresh;
+  final VoidCallback? onGoToCourses;
 
   @override
   Widget build(BuildContext context) {
@@ -317,6 +538,7 @@ class _DownloadsEmpty extends StatelessWidget {
         padding: const EdgeInsets.all(24),
         child: Column(
           mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: <Widget>[
             const Icon(
               Icons.download_done_rounded,
@@ -335,11 +557,14 @@ class _DownloadsEmpty extends StatelessWidget {
               textAlign: TextAlign.center,
               style: Theme.of(context).textTheme.bodyMedium,
             ),
-            const SizedBox(height: 16),
-            ElevatedButton(
-              onPressed: onRefresh,
-              child: const Text('Actualizar'),
-            ),
+            if (onGoToCourses != null) ...<Widget>[
+              const SizedBox(height: 16),
+              FilledButton.icon(
+                onPressed: onGoToCourses,
+                icon: const Icon(Icons.menu_book_rounded),
+                label: const Text('Ir a Mis Cursos'),
+              ),
+            ],
           ],
         ),
       ),

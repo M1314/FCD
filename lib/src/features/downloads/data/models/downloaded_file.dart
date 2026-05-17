@@ -10,6 +10,9 @@ class DownloadedFile {
     required this.downloadedAt,
     this.courseName = '',
     this.lessonName = '',
+    this.courseBannerUrl = '',
+    this.courseIconUrl = '',
+    required this.localArtworkPath,
   });
 
   final String id;
@@ -20,6 +23,10 @@ class DownloadedFile {
   final DateTime downloadedAt;
   final String courseName;
   final String lessonName;
+  final String courseBannerUrl;
+  final String courseIconUrl;
+  /// Local file path of the downloaded artwork image; empty if not downloaded.
+  final String localArtworkPath;
 
   Map<String, dynamic> toJson() {
     return <String, dynamic>{
@@ -31,6 +38,9 @@ class DownloadedFile {
       'downloadedAt': downloadedAt.toIso8601String(),
       'courseName': courseName,
       'lessonName': lessonName,
+      'courseBannerUrl': courseBannerUrl,
+      'courseIconUrl': courseIconUrl,
+      'localArtworkPath': localArtworkPath,
     };
   }
 
@@ -48,6 +58,9 @@ class DownloadedFile {
           DateTime.now(),
       courseName: json['courseName']?.toString() ?? '',
       lessonName: json['lessonName']?.toString() ?? '',
+      courseBannerUrl: json['courseBannerUrl']?.toString() ?? '',
+      courseIconUrl: json['courseIconUrl']?.toString() ?? '',
+      localArtworkPath: json['localArtworkPath'] as String,
     );
   }
 

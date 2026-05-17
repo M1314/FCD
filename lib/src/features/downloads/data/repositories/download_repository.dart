@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:dio/dio.dart';
@@ -14,6 +15,9 @@ class DownloadRepository {
   final ApiClient _apiClient;
 
   static const String _downloadHistoryKey = 'download_history_v1';
+  
+  // Serialize history updates to prevent lost-update races during concurrent downloads
+  Future<void>? _historyUpdateLock;
 
   Future<Directory> getBaseDirectory() async {
     if (Platform.isIOS) {
@@ -22,20 +26,9 @@ class DownloadRepository {
     return getApplicationSupportDirectory();
   }
 
-  Future<File> downloadResource(
-    LessonResource resource, {
-    required ProgressCallback onProgress,
-    CancelToken? cancelToken,
-    void Function()? onAlreadyDownloaded,
-    String courseName = '',
-    String lessonName = '',
-  }) async {
-    final existingFile = await getExistingDownloadedFile(resource);
-    if (existingFile != null) {
-      onAlreadyDownloaded?.call();
-      return existingFile;
-    }
-
+  /// Returns the file path where [resource] would be downloaded.
+  /// Creates the downloads directory if it doesn't exist.
+  Future<String> getDownloadFilePath(LessonResource resource) async {
     final baseDir = await getBaseDirectory();
     final folder = Directory('${baseDir.path}/downloads');
     if (!await folder.exists()) {
@@ -48,7 +41,31 @@ class DownloadRepository {
       resource.type.name,
       extension,
     );
-    var file = File('${folder.path}/$filename');
+    return '${folder.path}/$filename';
+  }
+
+  Future<File> downloadResource(
+    LessonResource resource, {
+    required ProgressCallback onProgress,
+    CancelToken? cancelToken,
+    void Function()? onAlreadyDownloaded,
+    String courseName = '',
+    String lessonName = '',
+  }) async {
+    final existingFile = await getExistingDownloadedFile(
+      resource,
+      courseName: courseName,
+      lessonName: lessonName,
+    );
+    if (existingFile != null) {
+      onAlreadyDownloaded?.call();
+      return existingFile;
+    }
+
+    final filePath = await getDownloadFilePath(resource);
+    var file = File(filePath);
+    final defaultExtension =
+        extensionFromPath(filePath) ?? _extensionFromResource(resource);
 
     final response = await _apiClient.download(
       resource.url,
@@ -56,7 +73,13 @@ class DownloadRepository {
       onReceiveProgress: onProgress,
       cancelToken: cancelToken,
     );
-    file = await _renameDownloadedFile(file, extension, response);
+    file = await _renameDownloadedFile(file, defaultExtension, response);
+
+    final baseDir = await getBaseDirectory();
+    final artworkUrl = resource.courseIconUrl.isNotEmpty
+        ? resource.courseIconUrl
+        : resource.courseBannerUrl;
+    final localArtworkPath = await _downloadArtwork(artworkUrl, baseDir);
 
     await _saveToHistory(
       DownloadedFile(
@@ -68,13 +91,20 @@ class DownloadRepository {
         downloadedAt: DateTime.now(),
         courseName: courseName,
         lessonName: lessonName,
+        courseBannerUrl: resource.courseBannerUrl,
+        courseIconUrl: resource.courseIconUrl,
+        localArtworkPath: localArtworkPath,
       ),
     );
 
     return file;
   }
 
-  Future<File?> getExistingDownloadedFile(LessonResource resource) async {
+  Future<File?> getExistingDownloadedFile(
+    LessonResource resource, {
+    String courseName = '',
+    String lessonName = '',
+  }) async {
     final downloads = await getDownloads();
     for (final existing in downloads) {
       if (!_matchesResource(existing, resource)) {
@@ -88,11 +118,52 @@ class DownloadRepository {
       }
       return file;
     }
-    return null;
+
+    final file = await _findDownloadedFileOnDisk(resource);
+    if (file == null) {
+      return null;
+    }
+
+    DownloadedFile? existingEntry;
+    for (final entry in downloads) {
+      if (entry.localPath == file.path) {
+        existingEntry = entry;
+        break;
+      }
+    }
+
+    await _saveToHistory(
+      DownloadedFile(
+        id: _resourceId(resource),
+        url: resource.url,
+        name: resource.name,
+        type: resource.type.name,
+        localPath: file.path,
+        downloadedAt: existingEntry?.downloadedAt ?? DateTime.now(),
+        courseName:
+            courseName.isNotEmpty ? courseName : existingEntry?.courseName ?? '',
+        lessonName:
+            lessonName.isNotEmpty ? lessonName : existingEntry?.lessonName ?? '',
+        courseBannerUrl:
+            resource.courseBannerUrl.isNotEmpty
+                ? resource.courseBannerUrl
+                : existingEntry?.courseBannerUrl ?? '',
+        courseIconUrl:
+            resource.courseIconUrl.isNotEmpty
+                ? resource.courseIconUrl
+                : existingEntry?.courseIconUrl ?? '',
+        localArtworkPath: existingEntry?.localArtworkPath ?? '',
+      ),
+    );
+
+    return file;
   }
 
   Future<List<DownloadedFile>> getDownloads() async {
-    final files = await _readHistory();
+    var files = await _readHistory();
+    if (files.isEmpty) {
+      files = await _rebuildHistoryFromDisk();
+    }
     files.sort((a, b) => b.downloadedAt.compareTo(a.downloadedAt));
     return files;
   }
@@ -111,20 +182,128 @@ class DownloadRepository {
     if (removed > 0) {
       await _setHistory(existing);
     }
+
+    if (existing.isEmpty) {
+      final recovered = await _rebuildHistoryFromDisk();
+      if (recovered.isNotEmpty) {
+        return DownloadCleanupResult(removed: removed, files: recovered);
+      }
+    }
+
     return DownloadCleanupResult(removed: removed, files: existing);
   }
 
   Future<void> clearHistory() async {
+    final files = await _readHistory();
+    for (final entry in files) {
+      final file = File(entry.localPath);
+      if (await file.exists()) {
+        try {
+          await file.delete();
+        } catch (_) {
+          // Ignore failures while cleaning up.
+        }
+      }
+      if (entry.localArtworkPath.isNotEmpty) {
+        final artwork = File(entry.localArtworkPath);
+        if (await artwork.exists()) {
+          try {
+            await artwork.delete();
+          } catch (_) {
+            // Ignore failures while cleaning up.
+          }
+        }
+      }
+    }
+    final baseDir = await getBaseDirectory();
+    final downloadsDir = Directory('${baseDir.path}/downloads');
+    if (await downloadsDir.exists()) {
+      try {
+        await downloadsDir.delete(recursive: true);
+      } catch (_) {
+        // Ignore failures while cleaning up.
+      }
+    }
+    final artworkDir = Directory('${baseDir.path}/artwork');
+    if (await artworkDir.exists()) {
+      try {
+        await artworkDir.delete(recursive: true);
+      } catch (_) {
+        // Ignore failures while cleaning up.
+      }
+    }
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_downloadHistoryKey);
   }
 
-  Future<void> _saveToHistory(DownloadedFile file) async {
+  Future<void> deleteDownload(DownloadedFile file) async {
+    final localFile = File(file.localPath);
+    if (await localFile.exists()) {
+      try {
+        await localFile.delete();
+      } catch (_) {
+        // Ignore failures while cleaning up.
+      }
+    }
+    
+    // Only delete artwork if no other downloads reference it
+    if (file.localArtworkPath.isNotEmpty) {
+      final parsed = await _readHistory();
+      final otherReferences = parsed.where(
+        (entry) => 
+          entry.localArtworkPath == file.localArtworkPath &&
+          !_isSameResourceEntry(entry, file),
+      ).isNotEmpty;
+      
+      if (!otherReferences) {
+        final artwork = File(file.localArtworkPath);
+        if (await artwork.exists()) {
+          try {
+            await artwork.delete();
+          } catch (_) {
+            // Ignore failures while cleaning up.
+          }
+        }
+      }
+    }
+    
     final parsed = await _readHistory();
     parsed.removeWhere((entry) => _isSameResourceEntry(entry, file));
-    parsed.insert(0, file);
-
     await _setHistory(parsed);
+  }
+
+  /// Deletes a partial download file at [filePath] if it exists.
+  /// Used to clean up orphaned files after download cancellation.
+  Future<void> deletePartialDownload(String filePath) async {
+    final file = File(filePath);
+    if (await file.exists()) {
+      try {
+        await file.delete();
+      } catch (_) {
+        // Ignore failures while cleaning up.
+      }
+    }
+  }
+
+  Future<void> _saveToHistory(DownloadedFile file) async {
+    // Serialize history updates to prevent lost-update races
+    while (_historyUpdateLock != null) {
+      await _historyUpdateLock;
+    }
+    
+    final completer = Completer<void>();
+    _historyUpdateLock = completer.future;
+    
+    try {
+      final parsed = await _readHistory();
+      parsed.removeWhere((entry) => _isSameResourceEntry(entry, file));
+      parsed.insert(0, file);
+
+      await _setHistory(parsed);
+    } finally {
+      _historyUpdateLock = null;
+      completer.complete();
+    }
   }
 
   Future<void> _setHistory(List<DownloadedFile> files) async {
@@ -150,6 +329,64 @@ class DownloadRepository {
         .toList();
   }
 
+  Future<List<DownloadedFile>> _rebuildHistoryFromDisk() async {
+    final baseDir = await getBaseDirectory();
+    final folder = Directory('${baseDir.path}/downloads');
+    if (!await folder.exists()) {
+      return <DownloadedFile>[];
+    }
+
+    final recovered = <DownloadedFile>[];
+    await for (final entity in folder.list()) {
+      if (entity is! File) {
+        continue;
+      }
+      final filename = entity.path.split(Platform.pathSeparator).last;
+      final parsed = _parseRecoveredEntry(filename);
+      final modified = await entity.lastModified();
+      recovered.add(
+        DownloadedFile(
+          id: parsed.id,
+          url: parsed.url,
+          name: parsed.name,
+          type: parsed.type,
+          localPath: entity.path,
+          downloadedAt: modified,
+          localArtworkPath: '',
+        ),
+      );
+    }
+
+    if (recovered.isNotEmpty) {
+      await _setHistory(recovered);
+    }
+    return recovered;
+  }
+
+  _RecoveredDownload _parseRecoveredEntry(String filename) {
+    final pattern = RegExp(r'^(\d+)_(.+)$');
+    final match = pattern.firstMatch(filename);
+    var namePart = filename;
+    if (match != null && match.groupCount >= 2) {
+      namePart = match.group(2) ?? filename;
+    }
+    final dot = namePart.lastIndexOf('.');
+    final ext = dot != -1 ? namePart.substring(dot + 1).toLowerCase() : '';
+    var type = 'document';
+    if (ext == 'mp3' || ext == 'wav' || ext == 'm4a' || ext == 'aac') {
+      type = 'audio';
+    } else if (ext == 'mp4' || ext == 'mov' || ext == 'mkv') {
+      type = 'video';
+    }
+    final displayName = dot != -1 ? namePart.substring(0, dot) : namePart;
+    return _RecoveredDownload(
+      id: 'recovered:${filename.toLowerCase()}',
+      url: '',
+      name: displayName.replaceAll('_', ' '),
+      type: type,
+    );
+  }
+
   Future<void> _removeResourceFromHistory(LessonResource resource) async {
     final parsed = await _readHistory();
     parsed.removeWhere((entry) => _matchesResource(entry, resource));
@@ -165,7 +402,9 @@ class DownloadRepository {
   }
 
   bool _isSameResourceEntry(DownloadedFile a, DownloadedFile b) {
-    return a.id == b.id || (a.type == b.type && a.url == b.url);
+    return a.id == b.id ||
+        (a.type == b.type && a.url == b.url) ||
+        a.localPath == b.localPath;
   }
 
   String _legacyResourceId(LessonResource resource) {
@@ -269,6 +508,41 @@ class DownloadRepository {
     return '${path.substring(0, dot + 1)}${extension.toLowerCase()}';
   }
 
+  /// Downloads [artworkUrl] to a local file and returns its path.
+  /// Returns an empty string if the URL is empty or download fails.
+  Future<String> _downloadArtwork(String artworkUrl, Directory baseDir) async {
+    if (artworkUrl.isEmpty) {
+      return '';
+    }
+
+    try {
+      final uri = Uri.tryParse(artworkUrl);
+      final uriPath = uri?.path ?? artworkUrl;
+      final dot = uriPath.lastIndexOf('.');
+      final ext =
+          (dot != -1 && dot < uriPath.length - 1 && uriPath.length - dot <= 6)
+              ? uriPath.substring(dot)
+              : '.jpg';
+
+      final artworkDir = Directory('${baseDir.path}/artwork');
+      if (!await artworkDir.exists()) {
+        await artworkDir.create(recursive: true);
+      }
+
+      final filename = 'artwork_${artworkUrl.hashCode}$ext';
+      final artworkFile = File('${artworkDir.path}/$filename');
+
+      if (await artworkFile.exists()) {
+        return artworkFile.path;
+      }
+
+      await _apiClient.download(artworkUrl, artworkFile.path);
+      return artworkFile.path;
+    } catch (_) {
+      return '';
+    }
+  }
+
   String _safeFileName(String name, String prefix, String extension) {
     final normalized = name.trim().isEmpty ? prefix : name.trim();
     final sanitized = normalized
@@ -281,6 +555,56 @@ class DownloadRepository {
     }
     return '$withTime.$extension';
   }
+
+  String _normalizedResourceName(LessonResource resource) {
+    final normalized =
+        resource.name.trim().isEmpty ? resource.type.name : resource.name.trim();
+    return normalized
+        .replaceAll(RegExp(r'[\\/:*?"<>|]'), '_')
+        .replaceAll(RegExp(r'\s+'), '_');
+  }
+
+  String _resourceFileSuffix(LessonResource resource) {
+    final extension = _extensionFromResource(resource);
+    final normalized = _normalizedResourceName(resource);
+    final normalizedLower = normalized.toLowerCase();
+    final filename =
+        normalizedLower.endsWith('.$extension')
+            ? normalized
+            : '$normalized.$extension';
+    return '_$filename';
+  }
+
+  Future<File?> _findDownloadedFileOnDisk(LessonResource resource) async {
+    final baseDir = await getBaseDirectory();
+    final folder = Directory('${baseDir.path}/downloads');
+    if (!await folder.exists()) {
+      return null;
+    }
+
+    final suffix = _resourceFileSuffix(resource).toLowerCase();
+    File? match;
+    DateTime? matchModified;
+
+    await for (final entity in folder.list()) {
+      if (entity is! File) {
+        continue;
+      }
+      final filename =
+          entity.path.split(Platform.pathSeparator).last.toLowerCase();
+      if (!filename.endsWith(suffix)) {
+        continue;
+      }
+
+      final modified = await entity.lastModified();
+      if (match == null || modified.isAfter(matchModified!)) {
+        match = entity;
+        matchModified = modified;
+      }
+    }
+
+    return match;
+  }
 }
 
 class DownloadCleanupResult {
@@ -288,4 +612,18 @@ class DownloadCleanupResult {
 
   final int removed;
   final List<DownloadedFile> files;
+}
+
+class _RecoveredDownload {
+  const _RecoveredDownload({
+    required this.id,
+    required this.url,
+    required this.name,
+    required this.type,
+  });
+
+  final String id;
+  final String url;
+  final String name;
+  final String type;
 }

@@ -3,6 +3,7 @@ import 'package:fcd_app/src/features/ai/presentation/ai_chat_page.dart';
 import 'package:fcd_app/src/features/catalog/presentation/catalog_page.dart';
 import 'package:fcd_app/src/features/courses/presentation/courses_page.dart';
 import 'package:fcd_app/src/features/downloads/presentation/downloads_page.dart';
+import 'package:fcd_app/src/features/downloads/presentation/download_progress_banner.dart';
 import 'package:fcd_app/src/features/downloads/presentation/download_task_controller.dart';
 import 'package:fcd_app/src/features/favorites/presentation/favorites_page.dart';
 import 'package:flutter/material.dart';
@@ -20,15 +21,8 @@ class HomeShell extends StatefulWidget {
 class _HomeShellState extends State<HomeShell> {
   int _selectedIndex = 0;
   late final List<ScrollController> _tabScrollControllers;
-
-  static const List<Widget> _defaultPages = <Widget>[
-    CoursesPage(),
-    CatalogPage(),
-    AiChatPage(),
-    FavoritesPage(),
-    DownloadsPage(),
-    AccountPage(),
-  ];
+  bool _downloadsExpanded = false;
+  late final List<Widget> _defaultPages;
 
   static const List<NavigationDestination> _bottomDestinations =
       <NavigationDestination>[
@@ -69,6 +63,14 @@ class _HomeShellState extends State<HomeShell> {
   @override
   void initState() {
     super.initState();
+    _defaultPages = <Widget>[
+      const CoursesPage(),
+      const CatalogPage(),
+      const AiChatPage(),
+      const FavoritesPage(),
+      DownloadsPage(onGoToCourses: () => _onDestinationSelected(0)),
+      const AccountPage(),
+    ];
     assert(
       _pages.length == _bottomDestinations.length,
       'HomeShell pages length must match navigation destinations length.',
@@ -125,13 +127,25 @@ class _HomeShellState extends State<HomeShell> {
   @override
   Widget build(BuildContext context) {
     final isTablet = MediaQuery.sizeOf(context).shortestSide >= 600;
-    final wrappedPages = List<Widget>.generate(_pages.length, (index) {
+    final pages = widget.pages ?? _defaultPages;
+    final wrappedPages = List<Widget>.generate(pages.length, (index) {
       return PrimaryScrollController(
         controller: _tabScrollControllers[index],
-        child: _pages[index],
+        child: pages[index],
       );
     });
     final downloadController = context.watch<DownloadTaskController>();
+    final hasDownloads = downloadController.hasActiveDownloads;
+    final isDownloadsExpanded = _downloadsExpanded && hasDownloads;
+    if (_downloadsExpanded && !hasDownloads) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          setState(() {
+            _downloadsExpanded = false;
+          });
+        }
+      });
+    }
     final content = IndexedStack(index: _selectedIndex, children: wrappedPages);
     final shellBody = isTablet
         ? Row(
@@ -149,6 +163,16 @@ class _HomeShellState extends State<HomeShell> {
             ],
           )
         : SafeArea(child: content);
+
+    final shellContent = NotificationListener<ScrollNotification>(
+      onNotification: (notification) {
+        if (isDownloadsExpanded && notification is ScrollStartNotification) {
+          _collapseDownloadsBanner();
+        }
+        return false;
+      },
+      child: shellBody,
+    );
 
     return Scaffold(
       appBar: AppBar(
@@ -172,14 +196,27 @@ class _HomeShellState extends State<HomeShell> {
           ],
         ),
       ),
-      body: Column(
+      body: Stack(
         children: <Widget>[
-          if (downloadController.isDownloading)
-            _BackgroundDownloadBanner(
-              progress: downloadController.progress,
-              resourceName: downloadController.resourceName,
+          Positioned.fill(child: shellContent),
+          if (isDownloadsExpanded)
+            Positioned.fill(
+              child: GestureDetector(
+                onTap: _collapseDownloadsBanner,
+                behavior: HitTestBehavior.translucent,
+              ),
             ),
-          Expanded(child: shellBody),
+          if (hasDownloads)
+            Positioned(
+              top: 0,
+              left: 0,
+              right: 0,
+              child: DownloadProgressBanner(
+                controller: downloadController,
+                expanded: isDownloadsExpanded,
+                onToggle: _toggleDownloadsBanner,
+              ),
+            ),
         ],
       ),
       bottomNavigationBar: isTablet
@@ -247,6 +284,7 @@ class _HomeShellState extends State<HomeShell> {
     });
   }
 
+
   void _scrollTabToTop(int index) {
     if (index < 0 || index >= _tabScrollControllers.length) {
       return;
@@ -261,48 +299,19 @@ class _HomeShellState extends State<HomeShell> {
       curve: Curves.easeOutCubic,
     );
   }
-}
 
-class _BackgroundDownloadBanner extends StatelessWidget {
-  const _BackgroundDownloadBanner({
-    required this.progress,
-    required this.resourceName,
-  });
+  void _toggleDownloadsBanner() {
+    setState(() {
+      _downloadsExpanded = !_downloadsExpanded;
+    });
+  }
 
-  static const Color _bannerColor = Color(0xFFFFF5E8);
-  static const Color _bannerBorderColor = Color(0xFFE8DACA);
-
-  final double progress;
-  final String resourceName;
-
-  @override
-  Widget build(BuildContext context) {
-    final percent = (progress.clamp(0.0, 1.0) * 100).toStringAsFixed(0);
-    return Material(
-      color: _bannerColor,
-      child: SafeArea(
-        bottom: false,
-        child: Container(
-          width: double.infinity,
-          padding: const EdgeInsets.fromLTRB(14, 8, 14, 10),
-          decoration: const BoxDecoration(
-            border: Border(bottom: BorderSide(color: _bannerBorderColor)),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: <Widget>[
-              Text(
-                'Descargando en segundo plano: $resourceName ($percent%)',
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: Theme.of(context).textTheme.bodySmall,
-              ),
-              const SizedBox(height: 6),
-              LinearProgressIndicator(value: progress.clamp(0.0, 1.0)),
-            ],
-          ),
-        ),
-      ),
-    );
+  void _collapseDownloadsBanner() {
+    if (!_downloadsExpanded) {
+      return;
+    }
+    setState(() {
+      _downloadsExpanded = false;
+    });
   }
 }

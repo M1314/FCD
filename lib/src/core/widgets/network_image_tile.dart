@@ -8,6 +8,7 @@ class NetworkImageTile extends StatelessWidget {
     required this.height,
     required this.borderRadius,
     this.fallbackIcon = Icons.auto_stories_rounded,
+    this.fit = BoxFit.cover,
   });
 
   final String url;
@@ -15,6 +16,7 @@ class NetworkImageTile extends StatelessWidget {
   final double height;
   final double borderRadius;
   final IconData fallbackIcon;
+  final BoxFit fit;
 
   @override
   Widget build(BuildContext context) {
@@ -28,7 +30,7 @@ class NetworkImageTile extends StatelessWidget {
         url,
         width: width,
         height: height,
-        fit: BoxFit.cover,
+        fit: fit,
         errorBuilder: (context, error, stackTrace) => _fallback(),
       ),
     );
