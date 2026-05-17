@@ -1396,7 +1396,7 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
     );
     int attempts = 0;
     const maxAttempts = 120;
-    const fallbackAttempts = 70; // 7 seconds
+    const fallbackAttempts = 35; // 3.5 seconds
     Timer.periodic(const Duration(milliseconds: 100), (timer) {
       if (!mounted ||
           requestId != _resourcePreparationRequestId ||
@@ -1447,7 +1447,7 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
         return;
       }
 
-      // Fallback: show video after 7 seconds even without duration
+      // Fallback: show video after 3.5 seconds even without duration
       if (attempts >= fallbackAttempts) {
         timer.cancel();
         _debugVideoInitLog(
