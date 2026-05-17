@@ -42,6 +42,7 @@ class _DownloadsPageState extends State<DownloadsPage> {
   late final DownloadTaskController _downloadTaskController;
   final List<DownloadedFile> _pendingDeletes = <DownloadedFile>[];
   int _deleteSequence = 0;
+  ScaffoldMessengerState? _scaffoldMessenger;
 
   bool _loading = true;
   bool _wasDownloading = false;
@@ -61,8 +62,14 @@ class _DownloadsPageState extends State<DownloadsPage> {
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _scaffoldMessenger = ScaffoldMessenger.of(context);
+  }
+
+  @override
   void dispose() {
-    ScaffoldMessenger.of(context).clearSnackBars();
+    _scaffoldMessenger?.clearSnackBars();
     _downloadTaskController.removeListener(_handleDownloadTaskChange);
     super.dispose();
   }
@@ -189,7 +196,11 @@ class _DownloadsPageState extends State<DownloadsPage> {
     }
 
     setState(() {
-      _files = cleanupResult.files;
+      // Filter out pending deletes to prevent reappearing during undo window
+      _files = cleanupResult.files
+          .where((file) => !_pendingDeletes.any(
+              (pending) => pending.localPath == file.localPath))
+          .toList();
       _loading = false;
       _info = cleanupResult.removed > 0
           ? 'Se limpiaron ${cleanupResult.removed} archivo(s) inexistente(s) del historial.'

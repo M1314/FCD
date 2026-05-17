@@ -5,7 +5,7 @@ import 'package:fcd_app/src/features/courses/data/models/lesson_resource.dart';
 import 'package:fcd_app/src/features/downloads/data/repositories/download_repository.dart';
 import 'package:flutter/foundation.dart';
 
-enum DownloadTaskStatus { completed, alreadyDownloaded, failed, busy }
+enum DownloadTaskStatus { completed, alreadyDownloaded, failed, busy, canceled }
 
 class DownloadTaskResult {
   const DownloadTaskResult({required this.status, this.file, this.error});
@@ -164,7 +164,7 @@ class DownloadTaskController extends ChangeNotifier {
       );
     } on DioException catch (error) {
       if (error.type == DioExceptionType.cancel) {
-        return const DownloadTaskResult(status: DownloadTaskStatus.failed);
+        return const DownloadTaskResult(status: DownloadTaskStatus.canceled);
       }
       return DownloadTaskResult(
         status: DownloadTaskStatus.failed,

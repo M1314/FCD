@@ -922,6 +922,9 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
           ),
         );
         return;
+      case DownloadTaskStatus.canceled:
+        // User canceled, no error message needed
+        return;
       case DownloadTaskStatus.failed:
         ScaffoldMessenger.of(
           context,

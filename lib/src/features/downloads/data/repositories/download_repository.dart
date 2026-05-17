@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:dio/dio.dart';
@@ -13,6 +14,9 @@ class DownloadRepository {
   final ApiClient _apiClient;
 
   static const String _downloadHistoryKey = 'download_history_v1';
+  
+  // Serialize history updates to prevent lost-update races during concurrent downloads
+  Future<void>? _historyUpdateLock;
 
   Future<Directory> getBaseDirectory() async {
     if (Platform.isIOS) {
@@ -229,27 +233,52 @@ class DownloadRepository {
         // Ignore failures while cleaning up.
       }
     }
+    
+    // Only delete artwork if no other downloads reference it
     if (file.localArtworkPath.isNotEmpty) {
-      final artwork = File(file.localArtworkPath);
-      if (await artwork.exists()) {
-        try {
-          await artwork.delete();
-        } catch (_) {
-          // Ignore failures while cleaning up.
+      final parsed = await _readHistory();
+      final otherReferences = parsed.where(
+        (entry) => 
+          entry.localArtworkPath == file.localArtworkPath &&
+          !_isSameResourceEntry(entry, file),
+      ).isNotEmpty;
+      
+      if (!otherReferences) {
+        final artwork = File(file.localArtworkPath);
+        if (await artwork.exists()) {
+          try {
+            await artwork.delete();
+          } catch (_) {
+            // Ignore failures while cleaning up.
+          }
         }
       }
     }
+    
     final parsed = await _readHistory();
     parsed.removeWhere((entry) => _isSameResourceEntry(entry, file));
     await _setHistory(parsed);
   }
 
   Future<void> _saveToHistory(DownloadedFile file) async {
-    final parsed = await _readHistory();
-    parsed.removeWhere((entry) => _isSameResourceEntry(entry, file));
-    parsed.insert(0, file);
+    // Serialize history updates to prevent lost-update races
+    while (_historyUpdateLock != null) {
+      await _historyUpdateLock;
+    }
+    
+    final completer = Completer<void>();
+    _historyUpdateLock = completer.future;
+    
+    try {
+      final parsed = await _readHistory();
+      parsed.removeWhere((entry) => _isSameResourceEntry(entry, file));
+      parsed.insert(0, file);
 
-    await _setHistory(parsed);
+      await _setHistory(parsed);
+    } finally {
+      _historyUpdateLock = null;
+      completer.complete();
+    }
   }
 
   Future<void> _setHistory(List<DownloadedFile> files) async {
