@@ -14,6 +14,7 @@ import 'package:fcd_app/src/features/courses/data/models/lesson_resource.dart';
 import 'package:fcd_app/src/features/downloads/data/repositories/download_repository.dart';
 import 'package:fcd_app/src/features/downloads/presentation/download_progress_banner.dart';
 import 'package:fcd_app/src/features/downloads/presentation/download_task_controller.dart';
+import 'package:fcd_app/src/state/audio_playback_controller.dart';
 import 'package:fcd_app/src/state/session_controller.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
@@ -39,6 +40,7 @@ class CoursePlayerPage extends StatefulWidget {
     required this.lessons,
     this.forceStart = false,
     this.initialLessonIndex,
+    this.initialResourceIndex,
   });
 
   final Course course;
@@ -50,12 +52,16 @@ class CoursePlayerPage extends StatefulWidget {
   /// When set, the player starts at this lesson index, ignoring saved progress.
   final int? initialLessonIndex;
 
+  /// When set, the player starts at this resource index (with initialLessonIndex).
+  final int? initialResourceIndex;
+
   @override
   State<CoursePlayerPage> createState() => _CoursePlayerPageState();
 }
 
 class _CoursePlayerPageState extends State<CoursePlayerPage>
     with WidgetsBindingObserver, RouteAware {
+  late final AudioPlaybackController _playbackController;
   final ProgressStorage _progressStorage = ProgressStorage();
   final FavoritesStorage _favoritesStorage = FavoritesStorage();
   late final DownloadRepository _downloadRepository;
@@ -76,6 +82,8 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
   bool _showSessionExpiredBanner = false;
   bool _downloadsExpanded = false;
   Set<String> _downloadedResourceKeys = <String>{};
+  bool _reuseSharedAudio = false;
+  bool _resumeSharedAudio = false;
 
   BetterPlayerController? _videoController;
   AudioPlayer? _audioPlayer;
@@ -90,6 +98,9 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    _playbackController = context.read<AudioPlaybackController>();
+    _audioPlayer = _playbackController.player;
+    _activeMediaResourceKey = _playbackController.activeMediaResourceKey;
     _downloadRepository = DownloadRepository(
       apiClient: context.read<SessionController>().apiClient,
     );
@@ -121,7 +132,9 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
     WidgetsBinding.instance.removeObserver(this);
     _saveProgressOnDispose();
     _videoController?.dispose(forceDispose: true);
-    _audioPlayer?.dispose();
+    if (_audioPlayer != null && _audioPlayer != _playbackController.player) {
+      _audioPlayer?.dispose();
+    }
     _cachedSession?.removeListener(_onSessionChanged);
     super.dispose();
   }
@@ -214,7 +227,23 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
         0,
         widget.lessons.length - 1,
       );
-      _resourceIndex = 0;
+      final resources = widget.lessons[_lessonIndex].resources;
+      if (resources.isEmpty) {
+        _resourceIndex = 0;
+      } else {
+        final initialResourceIndex = widget.initialResourceIndex ?? 0;
+        _resourceIndex =
+            initialResourceIndex.clamp(0, resources.length - 1);
+      }
+      final targetKey = _currentMediaResourceKey;
+      if (_playbackController.player != null &&
+          targetKey != null &&
+          targetKey == _playbackController.activeMediaResourceKey) {
+        _reuseSharedAudio = true;
+        _resumeSharedAudio = _playbackController.player!.playing;
+        _savedMediaPositionMs =
+            _playbackController.player!.position.inMilliseconds;
+      }
     } else if (!widget.forceStart) {
       final saved = await _progressStorage.getProgress(widget.course.id);
       if (!mounted) {
@@ -243,6 +272,17 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
 
     _isCompleted = _completedLessonIds.contains(currentLesson.id);
     _isCurrentFavorite = _favoriteIds.contains(currentLesson.id);
+    if (_reuseSharedAudio) {
+      _isAudioLoading = false;
+      _activeMediaResourceKey = _currentMediaResourceKey;
+      _reuseSharedAudio = false;
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+      return;
+    }
     await _prepareCurrentResource();
     if (!mounted) {
       return;
@@ -304,8 +344,7 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
   }
 
   bool get _showMiniAudioPlayer {
-    final resource = currentResource;
-    return _audioPlayer != null && (resource == null || !resource.isAudio);
+    return _playbackController.player != null;
   }
 
   bool get _hasPreviousLesson => _lessonIndex > 0;
@@ -347,11 +386,11 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
         _buildProgressBanner(context),
         Expanded(
           child: SingleChildScrollView(
+            padding: EdgeInsets.only(bottom: _showMiniAudioPlayer ? 86 : 16),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: <Widget>[
                 _buildViewer(context),
-                if (_showMiniAudioPlayer) _buildMiniAudioPlayer(),
                 _buildBottomPanel(context),
               ],
             ),
@@ -380,12 +419,15 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
                 child: GestureDetector(
                   onTap: _collapseDownloadsBanner,
                   behavior: HitTestBehavior.translucent,
+                ),
+              ),
             Positioned(
               top: 0,
               left: 0,
               right: 0,
               child: _buildDownloadsBanner(context),
             ),
+            if (_showMiniAudioPlayer) _buildMiniAudioPlayer(),
           ],
         ),
       ),
@@ -828,36 +870,212 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
   }
 
   Widget _buildMiniAudioPlayer() {
-    final player = _audioPlayer;
+    final player = _playbackController.player;
     if (player == null) {
       return const SizedBox.shrink();
     }
-    final activeResource = _activeMediaResource;
+    final title = _playbackController.resourceTitle ?? 'Mini reproductor';
 
-    return Container(
-      margin: const EdgeInsets.fromLTRB(16, 10, 16, 2),
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(14),
-        color: const Color(0xFFFFF5E8),
-        border: Border.all(color: const Color(0xFFE8DACA)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: <Widget>[
-          Text(
-            activeResource?.name.isNotEmpty == true
-                ? activeResource!.name
-                : 'Mini reproductor',
-            style: Theme.of(
-              context,
-            ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
-          ),
-          const SizedBox(height: 8),
-          AudioPlayerWidget(player: player),
-        ],
+    return Positioned(
+      left: 12,
+      right: 12,
+      bottom: 8,
+      child: SafeArea(
+        top: false,
+        minimum: const EdgeInsets.only(bottom: 6),
+        child: StreamBuilder<PlayerState>(
+          stream: player.playerStateStream,
+          builder: (context, snapshot) {
+            final playerState = snapshot.data;
+            final processing = playerState?.processingState;
+            final playing = playerState?.playing ?? false;
+            final isBuffering =
+                processing == ProcessingState.loading ||
+                processing == ProcessingState.buffering;
+
+            return Container(
+              decoration: const BoxDecoration(
+                boxShadow: <BoxShadow>[
+                  BoxShadow(
+                    color: Color(0x14000000),
+                    blurRadius: 12,
+                    offset: Offset(0, 6),
+                  ),
+                ],
+              ),
+              child: Material(
+                color: Colors.transparent,
+                child: Ink(
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(16),
+                    color: const Color(0xFFFFF5E8),
+                    border: Border.all(color: const Color(0xFFE8DACA)),
+                  ),
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(16),
+                    onTap: _openActiveAudioResource,
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(12, 8, 12, 6),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: <Widget>[
+                          Row(
+                            children: <Widget>[
+                              if (isBuffering)
+                                const SizedBox(
+                                  width: 32,
+                                  height: 32,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2.2,
+                                  ),
+                                )
+                              else
+                                IconButton.filled(
+                                  onPressed: () => _toggleAudioPlayback(player),
+                                  icon: Icon(
+                                    playing
+                                        ? Icons.pause_rounded
+                                        : Icons.play_arrow_rounded,
+                                  ),
+                                  iconSize: 20,
+                                  padding: EdgeInsets.zero,
+                                  constraints: const BoxConstraints.tightFor(
+                                    width: 32,
+                                    height: 32,
+                                  ),
+                                  style: IconButton.styleFrom(
+                                    backgroundColor: AppTheme.deepBrown,
+                                    foregroundColor: Colors.white,
+                                  ),
+                                ),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: <Widget>[
+                                    ScrollingText(
+                                      title,
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .bodyMedium
+                                          ?.copyWith(
+                                            fontWeight: FontWeight.w700,
+                                          ),
+                                      velocity: 26,
+                                    ),
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      playing ? 'Reproduciendo' : 'En pausa',
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .bodySmall
+                                          ?.copyWith(color: AppTheme.mutedText),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 6),
+                          StreamBuilder<Duration>(
+                            stream: player.positionStream,
+                            builder: (context, positionSnapshot) {
+                              final position =
+                                  positionSnapshot.data ?? Duration.zero;
+                              final total = player.duration ?? Duration.zero;
+                              final totalMs = total.inMilliseconds;
+                              final progress = totalMs <= 0
+                                  ? 0.0
+                                  : (position.inMilliseconds / totalMs)
+                                      .clamp(0.0, 1.0);
+
+                              return ClipRRect(
+                                borderRadius: BorderRadius.circular(999),
+                                child: LinearProgressIndicator(
+                                  minHeight: 3,
+                                  value: progress,
+                                  backgroundColor: const Color(0xFFE8DACA),
+                                  color: AppTheme.deepBrown,
+                                ),
+                              );
+                            },
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            );
+          },
+        ),
       ),
     );
+  }
+
+  Future<void> _toggleAudioPlayback(AudioPlayer player) async {
+    if (player.playing) {
+      await player.pause();
+      return;
+    }
+    await player.play();
+  }
+
+  Future<void> _openActiveAudioResource() async {
+    final course = _playbackController.course;
+    final lessons = _playbackController.lessons;
+    final lessonIndex = _playbackController.lessonIndex;
+    final resourceIndex = _playbackController.resourceIndex;
+    if (course == null || lessons == null) {
+      return;
+    }
+    if (lessonIndex == null || resourceIndex == null) {
+      return;
+    }
+
+    if (course.id == widget.course.id) {
+      setState(() {
+        _lessonIndex = lessonIndex;
+        _resourceIndex = resourceIndex.clamp(0, lessons.length - 1);
+        _isCompleted = _completedLessonIds.contains(currentLesson.id);
+        _isCurrentFavorite = _favoriteIds.contains(currentLesson.id);
+        _showVideoDurationWarning = false;
+      });
+      return;
+    }
+
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => CoursePlayerPage(
+          course: course,
+          lessons: lessons,
+          initialLessonIndex: lessonIndex,
+          initialResourceIndex: resourceIndex,
+        ),
+      ),
+    );
+  }
+
+  Future<void> _switchToLessonResource(int lessonIndex, int resourceIndex) async {
+    final resources = widget.lessons[lessonIndex].resources;
+    if (resources.isEmpty) {
+      return;
+    }
+    setState(() {
+      _lessonIndex = lessonIndex;
+      _resourceIndex = resourceIndex.clamp(0, resources.length - 1);
+      _isCompleted = _completedLessonIds.contains(currentLesson.id);
+      _isCurrentFavorite = _favoriteIds.contains(currentLesson.id);
+      _showVideoDurationWarning = false;
+    });
+    _savedMediaPositionMs = 0;
+
+    await _saveProgress();
+    await _prepareCurrentResource();
+    if (mounted) {
+      setState(() {});
+    }
   }
 
   Widget _buildDocumentViewer() {
@@ -1262,6 +1480,7 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
     }
 
     if (resource.isVideo) {
+      _playbackController.clearSession();
       final artworkUrl = widget.course.iconUrl.isNotEmpty
           ? widget.course.iconUrl
           : widget.course.bannerUrl;
@@ -1286,9 +1505,22 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
       return;
     }
     if (resource.isAudio) {
+      if (_reuseSharedAudio &&
+          _audioPlayer != null &&
+          _currentMediaResourceKey == _playbackController.activeMediaResourceKey) {
+        _isAudioLoading = false;
+        _activeMediaResourceKey = _currentMediaResourceKey;
+        if (_resumeSharedAudio && !_audioPlayer!.playing) {
+          await _audioPlayer!.play();
+        }
+        _reuseSharedAudio = false;
+        _resumeSharedAudio = false;
+        return;
+      }
       _isAudioLoading = true;
       setState(() {});
-      final audioPlayer = _audioPlayer ??= AudioPlayer();
+      final audioPlayer =
+          _audioPlayer ??= _playbackController.player ?? AudioPlayer();
       final artworkUrl = widget.course.iconUrl.isNotEmpty
           ? widget.course.iconUrl
           : widget.course.bannerUrl;
@@ -1312,6 +1544,19 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
       _audioPlayer = audioPlayer;
       _isAudioLoading = false;
       _activeMediaResourceKey = _currentMediaResourceKey;
+      _reuseSharedAudio = false;
+      _resumeSharedAudio = false;
+      _playbackController.setSession(
+        player: audioPlayer,
+        courseId: widget.course.id,
+        lessonIndex: _lessonIndex,
+        resourceIndex: _resourceIndex,
+        resourceTitle:
+            resource.name.isEmpty ? 'Audio de la lección' : resource.name,
+        courseTitle: widget.course.name,
+        course: widget.course,
+        lessons: widget.lessons,
+      );
       if (_savedMediaPositionMs > 0) {
         try {
           await audioPlayer.seek(Duration(milliseconds: _savedMediaPositionMs));
