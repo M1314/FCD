@@ -95,7 +95,7 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    final route = ModalRoute.of(context);
+    final route = ModalRoute.of(context) as ModalRoute<void>?;
     if (route != null) {
       routeObserver.subscribe(this, route);
     }
