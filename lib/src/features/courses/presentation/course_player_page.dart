@@ -1,6 +1,5 @@
 import 'dart:async';
 
-import 'package:audio_service/audio_service.dart';
 import 'package:better_player_plus/better_player_plus.dart';
 import 'package:fcd_app/src/core/config/api_config.dart';
 import 'package:fcd_app/src/core/navigation/route_observer.dart';
@@ -8,6 +7,7 @@ import 'package:fcd_app/src/core/storage/favorites_storage.dart';
 import 'package:fcd_app/src/core/storage/progress_storage.dart';
 import 'package:fcd_app/src/core/theme/app_theme.dart';
 import 'package:fcd_app/src/core/widgets/audio_player_widget.dart';
+import 'package:fcd_app/src/core/widgets/scrolling_text.dart';
 import 'package:fcd_app/src/features/courses/data/models/course.dart';
 import 'package:fcd_app/src/features/courses/data/models/course_lesson.dart';
 import 'package:fcd_app/src/features/courses/data/models/lesson_resource.dart';
@@ -760,7 +760,7 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
         children: <Widget>[
           const Icon(Icons.multitrack_audio_rounded, size: 36),
           const SizedBox(height: 10),
-          Text(
+          ScrollingText(
             resource.name.isEmpty ? 'Audio de la lección' : resource.name,
             style: Theme.of(context).textTheme.titleMedium,
           ),

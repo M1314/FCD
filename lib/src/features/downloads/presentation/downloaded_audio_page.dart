@@ -1,8 +1,8 @@
 import 'dart:io';
 
-import 'package:audio_service/audio_service.dart';
 import 'package:fcd_app/src/core/theme/app_theme.dart';
 import 'package:fcd_app/src/core/widgets/network_image_tile.dart';
+import 'package:fcd_app/src/core/widgets/scrolling_text.dart';
 import 'package:fcd_app/src/features/downloads/data/models/downloaded_file.dart';
 import 'package:flutter/material.dart';
 import 'package:just_audio/just_audio.dart';
@@ -184,13 +184,12 @@ class _DownloadedAudioPageState extends State<DownloadedAudioPage> {
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: <Widget>[
-                                  Text(
+                                  ScrollingText(
                                     widget.file.name.isEmpty
                                         ? 'Audio descargado'
                                         : widget.file.name,
                                     textAlign: TextAlign.left,
                                     maxLines: 2,
-                                    overflow: TextOverflow.ellipsis,
                                     style: Theme.of(context)
                                         .textTheme
                                         .titleSmall
