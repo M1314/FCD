@@ -25,8 +25,9 @@ void main() {
 
       expect(result.status, DownloadTaskStatus.completed);
       expect(result.file, isNotNull);
-      expect(controller.isDownloading, isFalse);
-      expect(controller.progress, 0);
+      expect(controller.hasActiveDownloads, isFalse);
+      expect(controller.activeDownloads, isEmpty);
+      expect(controller.overallProgress, 0);
 
       await tempDir.delete(recursive: true);
     });
