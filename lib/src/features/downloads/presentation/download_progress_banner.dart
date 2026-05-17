@@ -87,18 +87,28 @@ class _DownloadsExpandedList extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      children: downloads
-          .map(
-            (download) => Padding(
-              padding: const EdgeInsets.only(bottom: 8),
-              child: _DownloadProgressRow(
-                download: download,
-                onCancel: onCancel,
-              ),
-            ),
-          )
-          .toList(),
+    final maxHeight = MediaQuery.sizeOf(context).height * 0.4;
+
+    return ConstrainedBox(
+      constraints: BoxConstraints(maxHeight: maxHeight),
+      child: Scrollbar(
+        thumbVisibility: downloads.length > 1,
+        child: SingleChildScrollView(
+          child: Column(
+            children: downloads
+                .map(
+                  (download) => Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: _DownloadProgressRow(
+                      download: download,
+                      onCancel: onCancel,
+                    ),
+                  ),
+                )
+                .toList(),
+          ),
+        ),
+      ),
     );
   }
 }
