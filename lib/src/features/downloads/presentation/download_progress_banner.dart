@@ -30,18 +30,26 @@ class DownloadProgressBanner extends StatelessWidget {
     return Material(
       color: _bannerColor,
       child: SafeArea(
-        bottom: false,
+        top: false,
         child: InkWell(
           onTap: onToggle,
           child: Container(
             width: double.infinity,
             padding: const EdgeInsets.fromLTRB(14, 8, 14, 10),
             decoration: const BoxDecoration(
-              border: Border(bottom: BorderSide(color: _bannerBorderColor)),
+              border: Border(top: BorderSide(color: _bannerBorderColor)),
             ),
             child: Column(
+              mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: <Widget>[
+                if (expanded) ...<Widget>[
+                  _DownloadsExpandedList(
+                    downloads: downloads,
+                    onCancel: controller.cancelDownload,
+                  ),
+                  const SizedBox(height: 10),
+                ],
                 Row(
                   children: <Widget>[
                     Expanded(
@@ -54,8 +62,8 @@ class DownloadProgressBanner extends StatelessWidget {
                     ),
                     Icon(
                       expanded
-                          ? Icons.expand_less_rounded
-                          : Icons.expand_more_rounded,
+                          ? Icons.expand_more_rounded
+                          : Icons.expand_less_rounded,
                       size: 20,
                       color: Theme.of(context).colorScheme.onSurfaceVariant,
                     ),
@@ -63,13 +71,6 @@ class DownloadProgressBanner extends StatelessWidget {
                 ),
                 const SizedBox(height: 6),
                 LinearProgressIndicator(value: overallProgress.clamp(0.0, 1.0)),
-                if (expanded) ...<Widget>[
-                  const SizedBox(height: 10),
-                  _DownloadsExpandedList(
-                    downloads: downloads,
-                    onCancel: controller.cancelDownload,
-                  ),
-                ],
               ],
             ),
           ),
