@@ -40,6 +40,9 @@ class DownloadsPage extends StatefulWidget {
 class _DownloadsPageState extends State<DownloadsPage> {
   late final DownloadRepository _downloadRepository;
   late final DownloadTaskController _downloadTaskController;
+  final List<DownloadedFile> _pendingDeletes = <DownloadedFile>[];
+  int _deleteSequence = 0;
+  ScaffoldMessengerState? _scaffoldMessenger;
 
   bool _loading = true;
   bool _wasDownloading = false;
@@ -53,13 +56,20 @@ class _DownloadsPageState extends State<DownloadsPage> {
       apiClient: context.read<SessionController>().apiClient,
     );
     _downloadTaskController = context.read<DownloadTaskController>();
-    _wasDownloading = _downloadTaskController.isDownloading;
+    _wasDownloading = _downloadTaskController.hasActiveDownloads;
     _downloadTaskController.addListener(_handleDownloadTaskChange);
     _load();
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _scaffoldMessenger = ScaffoldMessenger.of(context);
+  }
+
+  @override
   void dispose() {
+    _scaffoldMessenger?.clearSnackBars();
     _downloadTaskController.removeListener(_handleDownloadTaskChange);
     super.dispose();
   }
@@ -162,6 +172,7 @@ class _DownloadsPageState extends State<DownloadsPage> {
                     onPlayAudio: () => _openAudio(entryItem.file),
                     onPlayVideo: () => _playVideo(entryItem.file),
                     onOpen: () => _open(entryItem.file),
+                    onDelete: () => _deleteEntry(entryItem.file),
                   ),
                 );
               },
@@ -185,7 +196,11 @@ class _DownloadsPageState extends State<DownloadsPage> {
     }
 
     setState(() {
-      _files = cleanupResult.files;
+      // Filter out pending deletes to prevent reappearing during undo window
+      _files = cleanupResult.files
+          .where((file) => !_pendingDeletes.any(
+              (pending) => pending.localPath == file.localPath))
+          .toList();
       _loading = false;
       _info = cleanupResult.removed > 0
           ? 'Se limpiaron ${cleanupResult.removed} archivo(s) inexistente(s) del historial.'
@@ -194,11 +209,11 @@ class _DownloadsPageState extends State<DownloadsPage> {
   }
 
   void _handleDownloadTaskChange() {
-    final isDownloading = _downloadTaskController.isDownloading;
-    if (_wasDownloading && !isDownloading && mounted) {
+    final hasDownloads = _downloadTaskController.hasActiveDownloads;
+    if (_wasDownloading && !hasDownloads && mounted) {
       _load();
     }
-    _wasDownloading = isDownloading;
+    _wasDownloading = hasDownloads;
   }
 
   Future<void> _open(DownloadedFile file) async {
@@ -307,6 +322,66 @@ class _DownloadsPageState extends State<DownloadsPage> {
     }
     await _load();
   }
+
+  void _deleteEntry(DownloadedFile file) {
+    setState(() {
+      _files.removeWhere((entry) => entry.localPath == file.localPath);
+      _pendingDeletes.add(file);
+    });
+
+    final sequence = ++_deleteSequence;
+    final messenger = ScaffoldMessenger.of(context);
+    messenger.clearSnackBars();
+    messenger
+        .showSnackBar(
+          SnackBar(
+            content: Text(
+              _pendingDeletes.length == 1
+                  ? 'Descarga eliminada.'
+                  : 'Se eliminaron ${_pendingDeletes.length} descargas.',
+            ),
+            action: SnackBarAction(
+              label: 'Deshacer',
+              onPressed: _undoDelete,
+            ),
+            duration: const Duration(seconds: 4),
+          ),
+        )
+        .closed
+        .then((reason) {
+          if (reason == SnackBarClosedReason.action ||
+              sequence != _deleteSequence) {
+            return;
+          }
+          _commitPendingDelete();
+        });
+  }
+
+  void _undoDelete() {
+    if (_pendingDeletes.isEmpty) {
+      return;
+    }
+    setState(() {
+      _files.addAll(_pendingDeletes);
+      _files.sort((a, b) => b.downloadedAt.compareTo(a.downloadedAt));
+      _pendingDeletes.clear();
+    });
+  }
+
+  Future<void> _commitPendingDelete() async {
+    if (_pendingDeletes.isEmpty) {
+      return;
+    }
+    final pending = List<DownloadedFile>.from(_pendingDeletes);
+    _pendingDeletes.clear();
+    for (final entry in pending) {
+      await _downloadRepository.deleteDownload(entry);
+    }
+    if (!mounted) {
+      return;
+    }
+    await _load();
+  }
 }
 
 class _DownloadCard extends StatelessWidget {
@@ -315,12 +390,14 @@ class _DownloadCard extends StatelessWidget {
     required this.onOpen,
     required this.onPlayAudio,
     required this.onPlayVideo,
+    required this.onDelete,
   });
 
   final DownloadedFile file;
   final VoidCallback onOpen;
   final VoidCallback onPlayAudio;
   final VoidCallback onPlayVideo;
+  final VoidCallback onDelete;
 
   @override
   Widget build(BuildContext context) {
@@ -368,18 +445,37 @@ class _DownloadCard extends StatelessWidget {
                   ],
                 ),
               ),
-              if (file.type == 'audio')
-                const Icon(Icons.play_arrow_rounded, color: AppTheme.deepBrown)
-              else if (file.type == 'video')
-                const Icon(
-                  Icons.play_circle_fill_rounded,
-                  color: AppTheme.deepBrown,
-                )
-              else
-                const Icon(
-                  Icons.open_in_new_rounded,
-                  color: AppTheme.deepBrown,
-                ),
+              Row(
+                children: <Widget>[
+                  IconButton(
+                    onPressed: onDelete,
+                    icon: const Icon(Icons.close_rounded),
+                    tooltip: 'Eliminar descarga',
+                    color: AppTheme.mutedText,
+                    visualDensity: VisualDensity.compact,
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(
+                      minWidth: 32,
+                      minHeight: 32,
+                    ),
+                  ),
+                  if (file.type == 'audio')
+                    const Icon(
+                      Icons.play_arrow_rounded,
+                      color: AppTheme.deepBrown,
+                    )
+                  else if (file.type == 'video')
+                    const Icon(
+                      Icons.play_circle_fill_rounded,
+                      color: AppTheme.deepBrown,
+                    )
+                  else
+                    const Icon(
+                      Icons.open_in_new_rounded,
+                      color: AppTheme.deepBrown,
+                    ),
+                ],
+              ),
             ],
           ),
         ),
