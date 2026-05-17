@@ -24,6 +24,14 @@ import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 
+@visibleForTesting
+bool shouldKeepExistingAudioPlayer({
+  required LessonResource? nextResource,
+  required bool hasPreviousAudioPlayer,
+}) {
+  return hasPreviousAudioPlayer && (nextResource?.isDocument ?? false);
+}
+
 class CoursePlayerPage extends StatefulWidget {
   const CoursePlayerPage({
     super.key,
@@ -271,6 +279,35 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
     return '$_lessonIndex:$clampedResourceIndex';
   }
 
+  LessonResource? get _activeMediaResource {
+    final key = _activeMediaResourceKey;
+    if (key == null) {
+      return null;
+    }
+    final parts = key.split(':');
+    if (parts.length != 2) {
+      return null;
+    }
+    final lessonIndex = int.tryParse(parts[0]);
+    final resourceIndex = int.tryParse(parts[1]);
+    if (lessonIndex == null || resourceIndex == null) {
+      return null;
+    }
+    if (lessonIndex < 0 || lessonIndex >= widget.lessons.length) {
+      return null;
+    }
+    final resources = widget.lessons[lessonIndex].resources;
+    if (resourceIndex < 0 || resourceIndex >= resources.length) {
+      return null;
+    }
+    return resources[resourceIndex];
+  }
+
+  bool get _showMiniAudioPlayer {
+    final resource = currentResource;
+    return _audioPlayer != null && (resource == null || !resource.isAudio);
+  }
+
   bool get _hasPreviousLesson => _lessonIndex > 0;
 
   bool get _hasNextLesson => _lessonIndex < widget.lessons.length - 1;
@@ -314,6 +351,7 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: <Widget>[
                 _buildViewer(context),
+                if (_showMiniAudioPlayer) _buildMiniAudioPlayer(),
                 _buildBottomPanel(context),
               ],
             ),
@@ -342,8 +380,6 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
                 child: GestureDetector(
                   onTap: _collapseDownloadsBanner,
                   behavior: HitTestBehavior.translucent,
-                ),
-              ),
             Positioned(
               top: 0,
               left: 0,
@@ -490,7 +526,11 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
                 ),
                 child: Row(
                   children: [
-                    Icon(Icons.warning_amber_rounded, color: Colors.orange.shade800, size: 20),
+                    Icon(
+                      Icons.warning_amber_rounded,
+                      color: Colors.orange.shade800,
+                      size: 20,
+                    ),
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
@@ -787,6 +827,39 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
     );
   }
 
+  Widget _buildMiniAudioPlayer() {
+    final player = _audioPlayer;
+    if (player == null) {
+      return const SizedBox.shrink();
+    }
+    final activeResource = _activeMediaResource;
+
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 10, 16, 2),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(14),
+        color: const Color(0xFFFFF5E8),
+        border: Border.all(color: const Color(0xFFE8DACA)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Text(
+            activeResource?.name.isNotEmpty == true
+                ? activeResource!.name
+                : 'Mini reproductor',
+            style: Theme.of(
+              context,
+            ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
+          ),
+          const SizedBox(height: 8),
+          AudioPlayerWidget(player: player),
+        ],
+      ),
+    );
+  }
+
   Widget _buildDocumentViewer() {
     final controller = _webViewController;
     if (controller == null) {
@@ -1060,17 +1133,12 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
 
   void _saveProgressOnDispose() {
     var mediaPositionMs = _savedMediaPositionMs;
-    if (_currentMediaResourceKey == _activeMediaResourceKey) {
-      final resource = currentResource;
-      if (resource != null) {
-        if (resource.isAudio && _audioPlayer != null) {
-          mediaPositionMs = _audioPlayer!.position.inMilliseconds;
-        } else if (resource.isVideo && _videoController != null) {
-          final controller = _videoController!.videoPlayerController;
-          if (controller != null) {
-            mediaPositionMs = controller.value.position.inMilliseconds;
-          }
-        }
+    if (_audioPlayer != null) {
+      mediaPositionMs = _audioPlayer!.position.inMilliseconds;
+    } else if (_videoController != null) {
+      final controller = _videoController!.videoPlayerController;
+      if (controller != null) {
+        mediaPositionMs = controller.value.position.inMilliseconds;
       }
     }
     _savedMediaPositionMs = mediaPositionMs;
@@ -1089,21 +1157,11 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
   }
 
   Future<int> _readCurrentMediaPositionMs() async {
-    final resource = currentResource;
-    if (resource == null) {
-      return 0;
-    }
-    // Only persist position when the currently selected resource is the same
-    // resource that actually owns the active player instance.
-    if (_currentMediaResourceKey != _activeMediaResourceKey) {
-      return 0;
-    }
-
-    if (resource.isAudio && _audioPlayer != null) {
+    if (_audioPlayer != null) {
       return _audioPlayer!.position.inMilliseconds;
     }
 
-    if (resource.isVideo && _videoController != null) {
+    if (_videoController != null) {
       final controller = _videoController!.videoPlayerController;
       if (controller == null) {
         return 0;
@@ -1174,15 +1232,24 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
 
   Future<void> _prepareCurrentResource() async {
     final requestId = ++_resourcePreparationRequestId;
+    final resource = currentResource;
     final previousVideoController = _videoController;
     final previousAudioPlayer = _audioPlayer;
+    final previousActiveMediaResourceKey = _activeMediaResourceKey;
+    final keepExistingAudioPlayer = shouldKeepExistingAudioPlayer(
+      nextResource: resource,
+      hasPreviousAudioPlayer: previousAudioPlayer != null,
+    );
 
     _videoController = null;
+    _audioPlayer = keepExistingAudioPlayer ? previousAudioPlayer : null;
     _webViewController = null;
-    _activeMediaResourceKey = null;
+    _activeMediaResourceKey = keepExistingAudioPlayer
+        ? previousActiveMediaResourceKey
+        : null;
 
     previousVideoController?.dispose(forceDispose: true);
-    if (previousAudioPlayer != null) {
+    if (!keepExistingAudioPlayer && previousAudioPlayer != null) {
       await previousAudioPlayer.stop();
     }
 
@@ -1190,7 +1257,6 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
       return;
     }
 
-    final resource = currentResource;
     if (resource == null) {
       return;
     }
@@ -1231,7 +1297,9 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
           Uri.parse(resource.url),
           tag: MediaItem(
             id: resource.url,
-            title: resource.name.isEmpty ? 'Audio de la lección' : resource.name,
+            title: resource.name.isEmpty
+                ? 'Audio de la lección'
+                : resource.name,
             artist: widget.course.name,
             artUri: artworkUrl.isNotEmpty ? Uri.parse(artworkUrl) : null,
           ),
