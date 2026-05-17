@@ -1,5 +1,6 @@
 import 'package:fcd_app/src/features/courses/data/models/lesson_resource.dart';
 import 'package:fcd_app/src/features/courses/presentation/course_player_page.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
@@ -54,5 +55,32 @@ void main() {
         isFalse,
       );
     });
+  });
+
+  testWidgets('buildTopSnackBar aligns to the top of the screen', (tester) async {
+    await tester.binding.setSurfaceSize(const Size(360, 640));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Builder(
+          builder: (context) => buildTopSnackBar(
+            context,
+            'Archivo descargado.',
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final align = tester.widget<Align>(find.byType(Align));
+    expect(align.alignment, Alignment.topCenter);
+    expect(find.text('Archivo descargado.'), findsOneWidget);
+    expect(find.byType(SafeArea), findsOneWidget);
+
+    await expectLater(
+      find.byType(SafeArea),
+      matchesGoldenFile('goldens/top_snackbar.png'),
+    );
   });
 }
