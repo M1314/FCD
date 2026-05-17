@@ -36,6 +36,7 @@ class _DownloadTaskState {
     required this.resourceId,
     required this.resourceName,
     required this.cancelToken,
+    required this.filePath,
   })
       : receivedBytes = 0,
         totalBytes = 0,
@@ -44,6 +45,7 @@ class _DownloadTaskState {
   final String resourceId;
   final String resourceName;
   final CancelToken cancelToken;
+  final String filePath;
   int receivedBytes;
   int totalBytes;
   double progress;
@@ -119,12 +121,17 @@ class DownloadTaskController extends ChangeNotifier {
     final resourceName = resource.name.trim().isEmpty
         ? _defaultResourceName
         : resource.name;
-  _activeDownloads[resourceId] = _DownloadTaskState(
-    resourceId: resourceId,
-    resourceName: resourceName,
-    cancelToken: CancelToken(),
-  );
-  notifyListeners();
+    
+    // Get the file path before starting download so we can clean up on cancel
+    final filePath = await _downloadRepository.getDownloadFilePath(resource);
+    
+    _activeDownloads[resourceId] = _DownloadTaskState(
+      resourceId: resourceId,
+      resourceName: resourceName,
+      cancelToken: CancelToken(),
+      filePath: filePath,
+    );
+    notifyListeners();
 
     try {
       var alreadyDownloaded = false;
@@ -183,7 +190,11 @@ class DownloadTaskController extends ChangeNotifier {
 
   void cancelDownload(String resourceId) {
     final entry = _activeDownloads.remove(resourceId);
-    entry?.cancelToken.cancel();
+    if (entry != null) {
+      entry.cancelToken.cancel();
+      // Clean up the partial download file asynchronously
+      _downloadRepository.deletePartialDownload(entry.filePath);
+    }
     notifyListeners();
   }
 

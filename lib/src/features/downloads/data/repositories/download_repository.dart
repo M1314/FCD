@@ -25,6 +25,24 @@ class DownloadRepository {
     return getApplicationSupportDirectory();
   }
 
+  /// Returns the file path where [resource] would be downloaded.
+  /// Creates the downloads directory if it doesn't exist.
+  Future<String> getDownloadFilePath(LessonResource resource) async {
+    final baseDir = await getBaseDirectory();
+    final folder = Directory('${baseDir.path}/downloads');
+    if (!await folder.exists()) {
+      await folder.create(recursive: true);
+    }
+
+    final extension = _extensionFromResource(resource);
+    final filename = _safeFileName(
+      resource.name,
+      resource.type.name,
+      extension,
+    );
+    return '${folder.path}/$filename';
+  }
+
   Future<File> downloadResource(
     LessonResource resource, {
     required ProgressCallback onProgress,
@@ -43,19 +61,8 @@ class DownloadRepository {
       return existingFile;
     }
 
-    final baseDir = await getBaseDirectory();
-    final folder = Directory('${baseDir.path}/downloads');
-    if (!await folder.exists()) {
-      await folder.create(recursive: true);
-    }
-
-    final extension = _extensionFromResource(resource);
-    final filename = _safeFileName(
-      resource.name,
-      resource.type.name,
-      extension,
-    );
-    final file = File('${folder.path}/$filename');
+    final filePath = await getDownloadFilePath(resource);
+    final file = File(filePath);
 
     await _apiClient.download(
       resource.url,
@@ -64,6 +71,7 @@ class DownloadRepository {
       cancelToken: cancelToken,
     );
 
+    final baseDir = await getBaseDirectory();
     final artworkUrl = resource.courseIconUrl.isNotEmpty
         ? resource.courseIconUrl
         : resource.courseBannerUrl;
@@ -258,6 +266,19 @@ class DownloadRepository {
     final parsed = await _readHistory();
     parsed.removeWhere((entry) => _isSameResourceEntry(entry, file));
     await _setHistory(parsed);
+  }
+
+  /// Deletes a partial download file at [filePath] if it exists.
+  /// Used to clean up orphaned files after download cancellation.
+  Future<void> deletePartialDownload(String filePath) async {
+    final file = File(filePath);
+    if (await file.exists()) {
+      try {
+        await file.delete();
+      } catch (_) {
+        // Ignore failures while cleaning up.
+      }
+    }
   }
 
   Future<void> _saveToHistory(DownloadedFile file) async {
