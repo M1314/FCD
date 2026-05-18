@@ -13,19 +13,14 @@ import 'package:open_filex/open_filex.dart';
 import 'package:provider/provider.dart';
 
 @visibleForTesting
-String downloadsGroupHeadingFor(DownloadedFile file) {
+String downloadsCourseHeadingFor(DownloadedFile file) {
   final course = file.courseName.trim();
-  final lesson = file.lessonName.trim();
-  if (course.isNotEmpty && lesson.isNotEmpty) {
-    return '$course · $lesson';
-  }
-  if (course.isNotEmpty) {
-    return course;
-  }
-  if (lesson.isNotEmpty) {
-    return lesson;
-  }
-  return 'Descargas';
+  return course.isNotEmpty ? course : 'Descargas';
+}
+
+@visibleForTesting
+String downloadsLessonHeadingFor(DownloadedFile file) {
+  return file.lessonName.trim();
 }
 
 class DownloadsPage extends StatefulWidget {
@@ -105,19 +100,28 @@ class _DownloadsPageState extends State<DownloadsPage> {
       );
     }
 
-    // Group downloads by course/lesson heading, preserving insertion order.
-    final grouped = <String, List<DownloadedFile>>{};
+    // Group downloads by course and lesson, preserving insertion order.
+    final grouped = <String, Map<String, List<DownloadedFile>>>{};
     for (final file in _files) {
-      final heading = downloadsGroupHeadingFor(file);
-      (grouped[heading] ??= <DownloadedFile>[]).add(file);
+      final courseHeading = downloadsCourseHeadingFor(file);
+      final lessonHeading = downloadsLessonHeadingFor(file);
+      final lessons = grouped.putIfAbsent(
+        courseHeading,
+        () => <String, List<DownloadedFile>>{},
+      );
+      (lessons[lessonHeading] ??= <DownloadedFile>[]).add(file);
     }
 
     final items = <_DownloadListItem>[];
-    for (final heading in grouped.keys) {
-      items.add(_DownloadHeadingItem(heading));
-      final filesInGroup = grouped[heading] ?? const <DownloadedFile>[];
-      for (final file in filesInGroup) {
-        items.add(_DownloadEntryItem(file));
+    for (final courseEntry in grouped.entries) {
+      items.add(_DownloadHeadingItem(courseEntry.key));
+      for (final lessonEntry in courseEntry.value.entries) {
+        if (lessonEntry.key.isNotEmpty) {
+          items.add(_DownloadLessonHeadingItem(lessonEntry.key));
+        }
+        for (final file in lessonEntry.value) {
+          items.add(_DownloadEntryItem(file));
+        }
       }
     }
 
@@ -181,6 +185,23 @@ class _DownloadsPageState extends State<DownloadsPage> {
                       style: Theme.of(context).textTheme.titleMedium?.copyWith(
                         color: AppTheme.deepBrown,
                         fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  );
+                }
+                if (item is _DownloadLessonHeadingItem) {
+                  final isAfterCourse =
+                      index > 0 && items[index - 1] is _DownloadHeadingItem;
+                  return Padding(
+                    padding: EdgeInsets.only(
+                      top: isAfterCourse ? 4 : 12,
+                      bottom: 6,
+                    ),
+                    child: Text(
+                      item.title,
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: AppTheme.deepBrown,
+                        fontWeight: FontWeight.w600,
                       ),
                     ),
                   );
@@ -532,6 +553,12 @@ abstract class _DownloadListItem {
 
 class _DownloadHeadingItem extends _DownloadListItem {
   const _DownloadHeadingItem(this.title);
+
+  final String title;
+}
+
+class _DownloadLessonHeadingItem extends _DownloadListItem {
+  const _DownloadLessonHeadingItem(this.title);
 
   final String title;
 }

@@ -102,7 +102,7 @@ void main() {
       expect(file.localArtworkPath, '/path/to/artwork.jpg');
     });
 
-    test('fromJson throws when localArtworkPath is missing', () {
+    test('fromJson defaults empty localArtworkPath when missing', () {
       final json = {
         'id': 'doc:https://example.com/doc.pdf',
         'url': 'https://example.com/doc.pdf',
@@ -112,7 +112,9 @@ void main() {
         'downloadedAt': '2025-01-01T00:00:00.000',
       };
 
-      expect(() => DownloadedFile.fromJson(json), throwsA(isA<TypeError>()));
+      final file = DownloadedFile.fromJson(json);
+
+      expect(file.localArtworkPath, isEmpty);
     });
 
     test('toRawJson roundtrip preserves data', () {

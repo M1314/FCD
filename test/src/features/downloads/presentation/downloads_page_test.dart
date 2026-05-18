@@ -26,27 +26,37 @@ void main() {
     );
   }
 
-  group('downloadsGroupHeadingFor', () {
-    test('combines course and lesson when both are present', () {
-      final heading = downloadsGroupHeadingFor(
+  group('downloadsCourseHeadingFor', () {
+    test('returns course when present', () {
+      final heading = downloadsCourseHeadingFor(
         buildFile(courseName: 'Curso A', lessonName: 'Lección 1'),
-      );
-
-      expect(heading, 'Curso A · Lección 1');
-    });
-
-    test('returns course when lesson is empty', () {
-      final heading = downloadsGroupHeadingFor(
-        buildFile(courseName: 'Curso A'),
       );
 
       expect(heading, 'Curso A');
     });
 
-    test('returns fallback heading when both are empty', () {
-      final heading = downloadsGroupHeadingFor(buildFile());
+    test('returns fallback heading when course is empty', () {
+      final heading = downloadsCourseHeadingFor(
+        buildFile(lessonName: 'Lección 1'),
+      );
 
       expect(heading, 'Descargas');
+    });
+  });
+
+  group('downloadsLessonHeadingFor', () {
+    test('returns lesson when present', () {
+      final heading = downloadsLessonHeadingFor(
+        buildFile(courseName: 'Curso A', lessonName: 'Lección 1'),
+      );
+
+      expect(heading, 'Lección 1');
+    });
+
+    test('returns empty when lesson is missing', () {
+      final heading = downloadsLessonHeadingFor(buildFile(courseName: 'Curso A'));
+
+      expect(heading, isEmpty);
     });
   });
 
