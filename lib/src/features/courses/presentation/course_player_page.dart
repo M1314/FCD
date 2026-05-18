@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:better_player_plus/better_player_plus.dart';
 import 'package:fcd_app/src/core/config/api_config.dart';
@@ -13,6 +14,7 @@ import 'package:fcd_app/src/core/widgets/scrolling_text.dart';
 import 'package:fcd_app/src/features/courses/data/models/course.dart';
 import 'package:fcd_app/src/features/courses/data/models/course_lesson.dart';
 import 'package:fcd_app/src/features/courses/data/models/lesson_resource.dart';
+import 'package:fcd_app/src/features/downloads/data/models/downloaded_file.dart';
 import 'package:fcd_app/src/features/downloads/data/repositories/download_repository.dart';
 import 'package:fcd_app/src/features/downloads/presentation/download_progress_banner.dart';
 import 'package:fcd_app/src/features/downloads/presentation/download_task_controller.dart';
@@ -38,6 +40,24 @@ bool shouldKeepExistingAudioPlayer({
 }
 
 @visibleForTesting
+String normalizeResourceUrl(String url) {
+  final queryIndex = url.indexOf('?');
+  final fragmentIndex = url.indexOf('#');
+  var endIndex = url.length;
+  if (queryIndex != -1 && queryIndex < endIndex) {
+    endIndex = queryIndex;
+  }
+  if (fragmentIndex != -1 && fragmentIndex < endIndex) {
+    endIndex = fragmentIndex;
+  }
+  return endIndex == url.length ? url : url.substring(0, endIndex);
+}
+
+@visibleForTesting
+String resourceDownloadKeyFor(LessonResource resource) {
+  return '${resource.type.name}:${normalizeResourceUrl(resource.url)}';
+}
+
 Widget buildTopSnackBar(BuildContext context, String message) {
   final colorScheme = Theme.of(context).colorScheme;
   return SafeArea(
@@ -115,6 +135,8 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
   bool _showSessionExpiredBanner = false;
   bool _downloadsExpanded = false;
   Set<String> _downloadedResourceKeys = <String>{};
+  Map<String, DownloadedFile> _downloadedResourceFiles =
+      <String, DownloadedFile>{};
   OverlayEntry? _downloadSnackBarEntry;
   Timer? _downloadSnackBarTimer;
   bool _reuseSharedAudio = false;
@@ -1201,18 +1223,13 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
   }
 
   String _resourceKey(LessonResource resource) {
-    return '${resource.type.name}:${_normalizedResourceUrl(resource.url)}';
+    return resourceDownloadKeyFor(resource);
   }
 
-  String _normalizedResourceUrl(String url) {
-    final uri = Uri.tryParse(url);
-    if (uri == null) {
-      return url;
-    }
-    if (uri.hasQuery || uri.fragment.isNotEmpty) {
-      return uri.replace(query: '', fragment: '').toString();
-    }
-    return uri.toString();
+  DownloadedFile? _downloadedFileForResource(LessonResource resource) {
+    final normalizedKey = _resourceKey(resource);
+    return _downloadedResourceFiles[normalizedKey] ??
+        _downloadedResourceFiles['${resource.type.name}:${resource.url}'];
   }
 
   Future<void> _refreshDownloadedResources() async {
@@ -1222,15 +1239,21 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
     }
     setState(() {
       final keys = <String>{};
+      final filesByKey = <String, DownloadedFile>{};
       for (final file in cleanup.files) {
         if (file.id.isNotEmpty) {
           keys.add(file.id);
+          filesByKey[file.id] = file;
         }
         if (file.url.isNotEmpty) {
-          keys.add('${file.type}:${_normalizedResourceUrl(file.url)}');
+          final normalizedUrl = normalizeResourceUrl(file.url);
+          final urlKey = '${file.type}:$normalizedUrl';
+          keys.add(urlKey);
+          filesByKey[urlKey] = file;
         }
       }
       _downloadedResourceKeys = keys;
+      _downloadedResourceFiles = filesByKey;
     });
   }
 
@@ -1444,10 +1467,28 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
       final artworkUrl = widget.course.iconUrl.isNotEmpty
           ? widget.course.iconUrl
           : widget.course.bannerUrl;
+      var videoSourceUrl = resource.url;
+      var isLocalFile = false;
+      var notificationImageUrl = artworkUrl.isNotEmpty ? artworkUrl : null;
+      final downloadedFile = _downloadedFileForResource(resource);
+      if (downloadedFile != null && downloadedFile.localPath.isNotEmpty) {
+        final localFile = File(downloadedFile.localPath);
+        if (await localFile.exists()) {
+          if (!mounted || requestId != _resourcePreparationRequestId) {
+            return;
+          }
+          videoSourceUrl = localFile.path;
+          isLocalFile = true;
+          if (downloadedFile.localArtworkPath.isNotEmpty) {
+            notificationImageUrl = 'file://${downloadedFile.localArtworkPath}';
+          }
+        }
+      }
       final videoController = _buildVideoController(
-        resource.url,
+        videoSourceUrl,
         title: resource.name.isEmpty ? 'Video de la lección' : resource.name,
-        imageUrl: artworkUrl.isNotEmpty ? artworkUrl : null,
+        imageUrl: notificationImageUrl,
+        isLocalFile: isLocalFile,
       );
       if (!mounted || requestId != _resourcePreparationRequestId) {
         videoController.dispose(forceDispose: true);
@@ -1484,16 +1525,35 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
       final artworkUrl = widget.course.iconUrl.isNotEmpty
           ? widget.course.iconUrl
           : widget.course.bannerUrl;
+      var audioSourceUri = Uri.parse(resource.url);
+      var audioSourceId = resource.url;
+      var notificationImageUri =
+          artworkUrl.isNotEmpty ? Uri.parse(artworkUrl) : null;
+      final downloadedFile = _downloadedFileForResource(resource);
+      if (downloadedFile != null && downloadedFile.localPath.isNotEmpty) {
+        final localFile = File(downloadedFile.localPath);
+        if (await localFile.exists()) {
+          if (!mounted || requestId != _resourcePreparationRequestId) {
+            _isAudioLoading = false;
+            return;
+          }
+          audioSourceUri = localFile.uri;
+          audioSourceId = audioSourceUri.toString();
+          if (downloadedFile.localArtworkPath.isNotEmpty) {
+            notificationImageUri = File(downloadedFile.localArtworkPath).uri;
+          }
+        }
+      }
       await audioPlayer.setAudioSource(
         AudioSource.uri(
-          Uri.parse(resource.url),
+          audioSourceUri,
           tag: MediaItem(
-            id: resource.url,
+            id: audioSourceId,
             title: resource.name.isEmpty
                 ? 'Audio de la lección'
                 : resource.name,
             artist: widget.course.name,
-            artUri: artworkUrl.isNotEmpty ? Uri.parse(artworkUrl) : null,
+            artUri: notificationImageUri,
           ),
         ),
       );
@@ -1548,14 +1608,19 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
     String url, {
     String? title,
     String? imageUrl,
+    bool isLocalFile = false,
   }) {
     final dataSource = BetterPlayerDataSource(
-      BetterPlayerDataSourceType.network,
+      isLocalFile
+          ? BetterPlayerDataSourceType.file
+          : BetterPlayerDataSourceType.network,
       url,
-      cacheConfiguration: const BetterPlayerCacheConfiguration(
-        useCache: true,
-        preCacheSize: 8 * 1024 * 1024,
-      ),
+      cacheConfiguration: isLocalFile
+          ? null
+          : const BetterPlayerCacheConfiguration(
+              useCache: true,
+              preCacheSize: 8 * 1024 * 1024,
+            ),
       bufferingConfiguration: const BetterPlayerBufferingConfiguration(
         minBufferMs: 12000,
         maxBufferMs: 90000,

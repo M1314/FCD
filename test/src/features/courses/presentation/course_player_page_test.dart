@@ -57,6 +57,35 @@ void main() {
     });
   });
 
+  group('resourceDownloadKeyFor', () {
+    test('strips query parameters and fragments from URLs', () {
+      const resource = LessonResource(
+        type: LessonResourceType.video,
+        url: 'https://example.com/video.mp4?token=123#section',
+        name: 'Video',
+        order: 1,
+      );
+
+      expect(
+        resourceDownloadKeyFor(resource),
+        'video:https://example.com/video.mp4',
+      );
+    });
+
+    test('keeps URLs without query parameters intact', () {
+      const resource = LessonResource(
+        type: LessonResourceType.video,
+        url: 'https://example.com/video.mp4',
+        name: 'Video',
+        order: 1,
+      );
+
+      expect(
+        resourceDownloadKeyFor(resource),
+        'video:https://example.com/video.mp4',
+      );
+    });
+  });
   testWidgets('buildTopSnackBar aligns to the top of the screen', (tester) async {
     await tester.binding.setSurfaceSize(const Size(360, 640));
     addTearDown(() => tester.binding.setSurfaceSize(null));
@@ -77,6 +106,5 @@ void main() {
     expect(align.alignment, Alignment.topCenter);
     expect(find.text('Archivo descargado.'), findsOneWidget);
     expect(find.byType(SafeArea), findsOneWidget);
-
   });
 }
