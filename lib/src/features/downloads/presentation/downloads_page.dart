@@ -24,9 +24,15 @@ String downloadsLessonHeadingFor(DownloadedFile file) {
 }
 
 class DownloadsPage extends StatefulWidget {
-  const DownloadsPage({super.key, this.onGoToCourses});
+  const DownloadsPage({
+    super.key,
+    this.onGoToCourses,
+    this.downloadRepository,
+  });
 
   final VoidCallback? onGoToCourses;
+  @visibleForTesting
+  final DownloadRepository? downloadRepository;
 
   @override
   State<DownloadsPage> createState() => _DownloadsPageState();
@@ -47,9 +53,11 @@ class _DownloadsPageState extends State<DownloadsPage> {
   @override
   void initState() {
     super.initState();
-    _downloadRepository = DownloadRepository(
-      apiClient: context.read<SessionController>().apiClient,
-    );
+    _downloadRepository =
+        widget.downloadRepository ??
+        DownloadRepository(
+          apiClient: context.read<SessionController>().apiClient,
+        );
     _downloadTaskController = context.read<DownloadTaskController>();
     _wasDownloading = _downloadTaskController.hasActiveDownloads;
     _downloadTaskController.addListener(_handleDownloadTaskChange);
@@ -76,7 +84,20 @@ class _DownloadsPageState extends State<DownloadsPage> {
     }
 
     if (_files.isEmpty) {
-      return _DownloadsEmpty(onGoToCourses: widget.onGoToCourses);
+      return RefreshIndicator(
+        onRefresh: _load,
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            return SingleChildScrollView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              child: ConstrainedBox(
+                constraints: BoxConstraints(minHeight: constraints.maxHeight),
+                child: _DownloadsEmpty(onGoToCourses: widget.onGoToCourses),
+              ),
+            );
+          },
+        ),
+      );
     }
 
     // Group downloads by course and lesson, preserving insertion order.
