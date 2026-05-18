@@ -21,11 +21,11 @@ class _DownloadedVideoPageState extends State<DownloadedVideoPage> {
   String? _error;
   bool _isTablet = false;
   bool _isPreparingController = false;
+  bool _didApplySystemUiMode = false;
 
   @override
   void initState() {
     super.initState();
-    SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
   }
 
   @override
@@ -36,6 +36,7 @@ class _DownloadedVideoPageState extends State<DownloadedVideoPage> {
       return;
     }
     _isTablet = OrientationPolicy.isTabletForSize(mediaQuery.size);
+    _applySystemUiModeIfNeeded();
     if (_controller == null && !_isPreparingController) {
       _prepareController();
     }
@@ -48,9 +49,21 @@ class _DownloadedVideoPageState extends State<DownloadedVideoPage> {
       isTablet: _isTablet,
       ignoreFullscreenFlag: true,
     );
-    SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+    if (!_isTablet) {
+      SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+    }
     _controller?.dispose(forceDispose: true);
     super.dispose();
+  }
+
+  void _applySystemUiModeIfNeeded() {
+    if (_didApplySystemUiMode) {
+      return;
+    }
+    _didApplySystemUiMode = true;
+    if (!_isTablet) {
+      SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
+    }
   }
 
   Future<void> _prepareController() async {
