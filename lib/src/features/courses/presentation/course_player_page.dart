@@ -1057,27 +1057,6 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
     );
   }
 
-  Future<void> _switchToLessonResource(int lessonIndex, int resourceIndex) async {
-    final resources = widget.lessons[lessonIndex].resources;
-    if (resources.isEmpty) {
-      return;
-    }
-    setState(() {
-      _lessonIndex = lessonIndex;
-      _resourceIndex = resourceIndex.clamp(0, resources.length - 1);
-      _isCompleted = _completedLessonIds.contains(currentLesson.id);
-      _isCurrentFavorite = _favoriteIds.contains(currentLesson.id);
-      _showVideoDurationWarning = false;
-    });
-    _savedMediaPositionMs = 0;
-
-    await _saveProgress();
-    await _prepareCurrentResource();
-    if (mounted) {
-      setState(() {});
-    }
-  }
-
   Widget _buildDocumentViewer() {
     final controller = _webViewController;
     if (controller == null) {
