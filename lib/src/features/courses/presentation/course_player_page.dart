@@ -58,6 +58,16 @@ String resourceDownloadKeyFor(LessonResource resource) {
   return '${resource.type.name}:${normalizeResourceUrl(resource.url)}';
 }
 
+@visibleForTesting
+DownloadedFile? downloadedFileForResource(
+  LessonResource resource,
+  Map<String, DownloadedFile> filesByKey,
+) {
+  final normalizedKey = resourceDownloadKeyFor(resource);
+  return filesByKey[normalizedKey] ??
+      filesByKey['${resource.type.name}:${resource.url}'];
+}
+
 Widget buildTopSnackBar(BuildContext context, String message) {
   final colorScheme = Theme.of(context).colorScheme;
   return SafeArea(
@@ -1227,9 +1237,7 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
   }
 
   DownloadedFile? _downloadedFileForResource(LessonResource resource) {
-    final normalizedKey = _resourceKey(resource);
-    return _downloadedResourceFiles[normalizedKey] ??
-        _downloadedResourceFiles['${resource.type.name}:${resource.url}'];
+    return downloadedFileForResource(resource, _downloadedResourceFiles);
   }
 
   Future<void> _refreshDownloadedResources() async {
