@@ -81,6 +81,7 @@ class _DownloadedAudioPageState extends State<DownloadedAudioPage> {
     }
 
     final existingPlayer = _playbackController.player;
+    final createdNewPlayer = existingPlayer == null;
     final player = existingPlayer ?? AudioPlayer();
     final artworkUrl = widget.file.courseIconUrl.isNotEmpty
         ? widget.file.courseIconUrl
@@ -110,14 +111,16 @@ class _DownloadedAudioPageState extends State<DownloadedAudioPage> {
         ),
       );
       if (!mounted) {
-        await player.dispose();
+        if (createdNewPlayer) {
+          await player.dispose();
+        }
         return;
       }
       setState(() {
         _player = player;
         _loading = false;
-        _usesSharedPlayer = true;
-        _ownsPlayer = false;
+        _usesSharedPlayer = !createdNewPlayer;
+        _ownsPlayer = createdNewPlayer;
       });
       player.play();
       _playbackController.setDownloadedSession(
@@ -127,7 +130,9 @@ class _DownloadedAudioPageState extends State<DownloadedAudioPage> {
             widget.file.name.isEmpty ? 'Audio descargado' : widget.file.name,
       );
     } catch (_) {
-      await player.dispose();
+      if (createdNewPlayer) {
+        await player.dispose();
+      }
       if (!mounted) {
         return;
       }

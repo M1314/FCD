@@ -53,6 +53,7 @@ class AudioPlaybackController extends ChangeNotifier
     await _persistCurrentCourseProgress();
     if (player != null) {
       await player.stop();
+      await player.dispose();
     }
     clearSession();
   }

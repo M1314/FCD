@@ -14,6 +14,7 @@ import 'package:fcd_app/src/features/courses/data/models/lesson_resource.dart';
 import 'package:fcd_app/src/features/downloads/data/repositories/download_repository.dart';
 import 'package:fcd_app/src/features/downloads/presentation/download_progress_banner.dart';
 import 'package:fcd_app/src/features/downloads/presentation/download_task_controller.dart';
+import 'package:fcd_app/src/features/downloads/presentation/downloaded_audio_page.dart';
 import 'package:fcd_app/src/state/audio_playback_controller.dart';
 import 'package:fcd_app/src/state/session_controller.dart';
 import 'package:flutter/material.dart';
@@ -1029,6 +1030,17 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
     final lessons = _playbackController.lessons;
     final lessonIndex = _playbackController.lessonIndex;
     final resourceIndex = _playbackController.resourceIndex;
+    final downloadedFile = _playbackController.downloadedFile;
+    
+    if (downloadedFile != null) {
+      await Navigator.of(context).push(
+        MaterialPageRoute<void>(
+          builder: (_) => DownloadedAudioPage(file: downloadedFile),
+        ),
+      );
+      return;
+    }
+    
     if (course == null || lessons == null) {
       return;
     }
