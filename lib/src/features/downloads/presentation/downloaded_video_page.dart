@@ -24,11 +24,6 @@ class _DownloadedVideoPageState extends State<DownloadedVideoPage> {
   bool _didApplySystemUiMode = false;
 
   @override
-  void initState() {
-    super.initState();
-  }
-
-  @override
   void didChangeDependencies() {
     super.didChangeDependencies();
     final mediaQuery = MediaQuery.maybeOf(context);
