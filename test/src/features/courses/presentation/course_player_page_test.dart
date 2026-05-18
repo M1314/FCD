@@ -1,5 +1,6 @@
 import 'package:fcd_app/src/features/courses/data/models/lesson_resource.dart';
 import 'package:fcd_app/src/features/courses/presentation/course_player_page.dart';
+import 'package:fcd_app/src/features/downloads/data/models/downloaded_file.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -84,6 +85,72 @@ void main() {
         resourceDownloadKeyFor(resource),
         'video:https://example.com/video.mp4',
       );
+    });
+  });
+
+  group('downloadedFileForResource', () {
+    test('returns match when url has query params stored normalized', () {
+      const resource = LessonResource(
+        type: LessonResourceType.audio,
+        url: 'https://example.com/audio.mp3?token=abc',
+        name: 'Audio',
+        order: 1,
+      );
+      final file = DownloadedFile(
+        id: 'audio:https://example.com/audio.mp3',
+        url: 'https://example.com/audio.mp3?token=abc',
+        name: 'Audio',
+        type: 'audio',
+        localPath: '/tmp/audio.mp3',
+        downloadedAt: DateTime(2026, 1, 1),
+        localArtworkPath: '',
+      );
+      final filesByKey = <String, DownloadedFile>{
+        'audio:https://example.com/audio.mp3': file,
+      };
+
+      final match = downloadedFileForResource(resource, filesByKey);
+
+      expect(match, file);
+    });
+
+    test('falls back to raw url key when normalized key is missing', () {
+      const resource = LessonResource(
+        type: LessonResourceType.video,
+        url: 'https://example.com/video.mp4',
+        name: 'Video',
+        order: 1,
+      );
+      final file = DownloadedFile(
+        id: 'video:https://example.com/video.mp4',
+        url: resource.url,
+        name: 'Video',
+        type: 'video',
+        localPath: '/tmp/video.mp4',
+        downloadedAt: DateTime(2026, 1, 1),
+        localArtworkPath: '',
+      );
+      final filesByKey = <String, DownloadedFile>{
+        'video:${resource.url}': file,
+      };
+
+      final match = downloadedFileForResource(resource, filesByKey);
+
+      expect(match, file);
+    });
+
+    test('returns null when there is no match', () {
+      const resource = LessonResource(
+        type: LessonResourceType.document,
+        url: 'https://example.com/guide.pdf',
+        name: 'Guide',
+        order: 1,
+      );
+      final filesByKey = <String, DownloadedFile>{};
+
+      final match = downloadedFileForResource(resource, filesByKey);
+
+      expect(match, isNull);
     });
   });
   testWidgets('buildTopSnackBar aligns to the top of the screen', (tester) async {
