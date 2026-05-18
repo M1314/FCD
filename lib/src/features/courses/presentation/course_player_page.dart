@@ -101,8 +101,9 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _playbackController = context.read<AudioPlaybackController>();
-    _audioPlayer = _playbackController.player;
-    _activeMediaResourceKey = _playbackController.activeMediaResourceKey;
+    // Do not adopt whatever shared/global audio session is currently active.
+    // This page should only attach `_audioPlayer` and `_activeMediaResourceKey`
+    // when it starts or resumes playback for one of this course's resources.
     _downloadRepository = DownloadRepository(
       apiClient: context.read<SessionController>().apiClient,
     );
