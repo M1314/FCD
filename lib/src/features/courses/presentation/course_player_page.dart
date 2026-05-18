@@ -1500,16 +1500,35 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
       final artworkUrl = widget.course.iconUrl.isNotEmpty
           ? widget.course.iconUrl
           : widget.course.bannerUrl;
+      var audioSourceUri = Uri.parse(resource.url);
+      var audioSourceId = resource.url;
+      var notificationImageUri =
+          artworkUrl.isNotEmpty ? Uri.parse(artworkUrl) : null;
+      final downloadedFile = _downloadedFileForResource(resource);
+      if (downloadedFile != null && downloadedFile.localPath.isNotEmpty) {
+        final localFile = File(downloadedFile.localPath);
+        if (await localFile.exists()) {
+          if (!mounted || requestId != _resourcePreparationRequestId) {
+            _isAudioLoading = false;
+            return;
+          }
+          audioSourceUri = localFile.uri;
+          audioSourceId = audioSourceUri.toString();
+          if (downloadedFile.localArtworkPath.isNotEmpty) {
+            notificationImageUri = File(downloadedFile.localArtworkPath).uri;
+          }
+        }
+      }
       await audioPlayer.setAudioSource(
         AudioSource.uri(
-          Uri.parse(resource.url),
+          audioSourceUri,
           tag: MediaItem(
-            id: resource.url,
+            id: audioSourceId,
             title: resource.name.isEmpty
                 ? 'Audio de la lección'
                 : resource.name,
             artist: widget.course.name,
-            artUri: artworkUrl.isNotEmpty ? Uri.parse(artworkUrl) : null,
+            artUri: notificationImageUri,
           ),
         ),
       );
