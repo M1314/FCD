@@ -167,8 +167,7 @@ class _DownloadedVideoPageState extends State<DownloadedVideoPage> {
                 child: Align(
                   alignment: Alignment.topLeft,
                   child: IconButton(
-                    onPressed: () =>
-                        Navigator.of(context, rootNavigator: true).maybePop(),
+                    onPressed: () => _exitFullscreenAndPopPage(context),
                     icon: const Icon(Icons.arrow_back_rounded),
                     color: Colors.white,
                     tooltip: 'Volver',
@@ -180,6 +179,16 @@ class _DownloadedVideoPageState extends State<DownloadedVideoPage> {
         );
       },
     );
+  }
+
+  void _exitFullscreenAndPopPage(BuildContext fullscreenContext) {
+    Navigator.of(fullscreenContext, rootNavigator: true).maybePop();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) {
+        return;
+      }
+      Navigator.of(context, rootNavigator: true).maybePop();
+    });
   }
 
   @override
