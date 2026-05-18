@@ -26,10 +26,10 @@ class AudioPlaybackController extends ChangeNotifier {
   DownloadedFile? get downloadedFile => _downloadedFile;
 
   String? get activeMediaResourceKey {
-    if (_lessonIndex == null || _resourceIndex == null) {
+    if (_courseId == null || _lessonIndex == null || _resourceIndex == null) {
       return null;
     }
-    return '${_lessonIndex!}:${_resourceIndex!}';
+    return '${_courseId!}:${_lessonIndex!}:${_resourceIndex!}';
   }
 
   Future<void> stopAndClear() async {
