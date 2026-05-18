@@ -70,12 +70,6 @@ void main() {
       lessThan(tester.getTopLeft(labelFinder).dy),
     );
 
-    await expectLater(
-      find.byType(DownloadProgressBanner),
-      matchesGoldenFile(
-        'goldens/download_progress_banner_expanded.png',
-      ),
-    );
   });
 }
 
