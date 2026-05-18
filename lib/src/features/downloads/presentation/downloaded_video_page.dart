@@ -74,7 +74,7 @@ class _DownloadedVideoPageState extends State<DownloadedVideoPage> {
 
     final controller = BetterPlayerController(
       const BetterPlayerConfiguration(
-        autoPlay: false,
+        autoPlay: true,
         fit: BoxFit.contain,
         allowedScreenSleep: false,
         handleLifecycle: false,

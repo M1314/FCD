@@ -1,11 +1,15 @@
 import 'package:fcd_app/src/features/account/presentation/account_page.dart';
 import 'package:fcd_app/src/features/ai/presentation/ai_chat_page.dart';
 import 'package:fcd_app/src/features/catalog/presentation/catalog_page.dart';
+import 'package:fcd_app/src/features/courses/presentation/course_player_page.dart';
+import 'package:fcd_app/src/features/downloads/presentation/downloaded_audio_page.dart';
 import 'package:fcd_app/src/features/courses/presentation/courses_page.dart';
-import 'package:fcd_app/src/features/downloads/presentation/downloads_page.dart';
 import 'package:fcd_app/src/features/downloads/presentation/download_progress_banner.dart';
 import 'package:fcd_app/src/features/downloads/presentation/download_task_controller.dart';
+import 'package:fcd_app/src/features/downloads/presentation/downloads_page.dart';
 import 'package:fcd_app/src/features/favorites/presentation/favorites_page.dart';
+import 'package:fcd_app/src/state/audio_playback_controller.dart';
+import 'package:fcd_app/src/core/widgets/audio_mini_player.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -135,6 +139,7 @@ class _HomeShellState extends State<HomeShell> {
       );
     });
     final downloadController = context.watch<DownloadTaskController>();
+    final playbackController = context.watch<AudioPlaybackController>();
     final hasDownloads = downloadController.hasActiveDownloads;
     final isDownloadsExpanded = _downloadsExpanded && hasDownloads;
     if (_downloadsExpanded && !hasDownloads) {
@@ -199,6 +204,17 @@ class _HomeShellState extends State<HomeShell> {
       body: Stack(
         children: <Widget>[
           Positioned.fill(child: shellContent),
+          if (playbackController.player != null)
+            Positioned(
+              left: 12,
+              right: 12,
+              bottom: 8,
+              child: SafeArea(
+                top: false,
+                minimum: const EdgeInsets.only(bottom: 6),
+                child: _GlobalMiniPlayer(controller: playbackController),
+              ),
+            ),
           if (isDownloadsExpanded)
             Positioned.fill(
               child: GestureDetector(
@@ -313,5 +329,61 @@ class _HomeShellState extends State<HomeShell> {
     setState(() {
       _downloadsExpanded = false;
     });
+  }
+}
+
+class _GlobalMiniPlayer extends StatelessWidget {
+  const _GlobalMiniPlayer({required this.controller});
+
+  final AudioPlaybackController controller;
+
+  @override
+  Widget build(BuildContext context) {
+    final player = controller.player;
+    if (player == null) {
+      return const SizedBox.shrink();
+    }
+    final title = controller.resourceTitle ?? 'Mini reproductor';
+
+    return AudioMiniPlayer(
+      player: player,
+      title: title,
+      onTap: () => _openLesson(context),
+      onClose: controller.stopAndClear,
+      showCloseButton: true,
+    );
+  }
+
+  Future<void> _openLesson(BuildContext context) async {
+    final course = controller.course;
+    final lessons = controller.lessons;
+    final lessonIndex = controller.lessonIndex;
+    final resourceIndex = controller.resourceIndex;
+    final downloadedFile = controller.downloadedFile;
+    if (downloadedFile != null) {
+      await Navigator.of(context).push(
+        MaterialPageRoute<void>(
+          builder: (_) => DownloadedAudioPage(file: downloadedFile),
+        ),
+      );
+      return;
+    }
+    if (course == null || lessons == null) {
+      return;
+    }
+    if (lessonIndex == null || resourceIndex == null) {
+      return;
+    }
+
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => CoursePlayerPage(
+          course: course,
+          lessons: lessons,
+          initialLessonIndex: lessonIndex,
+          initialResourceIndex: resourceIndex,
+        ),
+      ),
+    );
   }
 }

@@ -21,7 +21,7 @@ class ScrollingText extends StatefulWidget {
 }
 
 class _ScrollingTextState extends State<ScrollingText>
-    with SingleTickerProviderStateMixin {
+    with TickerProviderStateMixin {
   final ScrollController _scrollController = ScrollController();
   AnimationController? _animationController;
   double _lastMaxScrollExtent = 0;
@@ -34,9 +34,12 @@ class _ScrollingTextState extends State<ScrollingText>
   }
 
   void _stopScrolling() {
-    _animationController?.stop();
-    _animationController?.dispose();
-    _animationController = null;
+    final controller = _animationController;
+    if (controller != null) {
+      _animationController = null;
+      controller.stop();
+      controller.dispose();
+    }
     if (_scrollController.hasClients) {
       _scrollController.jumpTo(0);
     }
@@ -116,12 +119,12 @@ class _ScrollingTextState extends State<ScrollingText>
           );
         }
 
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (!mounted || !_scrollController.hasClients) {
-            return;
-          }
-          _startScrolling(_scrollController.position.maxScrollExtent);
-        });
+         WidgetsBinding.instance.addPostFrameCallback((_) {
+           if (!mounted || !_scrollController.hasClients) {
+             return;
+           }
+           _startScrolling(_scrollController.position.maxScrollExtent);
+         });
 
         return ClipRect(
           child: SingleChildScrollView(
