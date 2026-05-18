@@ -874,7 +874,9 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
     if (player == null) {
       return const SizedBox.shrink();
     }
-    final title = _playbackController.resourceTitle ?? 'Mini reproductor';
+    final title = _activeMediaResource?.name ??
+        _playbackController.resourceTitle ??
+        'Mini reproductor';
 
     return Positioned(
       left: 12,
