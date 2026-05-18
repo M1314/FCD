@@ -61,6 +61,8 @@ class _DownloadedVideoPageState extends State<DownloadedVideoPage> {
       return;
     }
     _didApplySystemUiMode = true;
+    // iPad should stay edge-to-edge; immersive mode shifts safe-area insets
+    // when the fullscreen route opens/closes and causes a visible jump.
     if (!_isTablet) {
       SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
     }
@@ -104,6 +106,8 @@ class _DownloadedVideoPageState extends State<DownloadedVideoPage> {
         allowedScreenSleep: false,
         handleLifecycle: false,
         autoDispose: false,
+        // Keep downloaded videos opening fullscreen on phones, but not on iPad
+        // where entering fullscreen should not toggle immersive system UI.
         fullScreenByDefault: !_isTablet,
         eventListener: _handleVideoEvents,
         routePageBuilder: _buildFullscreenRoute,
@@ -140,6 +144,8 @@ class _DownloadedVideoPageState extends State<DownloadedVideoPage> {
   }
 
   void _handleVideoEvents(BetterPlayerEvent event) {
+    // Ignore fullscreen orientation/system-UI transitions on iPad to keep
+    // layout insets stable while BetterPlayer opens and closes fullscreen.
     if (_isTablet) {
       return;
     }
