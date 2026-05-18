@@ -174,4 +174,33 @@ void main() {
     expect(find.text('Archivo descargado.'), findsOneWidget);
     expect(find.byType(SafeArea), findsOneWidget);
   });
+
+  testWidgets('buildTopSnackBar allows swipe-up dismiss', (tester) async {
+    var dismissed = false;
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Builder(
+          builder: (context) => buildTopSnackBar(
+            context,
+            'Archivo descargado.',
+            onDismissed: () => dismissed = true,
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final dismissible = tester.widget<Dismissible>(find.byType(Dismissible));
+    expect(dismissible.direction, DismissDirection.up);
+
+    await tester.fling(
+      find.byType(Dismissible),
+      const Offset(0, -300),
+      1200,
+    );
+    await tester.pumpAndSettle();
+
+    expect(dismissed, isTrue);
+  });
 }

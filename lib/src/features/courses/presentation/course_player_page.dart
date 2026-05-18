@@ -68,9 +68,14 @@ DownloadedFile? downloadedFileForResource(
       filesByKey['${resource.type.name}:${resource.url}'];
 }
 
-Widget buildTopSnackBar(BuildContext context, String message) {
+Widget buildTopSnackBar(
+  BuildContext context,
+  String message, {
+  VoidCallback? onTap,
+  VoidCallback? onDismissed,
+}) {
   final colorScheme = Theme.of(context).colorScheme;
-  return SafeArea(
+  final content = SafeArea(
     child: Align(
       alignment: Alignment.topCenter,
       child: Padding(
@@ -93,6 +98,23 @@ Widget buildTopSnackBar(BuildContext context, String message) {
         ),
       ),
     ),
+  );
+  final tappableContent = onTap == null
+      ? content
+      : GestureDetector(
+          onTap: onTap,
+          behavior: HitTestBehavior.translucent,
+          child: content,
+        );
+  if (onDismissed == null) {
+    return tappableContent;
+  }
+
+  return Dismissible(
+    key: const ValueKey('download-success-snackbar'),
+    direction: DismissDirection.up,
+    onDismissed: (_) => onDismissed(),
+    child: tappableContent,
   );
 }
 
@@ -1216,9 +1238,11 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
       return;
     }
     _downloadSnackBarEntry = OverlayEntry(
-      builder: (context) => GestureDetector(
+      builder: (context) => buildTopSnackBar(
+        context,
+        message,
         onTap: _dismissDownloadSnackBar,
-        child: buildTopSnackBar(context, message),
+        onDismissed: _dismissDownloadSnackBar,
       ),
     );
     overlay.insert(_downloadSnackBarEntry!);
