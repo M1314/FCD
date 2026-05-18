@@ -55,4 +55,34 @@ void main() {
       );
     });
   });
+
+  group('resourceDownloadKeyFor', () {
+    test('strips query parameters and fragments from URLs', () {
+      const resource = LessonResource(
+        type: LessonResourceType.video,
+        url: 'https://example.com/video.mp4?token=123#section',
+        name: 'Video',
+        order: 1,
+      );
+
+      expect(
+        resourceDownloadKeyFor(resource),
+        'video:https://example.com/video.mp4',
+      );
+    });
+
+    test('keeps URLs without query parameters intact', () {
+      const resource = LessonResource(
+        type: LessonResourceType.video,
+        url: 'https://example.com/video.mp4',
+        name: 'Video',
+        order: 1,
+      );
+
+      expect(
+        resourceDownloadKeyFor(resource),
+        'video:https://example.com/video.mp4',
+      );
+    });
+  });
 }
