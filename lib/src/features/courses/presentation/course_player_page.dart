@@ -1396,7 +1396,7 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
     );
     int attempts = 0;
     const maxAttempts = 120;
-    const fallbackAttempts = 35; // 3.5 seconds
+    const fallbackAttempts = 50; // 5 seconds
     Timer.periodic(const Duration(milliseconds: 100), (timer) {
       if (!mounted ||
           requestId != _resourcePreparationRequestId ||
