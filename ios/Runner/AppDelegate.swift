@@ -10,29 +10,34 @@ import UIKit
     _ application: UIApplication,
     didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
   ) -> Bool {
-    if let registrar = self.registrar(forPlugin: "OrientationLockPlugin") {
-      let channel = FlutterMethodChannel(
-        name: "orientation_lock",
-        binaryMessenger: registrar.messenger()
-      )
-      channel.setMethodCallHandler { call, result in
-        if call.method == "setOrientationMask" {
-          if let args = call.arguments as? [String: Any],
-             let mask = args["mask"] as? String {
-            AppDelegate.updateOrientationMask(mask)
-            result(nil as Any?)
-          } else {
-            result(
-              FlutterError(
-                code: "bad_args",
-                message: "Missing orientation mask",
-                details: nil
-              )
-            )
-          }
+    guard let registrar = self.registrar(forPlugin: "OrientationLockPlugin") else {
+      let message = "Failed to register orientation_lock channel: registrar(forPlugin:) returned nil for OrientationLockPlugin."
+      NSLog("%@", message)
+      assertionFailure(message)
+      return super.application(application, didFinishLaunchingWithOptions: launchOptions)
+    }
+
+    let channel = FlutterMethodChannel(
+      name: "orientation_lock",
+      binaryMessenger: registrar.messenger()
+    )
+    channel.setMethodCallHandler { call, result in
+      if call.method == "setOrientationMask" {
+        if let args = call.arguments as? [String: Any],
+           let mask = args["mask"] as? String {
+          AppDelegate.updateOrientationMask(mask)
+          result(nil as Any?)
         } else {
-          result(FlutterMethodNotImplemented)
+          result(
+            FlutterError(
+              code: "bad_args",
+              message: "Missing orientation mask",
+              details: nil
+            )
+          )
         }
+      } else {
+        result(FlutterMethodNotImplemented)
       }
     }
 
