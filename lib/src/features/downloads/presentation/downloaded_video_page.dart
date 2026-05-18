@@ -29,6 +29,8 @@ class _DownloadedVideoPageState extends State<DownloadedVideoPage> {
     if (mediaQuery == null) {
       return;
     }
+    // Tablet classification can change on iPad when the app window is resized,
+    // so keep system UI mode aligned with the current layout each rebuild.
     _isTablet = OrientationPolicy.isTabletForSize(mediaQuery.size);
     _applySystemUiModeForCurrentLayout();
     if (_controller == null && !_isPreparingController) {
