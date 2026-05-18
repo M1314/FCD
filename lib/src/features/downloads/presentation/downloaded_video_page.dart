@@ -21,7 +21,6 @@ class _DownloadedVideoPageState extends State<DownloadedVideoPage> {
   String? _error;
   bool _isTablet = false;
   bool _isPreparingController = false;
-  bool _didApplySystemUiMode = false;
 
   @override
   void didChangeDependencies() {
@@ -31,7 +30,7 @@ class _DownloadedVideoPageState extends State<DownloadedVideoPage> {
       return;
     }
     _isTablet = OrientationPolicy.isTabletForSize(mediaQuery.size);
-    _applySystemUiModeIfNeeded();
+    _applySystemUiModeForCurrentLayout();
     if (_controller == null && !_isPreparingController) {
       _prepareController();
     }
@@ -51,16 +50,15 @@ class _DownloadedVideoPageState extends State<DownloadedVideoPage> {
     super.dispose();
   }
 
-  void _applySystemUiModeIfNeeded() {
-    if (_didApplySystemUiMode) {
-      return;
-    }
-    _didApplySystemUiMode = true;
+  void _applySystemUiModeForCurrentLayout() {
     // iPad should stay edge-to-edge; immersive mode shifts safe-area insets
     // when the fullscreen route opens/closes and causes a visible jump.
-    if (!_isTablet) {
-      SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
-    }
+    //
+    // Re-apply when MediaQuery changes so resizable tablet windows that cross
+    // the tablet breakpoint keep the same intended phone/tablet behavior.
+    SystemChrome.setEnabledSystemUIMode(
+      _isTablet ? SystemUiMode.edgeToEdge : SystemUiMode.immersiveSticky,
+    );
   }
 
   Future<void> _prepareController() async {
