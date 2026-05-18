@@ -20,7 +20,6 @@ class _DownloadedVideoPageState extends State<DownloadedVideoPage> {
   BetterPlayerController? _controller;
   String? _error;
   bool _isTablet = false;
-  Size? _lastSize;
   bool _isPreparingController = false;
 
   @override
@@ -37,7 +36,6 @@ class _DownloadedVideoPageState extends State<DownloadedVideoPage> {
       return;
     }
     _isTablet = OrientationPolicy.isTabletForSize(mediaQuery.size);
-    _lastSize = mediaQuery.size;
     if (_controller == null && !_isPreparingController) {
       _prepareController();
     }

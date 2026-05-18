@@ -1119,6 +1119,9 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
         return;
       case DownloadTaskStatus.alreadyDownloaded:
         await _refreshDownloadedResources();
+        if (!mounted) {
+          return;
+        }
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Este recurso ya fue descargado previamente.'),
