@@ -44,7 +44,10 @@ class _DownloadedVideoPageState extends State<DownloadedVideoPage> {
   @override
   void dispose() {
     OrientationPolicy.setVideoFullscreenActive(false);
-    OrientationPolicy.applyDefault(isTablet: _isTablet);
+    OrientationPolicy.applyDefault(
+      isTablet: _isTablet,
+      ignoreFullscreenFlag: true,
+    );
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     _controller?.dispose(forceDispose: true);
     super.dispose();

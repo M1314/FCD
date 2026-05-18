@@ -173,8 +173,11 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
   @override
   void dispose() {
     if (!_isTablet) {
-      OrientationPolicy.isVideoFullscreenActive = false;
-      OrientationPolicy.applyDefault(isTablet: _isTablet);
+      OrientationPolicy.setVideoFullscreenActive(false);
+      OrientationPolicy.applyDefault(
+        isTablet: _isTablet,
+        ignoreFullscreenFlag: true,
+      );
     }
     routeObserver.unsubscribe(this);
     WidgetsBinding.instance.removeObserver(this);

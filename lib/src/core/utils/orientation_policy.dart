@@ -22,8 +22,11 @@ class OrientationPolicy {
     _isVideoFullscreenActive = isActive;
   }
 
-  static Future<void> applyDefault({required bool isTablet}) {
-    if (!isTablet && _isVideoFullscreenActive) {
+  static Future<void> applyDefault({
+    required bool isTablet,
+    bool ignoreFullscreenFlag = false,
+  }) {
+    if (!ignoreFullscreenFlag && !isTablet && _isVideoFullscreenActive) {
       return Future<void>.value();
     }
     if (defaultTargetPlatform == TargetPlatform.iOS) {
