@@ -86,7 +86,6 @@ void main() {
       );
     });
   });
-
   testWidgets('buildTopSnackBar aligns to the top of the screen', (tester) async {
     await tester.binding.setSurfaceSize(const Size(360, 640));
     addTearDown(() => tester.binding.setSurfaceSize(null));
