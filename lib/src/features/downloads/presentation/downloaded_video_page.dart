@@ -93,6 +93,7 @@ class _DownloadedVideoPageState extends State<DownloadedVideoPage> {
         autoDispose: false,
         fullScreenByDefault: !_isTablet,
         eventListener: _handleVideoEvents,
+        routePageBuilder: _buildFullscreenRoute,
         deviceOrientationsOnFullScreen: _isTablet
             ? DeviceOrientation.values
             : <DeviceOrientation>[
@@ -141,6 +142,44 @@ class _DownloadedVideoPageState extends State<DownloadedVideoPage> {
       default:
         break;
     }
+  }
+
+  Widget _buildFullscreenRoute(
+    BuildContext context,
+    Animation<double> animation,
+    Animation<double> secondaryAnimation,
+    BetterPlayerControllerProvider controllerProvider,
+  ) {
+    return AnimatedBuilder(
+      animation: animation,
+      builder: (context, child) {
+        return Scaffold(
+          resizeToAvoidBottomInset: false,
+          body: Stack(
+            children: <Widget>[
+              Positioned.fill(
+                child: Container(
+                  color: Colors.black,
+                  child: controllerProvider,
+                ),
+              ),
+              SafeArea(
+                child: Align(
+                  alignment: Alignment.topLeft,
+                  child: IconButton(
+                    onPressed: () =>
+                        Navigator.of(context, rootNavigator: true).maybePop(),
+                    icon: const Icon(Icons.arrow_back_rounded),
+                    color: Colors.white,
+                    tooltip: 'Volver',
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
   }
 
   @override
