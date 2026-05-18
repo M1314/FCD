@@ -68,6 +68,18 @@ DownloadedFile? downloadedFileForResource(
       filesByKey['${resource.type.name}:${resource.url}'];
 }
 
+@visibleForTesting
+double coursePlayerScrollBottomPadding({
+  required bool showMiniPlayer,
+  required bool hasDownloads,
+}) {
+  const basePadding = 16.0;
+  const miniPlayerPadding = 86.0;
+  const downloadsPadding = 86.0;
+  return (showMiniPlayer ? miniPlayerPadding : basePadding) +
+      (hasDownloads ? downloadsPadding : 0.0);
+}
+
 Widget buildTopSnackBar(BuildContext context, String message) {
   final colorScheme = Theme.of(context).colorScheme;
   return SafeArea(
@@ -463,6 +475,12 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
       );
     }
 
+    final hasDownloads =
+        context.watch<DownloadTaskController>().hasActiveDownloads;
+    final scrollBottomPadding = coursePlayerScrollBottomPadding(
+      showMiniPlayer: _showMiniAudioPlayer,
+      hasDownloads: hasDownloads,
+    );
     final content = Column(
       children: <Widget>[
         if (_showSessionExpiredBanner) _buildSessionExpiredBanner(context),
@@ -470,7 +488,7 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
         _buildProgressBanner(context),
         Expanded(
           child: SingleChildScrollView(
-            padding: EdgeInsets.only(bottom: _showMiniAudioPlayer ? 86 : 16),
+            padding: EdgeInsets.only(bottom: scrollBottomPadding),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: <Widget>[
