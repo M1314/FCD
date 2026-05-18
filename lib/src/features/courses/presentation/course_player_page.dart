@@ -56,6 +56,34 @@ String resourceDownloadKeyFor(LessonResource resource) {
   return '${resource.type.name}:${normalizeResourceUrl(resource.url)}';
 }
 
+Widget buildTopSnackBar(BuildContext context, String message) {
+  final colorScheme = Theme.of(context).colorScheme;
+  return SafeArea(
+    child: Align(
+      alignment: Alignment.topCenter,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        child: Material(
+          color: colorScheme.inverseSurface,
+          elevation: 6,
+          borderRadius: BorderRadius.circular(12),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            child: Text(
+              message,
+              style: Theme.of(
+                context,
+              ).textTheme.bodyMedium?.copyWith(
+                color: colorScheme.onInverseSurface,
+              ),
+            ),
+          ),
+        ),
+      ),
+    ),
+  );
+}
+
 class CoursePlayerPage extends StatefulWidget {
   const CoursePlayerPage({
     super.key,
@@ -107,6 +135,8 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
   Set<String> _downloadedResourceKeys = <String>{};
   Map<String, DownloadedFile> _downloadedResourceFiles =
       <String, DownloadedFile>{};
+  OverlayEntry? _downloadSnackBarEntry;
+  Timer? _downloadSnackBarTimer;
   bool _reuseSharedAudio = false;
   bool _resumeSharedAudio = false;
 
@@ -157,6 +187,7 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
     routeObserver.unsubscribe(this);
     WidgetsBinding.instance.removeObserver(this);
     _saveProgressOnDispose();
+    _dismissDownloadSnackBar();
     _videoController?.dispose(forceDispose: true);
     if (_audioPlayer != null && _audioPlayer != _playbackController.player) {
       _audioPlayer?.dispose();
@@ -1115,37 +1146,56 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
         await _refreshDownloadedResources();
         final file = result.file;
         if (file == null) {
-          ScaffoldMessenger.of(
-            context,
-          ).showSnackBar(const SnackBar(content: Text('Archivo descargado.')));
+          _showTopDownloadSnackBar('Archivo descargado.');
           return;
         }
         if (resource.isAudio || resource.isVideo) {
           if (!mounted) {
             return;
           }
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Archivo descargado. Disponible en Descargas.'),
-            ),
-          );
+          _showTopDownloadSnackBar('Archivo descargado. Disponible en Descargas.');
           return;
         }
         final openResult = await OpenFilex.open(file.path);
         if (!mounted) {
           return;
         }
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              openResult.type == ResultType.done
-                  ? 'Archivo descargado y abierto.'
-                  : 'Archivo descargado: ${file.path}',
-            ),
-          ),
+        _showTopDownloadSnackBar(
+          openResult.type == ResultType.done
+              ? 'Archivo descargado y abierto.'
+              : 'Archivo descargado: ${file.path}',
         );
         return;
     }
+  }
+
+  void _dismissDownloadSnackBar() {
+    _downloadSnackBarTimer?.cancel();
+    _downloadSnackBarTimer = null;
+    _downloadSnackBarEntry?.remove();
+    _downloadSnackBarEntry = null;
+  }
+
+  void _showTopDownloadSnackBar(String message) {
+    if (!mounted) {
+      return;
+    }
+    _dismissDownloadSnackBar();
+    final overlay = Overlay.maybeOf(context);
+    if (overlay == null) {
+      return;
+    }
+    _downloadSnackBarEntry = OverlayEntry(
+      builder: (context) => GestureDetector(
+        onTap: _dismissDownloadSnackBar,
+        child: buildTopSnackBar(context, message),
+      ),
+    );
+    overlay.insert(_downloadSnackBarEntry!);
+    _downloadSnackBarTimer = Timer(
+      const Duration(seconds: 4),
+      _dismissDownloadSnackBar,
+    );
   }
 
   bool _isResourceDownloaded(LessonResource resource) {
