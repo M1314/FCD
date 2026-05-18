@@ -1330,6 +1330,23 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
     } catch (_) {}
   }
 
+  Future<void> _persistSharedPlaybackProgress({
+    required int courseId,
+    required int lessonIndex,
+    required int resourceIndex,
+    required int mediaPositionMs,
+  }) async {
+    try {
+      _savedMediaPositionMs = mediaPositionMs;
+      await _progressStorage.saveProgress(
+        courseId: courseId,
+        lessonIndex: lessonIndex,
+        resourceIndex: resourceIndex,
+        mediaPositionMs: mediaPositionMs,
+      );
+    } catch (_) {}
+  }
+
   void _saveProgressOnDispose() {
     var mediaPositionMs = _savedMediaPositionMs;
     if (_audioPlayer != null) {
@@ -1537,6 +1554,7 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
         courseTitle: widget.course.name,
         course: widget.course,
         lessons: widget.lessons,
+        onPersistCourseProgress: _persistSharedPlaybackProgress,
       );
       if (_savedMediaPositionMs > 0) {
         try {

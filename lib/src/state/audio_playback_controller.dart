@@ -1,10 +1,25 @@
+import 'dart:async';
+
 import 'package:fcd_app/src/features/courses/data/models/course.dart';
 import 'package:fcd_app/src/features/courses/data/models/course_lesson.dart';
 import 'package:fcd_app/src/features/downloads/data/models/downloaded_file.dart';
-import 'package:flutter/foundation.dart';
+import 'package:flutter/widgets.dart';
 import 'package:just_audio/just_audio.dart';
 
-class AudioPlaybackController extends ChangeNotifier {
+typedef PersistCourseProgressCallback =
+    Future<void> Function({
+      required int courseId,
+      required int lessonIndex,
+      required int resourceIndex,
+      required int mediaPositionMs,
+    });
+
+class AudioPlaybackController extends ChangeNotifier
+    with WidgetsBindingObserver {
+  AudioPlaybackController() {
+    WidgetsBinding.instance.addObserver(this);
+  }
+
   AudioPlayer? _player;
   int? _courseId;
   int? _lessonIndex;
@@ -14,6 +29,7 @@ class AudioPlaybackController extends ChangeNotifier {
   Course? _course;
   List<CourseLesson>? _lessons;
   DownloadedFile? _downloadedFile;
+  PersistCourseProgressCallback? _persistCourseProgress;
 
   AudioPlayer? get player => _player;
   int? get courseId => _courseId;
@@ -34,6 +50,7 @@ class AudioPlaybackController extends ChangeNotifier {
 
   Future<void> stopAndClear() async {
     final player = _player;
+    await _persistCurrentCourseProgress();
     if (player != null) {
       await player.stop();
     }
@@ -50,6 +67,7 @@ class AudioPlaybackController extends ChangeNotifier {
     _course = null;
     _lessons = null;
     _downloadedFile = null;
+    _persistCourseProgress = null;
     notifyListeners();
   }
 
@@ -62,6 +80,7 @@ class AudioPlaybackController extends ChangeNotifier {
     String? courseTitle,
     Course? course,
     List<CourseLesson>? lessons,
+    PersistCourseProgressCallback? onPersistCourseProgress,
   }) {
     _player = player;
     _courseId = courseId;
@@ -72,6 +91,7 @@ class AudioPlaybackController extends ChangeNotifier {
     _course = course;
     _lessons = lessons;
     _downloadedFile = null;
+    _persistCourseProgress = onPersistCourseProgress;
     notifyListeners();
   }
 
@@ -89,6 +109,44 @@ class AudioPlaybackController extends ChangeNotifier {
     _course = null;
     _lessons = null;
     _downloadedFile = file;
+    _persistCourseProgress = null;
     notifyListeners();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.inactive ||
+        state == AppLifecycleState.detached) {
+      unawaited(_persistCurrentCourseProgress());
+    }
+  }
+
+  Future<void> _persistCurrentCourseProgress() async {
+    final player = _player;
+    final callback = _persistCourseProgress;
+    final courseId = _courseId;
+    final lessonIndex = _lessonIndex;
+    final resourceIndex = _resourceIndex;
+    if (player == null ||
+        callback == null ||
+        courseId == null ||
+        lessonIndex == null ||
+        resourceIndex == null) {
+      return;
+    }
+
+    await callback(
+      courseId: courseId,
+      lessonIndex: lessonIndex,
+      resourceIndex: resourceIndex,
+      mediaPositionMs: player.position.inMilliseconds,
+    );
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
   }
 }
