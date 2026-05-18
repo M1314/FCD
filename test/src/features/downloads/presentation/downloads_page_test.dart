@@ -2,6 +2,7 @@ import 'package:fcd_app/src/features/downloads/data/models/downloaded_file.dart'
 import 'package:fcd_app/src/features/downloads/data/repositories/download_repository.dart';
 import 'package:fcd_app/src/features/downloads/presentation/download_task_controller.dart';
 import 'package:fcd_app/src/features/downloads/presentation/downloads_page.dart';
+import 'package:fcd_app/src/state/audio_playback_controller.dart';
 import 'package:fcd_app/src/state/session_controller.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -67,11 +68,16 @@ void main() {
       final downloadController = DownloadTaskController(
         downloadRepository: repository,
       );
+      final playbackController =
+          _TestAudioPlaybackController(hasMiniPlayer: false);
 
       await tester.pumpWidget(
         MultiProvider(
           providers: [
             ChangeNotifierProvider<SessionController>.value(value: session),
+            ChangeNotifierProvider<AudioPlaybackController>.value(
+              value: playbackController,
+            ),
             ChangeNotifierProvider<DownloadTaskController>.value(
               value: downloadController,
             ),
@@ -93,14 +99,67 @@ void main() {
       expect(find.byType(RefreshIndicator), findsOneWidget);
       expect(find.text('Aún no tienes descargas'), findsOneWidget);
     });
+
+    testWidgets('adds extra bottom padding when mini player is visible',
+        (tester) async {
+      final session = SessionController.forTesting(apiClient: FakeApiClient());
+      final repository = _FakeDownloadRepository(
+        files: <DownloadedFile>[buildFile()],
+      );
+      final downloadController = DownloadTaskController(
+        downloadRepository: repository,
+      );
+      final playbackController =
+          _TestAudioPlaybackController(hasMiniPlayer: true);
+
+      await tester.pumpWidget(
+        MultiProvider(
+          providers: [
+            ChangeNotifierProvider<SessionController>.value(value: session),
+            ChangeNotifierProvider<AudioPlaybackController>.value(
+              value: playbackController,
+            ),
+            ChangeNotifierProvider<DownloadTaskController>.value(
+              value: downloadController,
+            ),
+          ],
+          child: MaterialApp(
+            home: Scaffold(
+              body: DownloadsPage(downloadRepository: repository),
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+      await tester.runAsync(() async {
+        await Future<void>.delayed(const Duration(milliseconds: 200));
+      });
+      await tester.pump();
+
+      final listView = tester.widget<ListView>(find.byType(ListView));
+      expect(
+        listView.padding,
+        const EdgeInsets.fromLTRB(14, 10, 14, 86),
+      );
+    });
   });
 }
 
 class _FakeDownloadRepository extends DownloadRepository {
-  _FakeDownloadRepository() : super(apiClient: FakeApiClient());
+  _FakeDownloadRepository({this.files = const []})
+      : super(apiClient: FakeApiClient());
+
+  final List<DownloadedFile> files;
 
   @override
   Future<DownloadCleanupResult> removeMissingDownloads() async {
-    return DownloadCleanupResult(removed: 0, files: <DownloadedFile>[]);
+    return DownloadCleanupResult(removed: 0, files: files);
   }
+}
+
+class _TestAudioPlaybackController extends AudioPlaybackController {
+  _TestAudioPlaybackController({required this.hasMiniPlayer});
+
+  @override
+  final bool hasMiniPlayer;
 }

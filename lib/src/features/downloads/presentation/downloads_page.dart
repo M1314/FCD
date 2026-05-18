@@ -7,6 +7,7 @@ import 'package:fcd_app/src/features/downloads/presentation/downloaded_audio_pag
 import 'package:fcd_app/src/features/downloads/presentation/downloaded_video_page.dart';
 import 'package:fcd_app/src/features/downloads/presentation/download_task_controller.dart';
 import 'package:fcd_app/src/state/session_controller.dart';
+import 'package:fcd_app/src/state/audio_playback_controller.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:open_filex/open_filex.dart';
@@ -79,6 +80,10 @@ class _DownloadsPageState extends State<DownloadsPage> {
 
   @override
   Widget build(BuildContext context) {
+    final showMiniPlayer = context.select(
+      (AudioPlaybackController controller) => controller.hasMiniPlayer,
+    );
+    final bottomPadding = showMiniPlayer ? 86.0 : 20.0;
     if (_loading) {
       return const Center(child: CircularProgressIndicator());
     }
@@ -90,6 +95,7 @@ class _DownloadsPageState extends State<DownloadsPage> {
           builder: (context, constraints) {
             return SingleChildScrollView(
               physics: const AlwaysScrollableScrollPhysics(),
+              padding: EdgeInsets.only(bottom: bottomPadding),
               child: ConstrainedBox(
                 constraints: BoxConstraints(minHeight: constraints.maxHeight),
                 child: _DownloadsEmpty(onGoToCourses: widget.onGoToCourses),
@@ -171,7 +177,7 @@ class _DownloadsPageState extends State<DownloadsPage> {
             onRefresh: _load,
             child: ListView.builder(
               physics: const AlwaysScrollableScrollPhysics(),
-              padding: const EdgeInsets.fromLTRB(14, 10, 14, 20),
+              padding: EdgeInsets.fromLTRB(14, 10, 14, bottomPadding),
               itemBuilder: (context, index) {
                 final item = items[index];
                 if (item is _DownloadHeadingItem) {

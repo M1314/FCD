@@ -32,6 +32,7 @@ class AudioPlaybackController extends ChangeNotifier
   PersistCourseProgressCallback? _persistCourseProgress;
 
   AudioPlayer? get player => _player;
+  bool get hasMiniPlayer => _player != null;
   int? get courseId => _courseId;
   int? get lessonIndex => _lessonIndex;
   int? get resourceIndex => _resourceIndex;
