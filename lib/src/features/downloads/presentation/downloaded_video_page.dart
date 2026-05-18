@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:better_player_plus/better_player_plus.dart';
+import 'package:fcd_app/src/core/utils/orientation_policy.dart';
 import 'package:fcd_app/src/core/theme/app_theme.dart';
 import 'package:fcd_app/src/features/downloads/data/models/downloaded_file.dart';
 import 'package:flutter/material.dart';
@@ -18,32 +19,42 @@ class DownloadedVideoPage extends StatefulWidget {
 class _DownloadedVideoPageState extends State<DownloadedVideoPage> {
   BetterPlayerController? _controller;
   String? _error;
+  bool _isTablet = false;
+  bool _isPreparingController = false;
 
   @override
   void initState() {
     super.initState();
-    SystemChrome.setPreferredOrientations(<DeviceOrientation>[
-      DeviceOrientation.landscapeLeft,
-      DeviceOrientation.landscapeRight,
-    ]);
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
-    _prepareController();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final mediaQuery = MediaQuery.maybeOf(context);
+    if (mediaQuery == null) {
+      return;
+    }
+    _isTablet = OrientationPolicy.isTabletForSize(mediaQuery.size);
+    if (_controller == null && !_isPreparingController) {
+      _prepareController();
+    }
   }
 
   @override
   void dispose() {
-    SystemChrome.setPreferredOrientations(<DeviceOrientation>[
-      DeviceOrientation.portraitUp,
-      DeviceOrientation.portraitDown,
-      DeviceOrientation.landscapeLeft,
-      DeviceOrientation.landscapeRight,
-    ]);
+    OrientationPolicy.setVideoFullscreenActive(false);
+    OrientationPolicy.applyDefault(
+      isTablet: _isTablet,
+      ignoreFullscreenFlag: true,
+    );
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     _controller?.dispose(forceDispose: true);
     super.dispose();
   }
 
   Future<void> _prepareController() async {
+    _isPreparingController = true;
     final localFile = File(widget.file.localPath);
     if (!await localFile.exists()) {
       if (mounted) {
@@ -51,6 +62,7 @@ class _DownloadedVideoPageState extends State<DownloadedVideoPage> {
           _error = 'El archivo ya no existe en el almacenamiento local.';
         });
       }
+      _isPreparingController = false;
       return;
     }
 
@@ -73,12 +85,24 @@ class _DownloadedVideoPageState extends State<DownloadedVideoPage> {
     );
 
     final controller = BetterPlayerController(
-      const BetterPlayerConfiguration(
+      BetterPlayerConfiguration(
         autoPlay: true,
         fit: BoxFit.contain,
         allowedScreenSleep: false,
         handleLifecycle: false,
         autoDispose: false,
+        fullScreenByDefault: !_isTablet,
+        eventListener: _handleVideoEvents,
+        routePageBuilder: _buildFullscreenRoute,
+        deviceOrientationsOnFullScreen: _isTablet
+            ? DeviceOrientation.values
+            : <DeviceOrientation>[
+                DeviceOrientation.landscapeLeft,
+                DeviceOrientation.landscapeRight,
+              ],
+        deviceOrientationsAfterFullScreen: _isTablet
+            ? DeviceOrientation.values
+            : <DeviceOrientation>[DeviceOrientation.portraitUp],
         controlsConfiguration: BetterPlayerControlsConfiguration(
           enableSkips: true,
           enablePlaybackSpeed: true,
@@ -91,14 +115,80 @@ class _DownloadedVideoPageState extends State<DownloadedVideoPage> {
       ),
       betterPlayerDataSource: dataSource,
     );
-
     if (mounted) {
       setState(() {
         _controller = controller;
       });
+      _isPreparingController = false;
     } else {
       controller.dispose(forceDispose: true);
+      _isPreparingController = false;
     }
+  }
+
+  void _handleVideoEvents(BetterPlayerEvent event) {
+    if (_isTablet) {
+      return;
+    }
+    switch (event.betterPlayerEventType) {
+      case BetterPlayerEventType.openFullscreen:
+        OrientationPolicy.setVideoFullscreenActive(true);
+        OrientationPolicy.applyVideoFullscreen(isTablet: _isTablet);
+        break;
+      case BetterPlayerEventType.hideFullscreen:
+        OrientationPolicy.setVideoFullscreenActive(false);
+        OrientationPolicy.applyDefault(isTablet: _isTablet);
+        break;
+      default:
+        break;
+    }
+  }
+
+  Widget _buildFullscreenRoute(
+    BuildContext context,
+    Animation<double> animation,
+    Animation<double> secondaryAnimation,
+    BetterPlayerControllerProvider controllerProvider,
+  ) {
+    return AnimatedBuilder(
+      animation: animation,
+      builder: (context, child) {
+        return Scaffold(
+          resizeToAvoidBottomInset: false,
+          body: Stack(
+            children: <Widget>[
+              Positioned.fill(
+                child: Container(
+                  color: Colors.black,
+                  child: controllerProvider,
+                ),
+              ),
+              SafeArea(
+                child: Align(
+                  alignment: Alignment.topLeft,
+                  child: IconButton(
+                    onPressed: () => _exitFullscreenAndPopPage(context),
+                    icon: const Icon(Icons.arrow_back_rounded),
+                    color: Colors.white,
+                    tooltip: 'Volver',
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  void _exitFullscreenAndPopPage(BuildContext fullscreenContext) {
+    Navigator.of(fullscreenContext, rootNavigator: true).maybePop();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) {
+        return;
+      }
+      Navigator.of(context, rootNavigator: true).maybePop();
+    });
   }
 
   @override

@@ -1,4 +1,5 @@
 import 'package:fcd_app/src/core/theme/app_theme.dart';
+import 'package:fcd_app/src/core/utils/orientation_policy.dart';
 import 'package:fcd_app/src/core/navigation/route_observer.dart';
 import 'package:fcd_app/src/features/auth/presentation/login_page.dart';
 import 'package:fcd_app/src/features/home/presentation/home_shell.dart';
@@ -17,7 +18,7 @@ class FcdApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light(),
       navigatorObservers: <NavigatorObserver>[routeObserver],
-      home: const _BootstrapGate(),
+      home: const OrientationPolicyGate(child: _BootstrapGate()),
     );
   }
 }
