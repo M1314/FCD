@@ -60,7 +60,7 @@ class DownloadedFile {
       lessonName: json['lessonName']?.toString() ?? '',
       courseBannerUrl: json['courseBannerUrl']?.toString() ?? '',
       courseIconUrl: json['courseIconUrl']?.toString() ?? '',
-      localArtworkPath: json['localArtworkPath'] as String,
+      localArtworkPath: json['localArtworkPath']?.toString() ?? '',
     );
   }
 

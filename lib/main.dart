@@ -1,6 +1,7 @@
 import 'package:fcd_app/src/app.dart';
 import 'package:fcd_app/src/features/downloads/data/repositories/download_repository.dart';
 import 'package:fcd_app/src/features/downloads/presentation/download_task_controller.dart';
+import 'package:fcd_app/src/state/audio_playback_controller.dart';
 import 'package:fcd_app/src/state/session_controller.dart';
 import 'package:flutter/material.dart';
 import 'package:just_audio_background/just_audio_background.dart';
@@ -30,6 +31,9 @@ Future<void> main() async {
               apiClient: sessionController.apiClient,
             ),
           ),
+        ),
+        ChangeNotifierProvider<AudioPlaybackController>(
+          create: (_) => AudioPlaybackController(),
         ),
       ],
       child: const FcdApp(),

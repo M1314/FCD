@@ -3,10 +3,12 @@ import 'dart:io';
 import 'package:fcd_app/src/core/theme/app_theme.dart';
 import 'package:fcd_app/src/core/widgets/network_image_tile.dart';
 import 'package:fcd_app/src/core/widgets/scrolling_text.dart';
+import 'package:fcd_app/src/state/audio_playback_controller.dart';
 import 'package:fcd_app/src/features/downloads/data/models/downloaded_file.dart';
 import 'package:flutter/material.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:just_audio_background/just_audio_background.dart';
+import 'package:provider/provider.dart';
 
 class DownloadedAudioPage extends StatefulWidget {
   const DownloadedAudioPage({
@@ -27,21 +29,38 @@ class _DownloadedAudioPageState extends State<DownloadedAudioPage> {
   bool _loading = true;
   String? _error;
   bool _ownsPlayer = false;
+  bool _usesSharedPlayer = false;
+  late final AudioPlaybackController _playbackController;
 
   @override
   void initState() {
     super.initState();
+    _playbackController = context.read<AudioPlaybackController>();
     if (widget.playerOverride != null) {
       _player = widget.playerOverride;
       _loading = false;
       return;
     }
-    _ownsPlayer = true;
+    final sharedFile = _playbackController.downloadedFile;
+    final sharedPlayer = _playbackController.player;
+    if (sharedPlayer != null &&
+        sharedFile != null &&
+        sharedFile.id == widget.file.id) {
+      _player = sharedPlayer;
+      _usesSharedPlayer = true;
+      _ownsPlayer = false;
+      _loading = false;
+      return;
+    }
     _preparePlayer();
   }
 
   @override
   void dispose() {
+    if (_usesSharedPlayer && _player == _playbackController.player) {
+      super.dispose();
+      return;
+    }
     if (_ownsPlayer) {
       _player?.dispose();
     }
@@ -61,7 +80,9 @@ class _DownloadedAudioPageState extends State<DownloadedAudioPage> {
       return;
     }
 
-    final player = AudioPlayer();
+    final existingPlayer = _playbackController.player;
+    final createdNewPlayer = existingPlayer == null;
+    final player = existingPlayer ?? AudioPlayer();
     final artworkUrl = widget.file.courseIconUrl.isNotEmpty
         ? widget.file.courseIconUrl
         : widget.file.courseBannerUrl;
@@ -90,15 +111,28 @@ class _DownloadedAudioPageState extends State<DownloadedAudioPage> {
         ),
       );
       if (!mounted) {
-        await player.dispose();
+        if (createdNewPlayer) {
+          await player.dispose();
+        }
         return;
       }
       setState(() {
         _player = player;
         _loading = false;
+        _usesSharedPlayer = !createdNewPlayer;
+        _ownsPlayer = createdNewPlayer;
       });
+      player.play();
+      _playbackController.setDownloadedSession(
+        player: player,
+        file: widget.file,
+        resourceTitle:
+            widget.file.name.isEmpty ? 'Audio descargado' : widget.file.name,
+      );
     } catch (_) {
-      await player.dispose();
+      if (createdNewPlayer) {
+        await player.dispose();
+      }
       if (!mounted) {
         return;
       }
@@ -116,7 +150,7 @@ class _DownloadedAudioPageState extends State<DownloadedAudioPage> {
 
   Widget _buildContent(BuildContext context) {
     if (_loading) {
-      return const CircularProgressIndicator();
+      return const Center(child: CircularProgressIndicator());
     }
     if (_error != null) {
       return Padding(

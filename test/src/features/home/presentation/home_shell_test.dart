@@ -1,6 +1,7 @@
 import 'package:fcd_app/src/features/downloads/data/repositories/download_repository.dart';
 import 'package:fcd_app/src/features/downloads/presentation/download_task_controller.dart';
 import 'package:fcd_app/src/features/home/presentation/home_shell.dart';
+import 'package:fcd_app/src/state/audio_playback_controller.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
@@ -16,10 +17,17 @@ void main() {
       addTearDown(tester.view.reset);
 
       await tester.pumpWidget(
-        ChangeNotifierProvider<DownloadTaskController>(
-          create: (_) => DownloadTaskController(
-            downloadRepository: DownloadRepository(apiClient: FakeApiClient()),
-          ),
+        MultiProvider(
+          providers: [
+            ChangeNotifierProvider<DownloadTaskController>(
+              create: (_) => DownloadTaskController(
+                downloadRepository: DownloadRepository(apiClient: FakeApiClient()),
+              ),
+            ),
+            ChangeNotifierProvider<AudioPlaybackController>(
+              create: (_) => AudioPlaybackController(),
+            ),
+          ],
           child: MaterialApp(
             home: HomeShell(
               pages: List<Widget>.generate(
