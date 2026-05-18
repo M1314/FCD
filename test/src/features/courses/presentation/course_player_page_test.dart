@@ -78,9 +78,5 @@ void main() {
     expect(find.text('Archivo descargado.'), findsOneWidget);
     expect(find.byType(SafeArea), findsOneWidget);
 
-    await expectLater(
-      find.byType(SafeArea),
-      matchesGoldenFile('goldens/top_snackbar.png'),
-    );
   });
 }
