@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:better_player_plus/better_player_plus.dart';
 import 'package:fcd_app/src/core/config/api_config.dart';
@@ -7,12 +8,14 @@ import 'package:fcd_app/src/core/storage/favorites_storage.dart';
 import 'package:fcd_app/src/core/storage/progress_storage.dart';
 import 'package:fcd_app/src/core/theme/app_theme.dart';
 import 'package:fcd_app/src/core/utils/file_type_utils.dart';
+import 'package:fcd_app/src/core/utils/orientation_policy.dart';
 import 'package:fcd_app/src/core/widgets/audio_mini_player.dart';
 import 'package:fcd_app/src/core/widgets/audio_player_widget.dart';
 import 'package:fcd_app/src/core/widgets/scrolling_text.dart';
 import 'package:fcd_app/src/features/courses/data/models/course.dart';
 import 'package:fcd_app/src/features/courses/data/models/course_lesson.dart';
 import 'package:fcd_app/src/features/courses/data/models/lesson_resource.dart';
+import 'package:fcd_app/src/features/downloads/data/models/downloaded_file.dart';
 import 'package:fcd_app/src/features/downloads/data/repositories/download_repository.dart';
 import 'package:fcd_app/src/features/downloads/presentation/download_progress_banner.dart';
 import 'package:fcd_app/src/features/downloads/presentation/download_task_controller.dart';
@@ -20,6 +23,7 @@ import 'package:fcd_app/src/features/downloads/presentation/downloaded_audio_pag
 import 'package:fcd_app/src/state/audio_playback_controller.dart';
 import 'package:fcd_app/src/state/session_controller.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:just_audio_background/just_audio_background.dart';
@@ -37,6 +41,34 @@ bool shouldKeepExistingAudioPlayer({
 }
 
 @visibleForTesting
+String normalizeResourceUrl(String url) {
+  final queryIndex = url.indexOf('?');
+  final fragmentIndex = url.indexOf('#');
+  var endIndex = url.length;
+  if (queryIndex != -1 && queryIndex < endIndex) {
+    endIndex = queryIndex;
+  }
+  if (fragmentIndex != -1 && fragmentIndex < endIndex) {
+    endIndex = fragmentIndex;
+  }
+  return endIndex == url.length ? url : url.substring(0, endIndex);
+}
+
+@visibleForTesting
+String resourceDownloadKeyFor(LessonResource resource) {
+  return '${resource.type.name}:${normalizeResourceUrl(resource.url)}';
+}
+
+@visibleForTesting
+DownloadedFile? downloadedFileForResource(
+  LessonResource resource,
+  Map<String, DownloadedFile> filesByKey,
+) {
+  final normalizedKey = resourceDownloadKeyFor(resource);
+  return filesByKey[normalizedKey] ??
+      filesByKey['${resource.type.name}:${resource.url}'];
+}
+
 Widget buildTopSnackBar(BuildContext context, String message) {
   final colorScheme = Theme.of(context).colorScheme;
   return SafeArea(
@@ -114,10 +146,13 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
   bool _showSessionExpiredBanner = false;
   bool _downloadsExpanded = false;
   Set<String> _downloadedResourceKeys = <String>{};
+  Map<String, DownloadedFile> _downloadedResourceFiles =
+      <String, DownloadedFile>{};
   OverlayEntry? _downloadSnackBarEntry;
   Timer? _downloadSnackBarTimer;
   bool _reuseSharedAudio = false;
   bool _resumeSharedAudio = false;
+  bool _isTablet = false;
 
   BetterPlayerController? _videoController;
   AudioPlayer? _audioPlayer;
@@ -153,6 +188,13 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
     if (route != null) {
       routeObserver.subscribe(this, route);
     }
+    final isTablet = OrientationPolicy.isTablet(context);
+    if (_isTablet != isTablet) {
+      _isTablet = isTablet;
+      if (!OrientationPolicy.isVideoFullscreenActive) {
+        OrientationPolicy.applyDefault(isTablet: isTablet);
+      }
+    }
     final session = context.read<SessionController>();
     if (_cachedSession == null) {
       session.addListener(_onSessionChanged);
@@ -163,6 +205,13 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
 
   @override
   void dispose() {
+    if (!_isTablet) {
+      OrientationPolicy.setVideoFullscreenActive(false);
+      OrientationPolicy.applyDefault(
+        isTablet: _isTablet,
+        ignoreFullscreenFlag: true,
+      );
+    }
     routeObserver.unsubscribe(this);
     WidgetsBinding.instance.removeObserver(this);
     _saveProgressOnDispose();
@@ -1107,6 +1156,9 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
         return;
       case DownloadTaskStatus.alreadyDownloaded:
         await _refreshDownloadedResources();
+        if (!mounted) {
+          return;
+        }
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Este recurso ya fue descargado previamente.'),
@@ -1186,18 +1238,11 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
   }
 
   String _resourceKey(LessonResource resource) {
-    return '${resource.type.name}:${_normalizedResourceUrl(resource.url)}';
+    return resourceDownloadKeyFor(resource);
   }
 
-  String _normalizedResourceUrl(String url) {
-    final uri = Uri.tryParse(url);
-    if (uri == null) {
-      return url;
-    }
-    if (uri.hasQuery || uri.fragment.isNotEmpty) {
-      return uri.replace(query: '', fragment: '').toString();
-    }
-    return uri.toString();
+  DownloadedFile? _downloadedFileForResource(LessonResource resource) {
+    return downloadedFileForResource(resource, _downloadedResourceFiles);
   }
 
   Future<void> _refreshDownloadedResources() async {
@@ -1207,15 +1252,21 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
     }
     setState(() {
       final keys = <String>{};
+      final filesByKey = <String, DownloadedFile>{};
       for (final file in cleanup.files) {
         if (file.id.isNotEmpty) {
           keys.add(file.id);
+          filesByKey[file.id] = file;
         }
         if (file.url.isNotEmpty) {
-          keys.add('${file.type}:${_normalizedResourceUrl(file.url)}');
+          final normalizedUrl = normalizeResourceUrl(file.url);
+          final urlKey = '${file.type}:$normalizedUrl';
+          keys.add(urlKey);
+          filesByKey[urlKey] = file;
         }
       }
       _downloadedResourceKeys = keys;
+      _downloadedResourceFiles = filesByKey;
     });
   }
 
@@ -1406,7 +1457,12 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
         ? previousActiveMediaResourceKey
         : null;
 
-    previousVideoController?.dispose(forceDispose: true);
+    if (previousVideoController != null) {
+      if (!_isTablet && previousVideoController.isFullScreen) {
+        OrientationPolicy.setVideoFullscreenActive(true);
+      }
+      previousVideoController.dispose(forceDispose: true);
+    }
     if (!keepExistingAudioPlayer && previousAudioPlayer != null) {
       await previousAudioPlayer.stop();
     }
@@ -1424,10 +1480,28 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
       final artworkUrl = widget.course.iconUrl.isNotEmpty
           ? widget.course.iconUrl
           : widget.course.bannerUrl;
+      var videoSourceUrl = resource.url;
+      var isLocalFile = false;
+      var notificationImageUrl = artworkUrl.isNotEmpty ? artworkUrl : null;
+      final downloadedFile = _downloadedFileForResource(resource);
+      if (downloadedFile != null && downloadedFile.localPath.isNotEmpty) {
+        final localFile = File(downloadedFile.localPath);
+        if (await localFile.exists()) {
+          if (!mounted || requestId != _resourcePreparationRequestId) {
+            return;
+          }
+          videoSourceUrl = localFile.path;
+          isLocalFile = true;
+          if (downloadedFile.localArtworkPath.isNotEmpty) {
+            notificationImageUrl = 'file://${downloadedFile.localArtworkPath}';
+          }
+        }
+      }
       final videoController = _buildVideoController(
-        resource.url,
+        videoSourceUrl,
         title: resource.name.isEmpty ? 'Video de la lección' : resource.name,
-        imageUrl: artworkUrl.isNotEmpty ? artworkUrl : null,
+        imageUrl: notificationImageUrl,
+        isLocalFile: isLocalFile,
       );
       if (!mounted || requestId != _resourcePreparationRequestId) {
         videoController.dispose(forceDispose: true);
@@ -1464,16 +1538,35 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
       final artworkUrl = widget.course.iconUrl.isNotEmpty
           ? widget.course.iconUrl
           : widget.course.bannerUrl;
+      var audioSourceUri = Uri.parse(resource.url);
+      var audioSourceId = resource.url;
+      var notificationImageUri =
+          artworkUrl.isNotEmpty ? Uri.parse(artworkUrl) : null;
+      final downloadedFile = _downloadedFileForResource(resource);
+      if (downloadedFile != null && downloadedFile.localPath.isNotEmpty) {
+        final localFile = File(downloadedFile.localPath);
+        if (await localFile.exists()) {
+          if (!mounted || requestId != _resourcePreparationRequestId) {
+            _isAudioLoading = false;
+            return;
+          }
+          audioSourceUri = localFile.uri;
+          audioSourceId = audioSourceUri.toString();
+          if (downloadedFile.localArtworkPath.isNotEmpty) {
+            notificationImageUri = File(downloadedFile.localArtworkPath).uri;
+          }
+        }
+      }
       await audioPlayer.setAudioSource(
         AudioSource.uri(
-          Uri.parse(resource.url),
+          audioSourceUri,
           tag: MediaItem(
-            id: resource.url,
+            id: audioSourceId,
             title: resource.name.isEmpty
                 ? 'Audio de la lección'
                 : resource.name,
             artist: widget.course.name,
-            artUri: artworkUrl.isNotEmpty ? Uri.parse(artworkUrl) : null,
+            artUri: notificationImageUri,
           ),
         ),
       );
@@ -1528,14 +1621,19 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
     String url, {
     String? title,
     String? imageUrl,
+    bool isLocalFile = false,
   }) {
     final dataSource = BetterPlayerDataSource(
-      BetterPlayerDataSourceType.network,
+      isLocalFile
+          ? BetterPlayerDataSourceType.file
+          : BetterPlayerDataSourceType.network,
       url,
-      cacheConfiguration: const BetterPlayerCacheConfiguration(
-        useCache: true,
-        preCacheSize: 8 * 1024 * 1024,
-      ),
+      cacheConfiguration: isLocalFile
+          ? null
+          : const BetterPlayerCacheConfiguration(
+              useCache: true,
+              preCacheSize: 8 * 1024 * 1024,
+            ),
       bufferingConfiguration: const BetterPlayerBufferingConfiguration(
         minBufferMs: 12000,
         maxBufferMs: 90000,
@@ -1550,12 +1648,23 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
     );
 
     final videoController = BetterPlayerController(
-      const BetterPlayerConfiguration(
+      BetterPlayerConfiguration(
         autoPlay: false,
         fit: BoxFit.contain,
         allowedScreenSleep: false,
         handleLifecycle: false,
         autoDispose: false,
+        eventListener: _handleVideoEvents,
+        routePageBuilder: _buildFullscreenRoute,
+        deviceOrientationsOnFullScreen: _isTablet
+            ? DeviceOrientation.values
+            : <DeviceOrientation>[
+                DeviceOrientation.landscapeLeft,
+                DeviceOrientation.landscapeRight,
+              ],
+        deviceOrientationsAfterFullScreen: _isTablet
+            ? DeviceOrientation.values
+            : <DeviceOrientation>[DeviceOrientation.portraitUp],
         controlsConfiguration: BetterPlayerControlsConfiguration(
           enableSkips: true,
           enablePlaybackSpeed: true,
@@ -1570,6 +1679,62 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
     );
 
     return videoController;
+  }
+
+  Widget _buildFullscreenRoute(
+    BuildContext context,
+    Animation<double> animation,
+    Animation<double> secondaryAnimation,
+    BetterPlayerControllerProvider controllerProvider,
+  ) {
+    return AnimatedBuilder(
+      animation: animation,
+      builder: (context, child) {
+        return Scaffold(
+          resizeToAvoidBottomInset: false,
+          body: Stack(
+            children: <Widget>[
+              Positioned.fill(
+                child: Container(
+                  color: Colors.black,
+                  child: controllerProvider,
+                ),
+              ),
+              SafeArea(
+                child: Align(
+                  alignment: Alignment.topLeft,
+                  child: IconButton(
+                    onPressed: () =>
+                        Navigator.of(context, rootNavigator: true).maybePop(),
+                    icon: const Icon(Icons.arrow_back_rounded),
+                    color: Colors.white,
+                    tooltip: 'Volver',
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  void _handleVideoEvents(BetterPlayerEvent event) {
+    if (_isTablet) {
+      return;
+    }
+    switch (event.betterPlayerEventType) {
+      case BetterPlayerEventType.openFullscreen:
+        OrientationPolicy.setVideoFullscreenActive(true);
+        OrientationPolicy.applyVideoFullscreen(isTablet: _isTablet);
+        break;
+      case BetterPlayerEventType.hideFullscreen:
+        OrientationPolicy.setVideoFullscreenActive(false);
+        OrientationPolicy.applyDefault(isTablet: _isTablet);
+        break;
+      default:
+        break;
+    }
   }
 
   void _startVideoInitializationCheck(
