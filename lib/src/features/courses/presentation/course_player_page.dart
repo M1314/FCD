@@ -1447,7 +1447,7 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
         return;
       }
 
-      // Fallback: show video after 3.5 seconds even without duration
+      // Fallback: show video after 5 seconds even without duration
       if (attempts >= fallbackAttempts) {
         timer.cancel();
         _debugVideoInitLog(
