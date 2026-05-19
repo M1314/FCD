@@ -68,6 +68,15 @@ DownloadedFile? downloadedFileForResource(
       filesByKey['${resource.type.name}:${resource.url}'];
 }
 
+@visibleForTesting
+String sharedPlaybackKeyFor({
+  required int courseId,
+  required int lessonIndex,
+  required int resourceIndex,
+}) {
+  return '$courseId:$lessonIndex:$resourceIndex';
+}
+
 Widget buildTopSnackBar(BuildContext context, String message) {
   final colorScheme = Theme.of(context).colorScheme;
   return SafeArea(
@@ -319,15 +328,6 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
         _resourceIndex =
             initialResourceIndex.clamp(0, resources.length - 1);
       }
-      final targetKey = _currentMediaResourceKey;
-      if (_playbackController.player != null &&
-          targetKey != null &&
-          targetKey == _playbackController.activeMediaResourceKey) {
-        _reuseSharedAudio = true;
-        _resumeSharedAudio = _playbackController.player!.playing;
-        _savedMediaPositionMs =
-            _playbackController.player!.position.inMilliseconds;
-      }
     } else if (!widget.forceStart) {
       final saved = await _progressStorage.getProgress(widget.course.id);
       if (!mounted) {
@@ -356,9 +356,11 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
 
     _isCompleted = _completedLessonIds.contains(currentLesson.id);
     _isCurrentFavorite = _favoriteIds.contains(currentLesson.id);
+    _maybeReuseSharedAudio();
     if (_reuseSharedAudio) {
       _isAudioLoading = false;
       _activeMediaResourceKey = _currentMediaResourceKey;
+      _audioPlayer = _playbackController.player;
       _reuseSharedAudio = false;
       if (mounted) {
         setState(() {
@@ -403,6 +405,7 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
     return '$_lessonIndex:$clampedResourceIndex';
   }
 
+
   LessonResource? get _activeMediaResource {
     final key = _activeMediaResourceKey;
     if (key == null) {
@@ -425,6 +428,26 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
       return null;
     }
     return resources[resourceIndex];
+  }
+
+  void _maybeReuseSharedAudio() {
+    final player = _playbackController.player;
+    if (player == null) {
+      return;
+    }
+    final targetKey = sharedPlaybackKeyFor(
+      courseId: widget.course.id,
+      lessonIndex: _lessonIndex,
+      resourceIndex: _resourceIndex,
+    );
+    if (targetKey != _playbackController.activeMediaResourceKey) {
+      return;
+    }
+    _audioPlayer = player;
+    _isAudioLoading = false;
+    _reuseSharedAudio = true;
+    _resumeSharedAudio = player.playing;
+    _savedMediaPositionMs = player.position.inMilliseconds;
   }
 
   bool get _showMiniAudioPlayer {
@@ -1516,7 +1539,12 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
     if (resource.isAudio) {
       if (_reuseSharedAudio &&
           _audioPlayer != null &&
-          _currentMediaResourceKey == _playbackController.activeMediaResourceKey) {
+          sharedPlaybackKeyFor(
+                courseId: widget.course.id,
+                lessonIndex: _lessonIndex,
+                resourceIndex: _resourceIndex,
+              ) ==
+              _playbackController.activeMediaResourceKey) {
         _isAudioLoading = false;
         _activeMediaResourceKey = _currentMediaResourceKey;
         if (_resumeSharedAudio && !_audioPlayer!.playing) {
