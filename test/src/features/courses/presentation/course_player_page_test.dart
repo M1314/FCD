@@ -153,6 +153,19 @@ void main() {
       expect(match, isNull);
     });
   });
+
+  group('sharedPlaybackKeyFor', () {
+    test('includes course, lesson, and resource indices', () {
+      expect(
+        sharedPlaybackKeyFor(
+          courseId: 42,
+          lessonIndex: 3,
+          resourceIndex: 1,
+        ),
+        '42:3:1',
+      );
+    });
+  });
   testWidgets('buildTopSnackBar aligns to the top of the screen', (tester) async {
     await tester.binding.setSurfaceSize(const Size(360, 640));
     addTearDown(() => tester.binding.setSurfaceSize(null));
