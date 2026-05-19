@@ -360,7 +360,6 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
     if (_reuseSharedAudio) {
       _isAudioLoading = false;
       _activeMediaResourceKey = _currentMediaResourceKey;
-      _audioPlayer = _playbackController.player;
       _reuseSharedAudio = false;
       if (mounted) {
         setState(() {
