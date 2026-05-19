@@ -8,6 +8,7 @@ import 'package:fcd_app/src/core/storage/favorites_storage.dart';
 import 'package:fcd_app/src/core/storage/progress_storage.dart';
 import 'package:fcd_app/src/core/theme/app_theme.dart';
 import 'package:fcd_app/src/core/utils/orientation_policy.dart';
+import 'package:fcd_app/src/core/navigation/home_tab_controller.dart';
 import 'package:fcd_app/src/core/widgets/audio_mini_player.dart';
 import 'package:fcd_app/src/core/widgets/audio_player_widget.dart';
 import 'package:fcd_app/src/core/widgets/scrolling_text.dart';
@@ -77,9 +78,16 @@ String sharedPlaybackKeyFor({
   return '$courseId:$lessonIndex:$resourceIndex';
 }
 
-Widget buildTopSnackBar(BuildContext context, String message) {
+Widget buildTopSnackBar(
+  BuildContext context,
+  String message, {
+  String? actionLabel,
+  VoidCallback? onAction,
+  VoidCallback? onTap,
+  VoidCallback? onDismissed,
+}) {
   final colorScheme = Theme.of(context).colorScheme;
-  return SafeArea(
+  final content = SafeArea(
     child: Align(
       alignment: Alignment.topCenter,
       child: Padding(
@@ -90,16 +98,56 @@ Widget buildTopSnackBar(BuildContext context, String message) {
           borderRadius: BorderRadius.circular(12),
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            child: Text(
-              message,
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: colorScheme.onInverseSurface,
-              ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: <Widget>[
+                Flexible(
+                  child: Text(
+                    message,
+                    style: Theme.of(
+                      context,
+                    ).textTheme.bodyMedium?.copyWith(
+                      color: colorScheme.onInverseSurface,
+                    ),
+                  ),
+                ),
+                if (actionLabel != null && onAction != null) ...[
+                  const SizedBox(width: 12),
+                  TextButton(
+                    onPressed: onAction,
+                    style: TextButton.styleFrom(
+                      foregroundColor: colorScheme.onInverseSurface,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 6,
+                      ),
+                    ),
+                    child: Text(actionLabel),
+                  ),
+                ],
+              ],
             ),
           ),
         ),
       ),
     ),
+  );
+  final tappableContent = onTap == null
+      ? content
+      : GestureDetector(
+          onTap: onTap,
+          behavior: HitTestBehavior.translucent,
+          child: content,
+        );
+  if (onDismissed == null) {
+    return tappableContent;
+  }
+
+  return Dismissible(
+    key: const ValueKey('download-success-snackbar'),
+    direction: DismissDirection.up,
+    onDismissed: (_) => onDismissed(),
+    child: tappableContent,
   );
 }
 
@@ -1203,8 +1251,12 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
           if (!mounted) {
             return;
           }
+          // Use a button to jump to Downloads because this banner
+          // lives in an Overlay without direct access to HomeShell.
           _showTopDownloadSnackBar(
-            'Archivo descargado. Disponible en Descargas.',
+            'Archivo descargado.',
+            actionLabel: 'Ver descargas',
+            onAction: _openDownloadsTab,
           );
           return;
         }
@@ -1228,7 +1280,21 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
     _downloadSnackBarEntry = null;
   }
 
-  void _showTopDownloadSnackBar(String message) {
+  void _openDownloadsTab() {
+    _dismissDownloadSnackBar();
+    // Set the tab first so HomeShell shows Downloads
+    // even after popping back to the root route.
+    homeTabController.setIndex(kDownloadsTabIndex);
+    if (mounted) {
+      Navigator.of(context).popUntil((route) => route.isFirst);
+    }
+  }
+
+  void _showTopDownloadSnackBar(
+    String message, {
+    String? actionLabel,
+    VoidCallback? onAction,
+  }) {
     if (!mounted) {
       return;
     }
@@ -1238,9 +1304,13 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
       return;
     }
     _downloadSnackBarEntry = OverlayEntry(
-      builder: (context) => GestureDetector(
+      builder: (context) => buildTopSnackBar(
+        context,
+        message,
+        actionLabel: actionLabel,
+        onAction: onAction,
         onTap: _dismissDownloadSnackBar,
-        child: buildTopSnackBar(context, message),
+        onDismissed: _dismissDownloadSnackBar,
       ),
     );
     overlay.insert(_downloadSnackBarEntry!);

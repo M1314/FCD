@@ -7,6 +7,7 @@ import 'package:fcd_app/src/features/courses/presentation/courses_page.dart';
 import 'package:fcd_app/src/features/downloads/presentation/download_progress_banner.dart';
 import 'package:fcd_app/src/features/downloads/presentation/download_task_controller.dart';
 import 'package:fcd_app/src/features/downloads/presentation/downloads_page.dart';
+import 'package:fcd_app/src/core/navigation/home_tab_controller.dart';
 import 'package:fcd_app/src/features/favorites/presentation/favorites_page.dart';
 import 'package:fcd_app/src/state/audio_playback_controller.dart';
 import 'package:fcd_app/src/core/widgets/audio_mini_player.dart';
@@ -67,6 +68,7 @@ class _HomeShellState extends State<HomeShell> {
   @override
   void initState() {
     super.initState();
+    _selectedIndex = context.read<HomeTabController>().index;
     _defaultPages = <Widget>[
       const CoursesPage(),
       const CatalogPage(),
@@ -131,6 +133,11 @@ class _HomeShellState extends State<HomeShell> {
   @override
   Widget build(BuildContext context) {
     final isTablet = MediaQuery.sizeOf(context).shortestSide >= 600;
+    // Watch shared tab state so other screens can jump to Downloads.
+    final selectedIndex = context.watch<HomeTabController>().index;
+    if (selectedIndex != _selectedIndex) {
+      _selectedIndex = selectedIndex;
+    }
     final pages = widget.pages ?? _defaultPages;
     final wrappedPages = List<Widget>.generate(pages.length, (index) {
       return PrimaryScrollController(
@@ -247,7 +254,7 @@ class _HomeShellState extends State<HomeShell> {
                 border: Border(top: BorderSide(color: Color(0xFFE8DACA))),
               ),
               child: NavigationBar(
-                selectedIndex: _selectedIndex,
+                selectedIndex: selectedIndex,
                 indicatorColor: const Color(0xFFE7C89C),
                 onDestinationSelected: _onDestinationSelected,
                 destinations: _bottomDestinations,
@@ -264,7 +271,7 @@ class _HomeShellState extends State<HomeShell> {
         return 'Asistente IA';
       case 3:
         return 'Mis Favoritos';
-      case 4:
+      case kDownloadsTabIndex:
         return 'Mis Descargas';
       case 5:
         return 'Mi Cuenta';
@@ -281,7 +288,7 @@ class _HomeShellState extends State<HomeShell> {
         return 'Resuelve dudas y profundiza';
       case 3:
         return 'Tus lecciones guardadas';
-      case 4:
+      case kDownloadsTabIndex:
         return 'Contenido disponible sin conexión';
       case 5:
         return 'Gestiona tu sesión y perfil';
@@ -291,13 +298,12 @@ class _HomeShellState extends State<HomeShell> {
   }
 
   void _onDestinationSelected(int index) {
+    context.read<HomeTabController>().setIndex(index);
     if (index == _selectedIndex) {
       _scrollTabToTop(index);
       return;
     }
-    setState(() {
-      _selectedIndex = index;
-    });
+    _selectedIndex = index;
   }
 
 
