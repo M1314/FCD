@@ -18,4 +18,13 @@ class HomeTabController extends ChangeNotifier {
   }
 }
 
-final HomeTabController homeTabController = HomeTabController();
+HomeTabController? _homeTabController;
+
+HomeTabController get homeTabController =>
+    _homeTabController ??= HomeTabController();
+
+@visibleForTesting
+void resetHomeTabController({int initialIndex = 0}) {
+  _homeTabController?.dispose();
+  _homeTabController = HomeTabController(initialIndex: initialIndex);
+}
