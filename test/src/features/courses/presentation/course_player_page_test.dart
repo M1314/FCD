@@ -154,6 +154,83 @@ void main() {
     });
   });
 
+  group('downloadedFileMatchesResource', () {
+    test('matches when ids align after normalization', () {
+      const resource = LessonResource(
+        type: LessonResourceType.audio,
+        url: 'https://example.com/audio.mp3?token=abc',
+        name: 'Audio',
+        order: 1,
+      );
+      final file = DownloadedFile(
+        id: 'audio:https://example.com/audio.mp3',
+        url: resource.url,
+        name: 'Audio',
+        type: 'audio',
+        localPath: '/tmp/audio.mp3',
+        downloadedAt: DateTime(2026, 1, 1),
+        localArtworkPath: '',
+      );
+
+      final matches = downloadedFileMatchesResource(
+        file: file,
+        resource: resource,
+      );
+
+      expect(matches, isTrue);
+    });
+
+    test('matches when normalized URLs are the same', () {
+      const resource = LessonResource(
+        type: LessonResourceType.audio,
+        url: 'https://example.com/audio.mp3?token=abc',
+        name: 'Audio',
+        order: 1,
+      );
+      final file = DownloadedFile(
+        id: 'legacy',
+        url: 'https://example.com/audio.mp3?token=xyz',
+        name: 'Audio',
+        type: 'audio',
+        localPath: '/tmp/audio.mp3',
+        downloadedAt: DateTime(2026, 1, 1),
+        localArtworkPath: '',
+      );
+
+      final matches = downloadedFileMatchesResource(
+        file: file,
+        resource: resource,
+      );
+
+      expect(matches, isTrue);
+    });
+
+    test('returns false when types differ', () {
+      const resource = LessonResource(
+        type: LessonResourceType.audio,
+        url: 'https://example.com/audio.mp3',
+        name: 'Audio',
+        order: 1,
+      );
+      final file = DownloadedFile(
+        id: 'video:https://example.com/audio.mp3',
+        url: resource.url,
+        name: 'Audio',
+        type: 'video',
+        localPath: '/tmp/audio.mp3',
+        downloadedAt: DateTime(2026, 1, 1),
+        localArtworkPath: '',
+      );
+
+      final matches = downloadedFileMatchesResource(
+        file: file,
+        resource: resource,
+      );
+
+      expect(matches, isFalse);
+    });
+  });
+
   group('sharedPlaybackKeyFor', () {
     test('includes course, lesson, and resource indices', () {
       expect(
