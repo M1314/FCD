@@ -68,6 +68,15 @@ DownloadedFile? downloadedFileForResource(
       filesByKey['${resource.type.name}:${resource.url}'];
 }
 
+@visibleForTesting
+String sharedPlaybackKeyFor({
+  required int courseId,
+  required int lessonIndex,
+  required int resourceIndex,
+}) {
+  return '$courseId:$lessonIndex:$resourceIndex';
+}
+
 Widget buildTopSnackBar(BuildContext context, String message) {
   final colorScheme = Theme.of(context).colorScheme;
   return SafeArea(
@@ -83,9 +92,7 @@ Widget buildTopSnackBar(BuildContext context, String message) {
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             child: Text(
               message,
-              style: Theme.of(
-                context,
-              ).textTheme.bodyMedium?.copyWith(
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                 color: colorScheme.onInverseSurface,
               ),
             ),
@@ -316,17 +323,7 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
         _resourceIndex = 0;
       } else {
         final initialResourceIndex = widget.initialResourceIndex ?? 0;
-        _resourceIndex =
-            initialResourceIndex.clamp(0, resources.length - 1);
-      }
-      final targetKey = _currentMediaResourceKey;
-      if (_playbackController.player != null &&
-          targetKey != null &&
-          targetKey == _playbackController.activeMediaResourceKey) {
-        _reuseSharedAudio = true;
-        _resumeSharedAudio = _playbackController.player!.playing;
-        _savedMediaPositionMs =
-            _playbackController.player!.position.inMilliseconds;
+        _resourceIndex = initialResourceIndex.clamp(0, resources.length - 1);
       }
     } else if (!widget.forceStart) {
       final saved = await _progressStorage.getProgress(widget.course.id);
@@ -356,6 +353,7 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
 
     _isCompleted = _completedLessonIds.contains(currentLesson.id);
     _isCurrentFavorite = _favoriteIds.contains(currentLesson.id);
+    _maybeReuseSharedAudio();
     if (_reuseSharedAudio) {
       _isAudioLoading = false;
       _activeMediaResourceKey = _currentMediaResourceKey;
@@ -425,6 +423,26 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
       return null;
     }
     return resources[resourceIndex];
+  }
+
+  void _maybeReuseSharedAudio() {
+    final player = _playbackController.player;
+    if (player == null) {
+      return;
+    }
+    final targetKey = sharedPlaybackKeyFor(
+      courseId: widget.course.id,
+      lessonIndex: _lessonIndex,
+      resourceIndex: _resourceIndex,
+    );
+    if (targetKey != _playbackController.activeMediaResourceKey) {
+      return;
+    }
+    _audioPlayer = player;
+    _isAudioLoading = false;
+    _reuseSharedAudio = true;
+    _resumeSharedAudio = player.playing;
+    _savedMediaPositionMs = player.position.inMilliseconds;
   }
 
   bool get _showMiniAudioPlayer {
@@ -835,8 +853,9 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
           ),
           const SizedBox(height: 12),
           ElevatedButton.icon(
-            onPressed:
-                isDownloading || isDownloaded ? null : _downloadCurrentResource,
+            onPressed: isDownloading || isDownloaded
+                ? null
+                : _downloadCurrentResource,
             icon: const Icon(Icons.download_rounded),
             label: Text(
               isDownloading
@@ -958,7 +977,8 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
     if (player == null) {
       return const SizedBox.shrink();
     }
-    final title = _activeMediaResource?.name ??
+    final title =
+        _activeMediaResource?.name ??
         _playbackController.resourceTitle ??
         'Mini reproductor';
 
@@ -986,7 +1006,7 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
     final lessonIndex = _playbackController.lessonIndex;
     final resourceIndex = _playbackController.resourceIndex;
     final downloadedFile = _playbackController.downloadedFile;
-    
+
     if (downloadedFile != null) {
       await Navigator.of(context).push(
         MaterialPageRoute<void>(
@@ -995,7 +1015,7 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
       );
       return;
     }
-    
+
     if (course == null || lessons == null) {
       return;
     }
@@ -1183,7 +1203,9 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
           if (!mounted) {
             return;
           }
-          _showTopDownloadSnackBar('Archivo descargado. Disponible en Descargas.');
+          _showTopDownloadSnackBar(
+            'Archivo descargado. Disponible en Descargas.',
+          );
           return;
         }
         final openResult = await OpenFilex.open(file.path);
@@ -1264,7 +1286,6 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
       _downloadedResourceFiles = filesByKey;
     });
   }
-
 
   Future<void> _nextLesson() async {
     await _markCurrentAsSeen();
@@ -1516,7 +1537,12 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
     if (resource.isAudio) {
       if (_reuseSharedAudio &&
           _audioPlayer != null &&
-          _currentMediaResourceKey == _playbackController.activeMediaResourceKey) {
+          sharedPlaybackKeyFor(
+                courseId: widget.course.id,
+                lessonIndex: _lessonIndex,
+                resourceIndex: _resourceIndex,
+              ) ==
+              _playbackController.activeMediaResourceKey) {
         _isAudioLoading = false;
         _activeMediaResourceKey = _currentMediaResourceKey;
         if (_resumeSharedAudio && !_audioPlayer!.playing) {
@@ -1528,15 +1554,16 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
       }
       _isAudioLoading = true;
       setState(() {});
-      final audioPlayer =
-          _audioPlayer ??= _playbackController.player ?? AudioPlayer();
+      final audioPlayer = _audioPlayer ??=
+          _playbackController.player ?? AudioPlayer();
       final artworkUrl = widget.course.iconUrl.isNotEmpty
           ? widget.course.iconUrl
           : widget.course.bannerUrl;
       var audioSourceUri = Uri.parse(resource.url);
       var audioSourceId = resource.url;
-      var notificationImageUri =
-          artworkUrl.isNotEmpty ? Uri.parse(artworkUrl) : null;
+      var notificationImageUri = artworkUrl.isNotEmpty
+          ? Uri.parse(artworkUrl)
+          : null;
       final downloadedFile = _downloadedFileForResource(resource);
       if (downloadedFile != null && downloadedFile.localPath.isNotEmpty) {
         final localFile = File(downloadedFile.localPath);
@@ -1579,8 +1606,9 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
         courseId: widget.course.id,
         lessonIndex: _lessonIndex,
         resourceIndex: _resourceIndex,
-        resourceTitle:
-            resource.name.isEmpty ? 'Audio de la lección' : resource.name,
+        resourceTitle: resource.name.isEmpty
+            ? 'Audio de la lección'
+            : resource.name,
         courseTitle: widget.course.name,
         course: widget.course,
         lessons: widget.lessons,
