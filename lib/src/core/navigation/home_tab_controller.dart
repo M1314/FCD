@@ -18,6 +18,8 @@ class HomeTabController extends ChangeNotifier {
   }
 }
 
+const int kDownloadsTabIndex = 4;
+
 HomeTabController? _homeTabController;
 
 HomeTabController get homeTabController =>

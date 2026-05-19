@@ -271,7 +271,7 @@ class _HomeShellState extends State<HomeShell> {
         return 'Asistente IA';
       case 3:
         return 'Mis Favoritos';
-      case 4:
+      case kDownloadsTabIndex:
         return 'Mis Descargas';
       case 5:
         return 'Mi Cuenta';
@@ -288,7 +288,7 @@ class _HomeShellState extends State<HomeShell> {
         return 'Resuelve dudas y profundiza';
       case 3:
         return 'Tus lecciones guardadas';
-      case 4:
+      case kDownloadsTabIndex:
         return 'Contenido disponible sin conexión';
       case 5:
         return 'Gestiona tu sesión y perfil';

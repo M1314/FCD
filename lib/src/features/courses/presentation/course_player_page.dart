@@ -1284,7 +1284,7 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
     _dismissDownloadSnackBar();
     // Set the tab first so HomeShell shows Downloads
     // even after popping back to the root route.
-    homeTabController.setIndex(4);
+    homeTabController.setIndex(kDownloadsTabIndex);
     if (mounted) {
       Navigator.of(context).popUntil((route) => route.isFirst);
     }
