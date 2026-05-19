@@ -9,14 +9,12 @@ class HomeTabController extends ChangeNotifier {
 
   int get index => _index;
 
-  void setIndex(int index, {bool notify = true}) {
+  void setIndex(int index) {
     if (_index == index) {
       return;
     }
     _index = index;
-    if (notify) {
-      notifyListeners();
-    }
+    notifyListeners();
   }
 }
 
