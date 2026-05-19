@@ -92,9 +92,7 @@ Widget buildTopSnackBar(BuildContext context, String message) {
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             child: Text(
               message,
-              style: Theme.of(
-                context,
-              ).textTheme.bodyMedium?.copyWith(
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                 color: colorScheme.onInverseSurface,
               ),
             ),
@@ -325,8 +323,7 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
         _resourceIndex = 0;
       } else {
         final initialResourceIndex = widget.initialResourceIndex ?? 0;
-        _resourceIndex =
-            initialResourceIndex.clamp(0, resources.length - 1);
+        _resourceIndex = initialResourceIndex.clamp(0, resources.length - 1);
       }
     } else if (!widget.forceStart) {
       final saved = await _progressStorage.getProgress(widget.course.id);
@@ -403,7 +400,6 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
     }
     return '$_lessonIndex:$clampedResourceIndex';
   }
-
 
   LessonResource? get _activeMediaResource {
     final key = _activeMediaResourceKey;
@@ -857,8 +853,9 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
           ),
           const SizedBox(height: 12),
           ElevatedButton.icon(
-            onPressed:
-                isDownloading || isDownloaded ? null : _downloadCurrentResource,
+            onPressed: isDownloading || isDownloaded
+                ? null
+                : _downloadCurrentResource,
             icon: const Icon(Icons.download_rounded),
             label: Text(
               isDownloading
@@ -980,7 +977,8 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
     if (player == null) {
       return const SizedBox.shrink();
     }
-    final title = _activeMediaResource?.name ??
+    final title =
+        _activeMediaResource?.name ??
         _playbackController.resourceTitle ??
         'Mini reproductor';
 
@@ -1008,7 +1006,7 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
     final lessonIndex = _playbackController.lessonIndex;
     final resourceIndex = _playbackController.resourceIndex;
     final downloadedFile = _playbackController.downloadedFile;
-    
+
     if (downloadedFile != null) {
       await Navigator.of(context).push(
         MaterialPageRoute<void>(
@@ -1017,7 +1015,7 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
       );
       return;
     }
-    
+
     if (course == null || lessons == null) {
       return;
     }
@@ -1205,7 +1203,9 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
           if (!mounted) {
             return;
           }
-          _showTopDownloadSnackBar('Archivo descargado. Disponible en Descargas.');
+          _showTopDownloadSnackBar(
+            'Archivo descargado. Disponible en Descargas.',
+          );
           return;
         }
         final openResult = await OpenFilex.open(file.path);
@@ -1286,7 +1286,6 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
       _downloadedResourceFiles = filesByKey;
     });
   }
-
 
   Future<void> _nextLesson() async {
     await _markCurrentAsSeen();
@@ -1555,15 +1554,16 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
       }
       _isAudioLoading = true;
       setState(() {});
-      final audioPlayer =
-          _audioPlayer ??= _playbackController.player ?? AudioPlayer();
+      final audioPlayer = _audioPlayer ??=
+          _playbackController.player ?? AudioPlayer();
       final artworkUrl = widget.course.iconUrl.isNotEmpty
           ? widget.course.iconUrl
           : widget.course.bannerUrl;
       var audioSourceUri = Uri.parse(resource.url);
       var audioSourceId = resource.url;
-      var notificationImageUri =
-          artworkUrl.isNotEmpty ? Uri.parse(artworkUrl) : null;
+      var notificationImageUri = artworkUrl.isNotEmpty
+          ? Uri.parse(artworkUrl)
+          : null;
       final downloadedFile = _downloadedFileForResource(resource);
       if (downloadedFile != null && downloadedFile.localPath.isNotEmpty) {
         final localFile = File(downloadedFile.localPath);
@@ -1606,8 +1606,9 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
         courseId: widget.course.id,
         lessonIndex: _lessonIndex,
         resourceIndex: _resourceIndex,
-        resourceTitle:
-            resource.name.isEmpty ? 'Audio de la lección' : resource.name,
+        resourceTitle: resource.name.isEmpty
+            ? 'Audio de la lección'
+            : resource.name,
         courseTitle: widget.course.name,
         course: widget.course,
         lessons: widget.lessons,
