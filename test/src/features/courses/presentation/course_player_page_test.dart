@@ -175,6 +175,28 @@ void main() {
     expect(find.byType(SafeArea), findsOneWidget);
   });
 
+  testWidgets('buildTopSnackBar renders action button', (tester) async {
+    await tester.binding.setSurfaceSize(const Size(360, 640));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Builder(
+          builder: (context) => buildTopSnackBar(
+            context,
+            'Archivo descargado.',
+            actionLabel: 'Ver descargas',
+            onAction: () {},
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Ver descargas'), findsOneWidget);
+    expect(find.byType(TextButton), findsOneWidget);
+  });
+
   testWidgets('buildTopSnackBar allows swipe-up dismiss', (tester) async {
     var dismissed = false;
 
