@@ -195,6 +195,18 @@ void main() {
       );
     });
   });
+  group('sharedPlaybackKeyFor', () {
+    test('includes course, lesson, and resource indices', () {
+      expect(
+        sharedPlaybackKeyFor(
+          courseId: 42,
+          lessonIndex: 3,
+          resourceIndex: 1,
+        ),
+        '42:3:1',
+      );
+    });
+  });
   testWidgets('buildTopSnackBar aligns to the top of the screen', (tester) async {
     await tester.binding.setSurfaceSize(const Size(360, 640));
     addTearDown(() => tester.binding.setSurfaceSize(null));
@@ -215,5 +227,56 @@ void main() {
     expect(align.alignment, Alignment.topCenter);
     expect(find.text('Archivo descargado.'), findsOneWidget);
     expect(find.byType(SafeArea), findsOneWidget);
+  });
+
+  testWidgets('buildTopSnackBar renders action button', (tester) async {
+    await tester.binding.setSurfaceSize(const Size(360, 640));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Builder(
+          builder: (context) => buildTopSnackBar(
+            context,
+            'Archivo descargado.',
+            actionLabel: 'Ver descargas',
+            onAction: () {},
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Ver descargas'), findsOneWidget);
+    expect(find.byType(TextButton), findsOneWidget);
+  });
+
+  testWidgets('buildTopSnackBar allows swipe-up dismiss', (tester) async {
+    var dismissed = false;
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Builder(
+          builder: (context) => buildTopSnackBar(
+            context,
+            'Archivo descargado.',
+            onDismissed: () => dismissed = true,
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final dismissible = tester.widget<Dismissible>(find.byType(Dismissible));
+    expect(dismissible.direction, DismissDirection.up);
+
+    await tester.fling(
+      find.byType(Dismissible),
+      const Offset(0, -300),
+      1200,
+    );
+    await tester.pumpAndSettle();
+
+    expect(dismissed, isTrue);
   });
 }

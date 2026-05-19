@@ -1,3 +1,4 @@
+import 'package:fcd_app/src/core/navigation/home_tab_controller.dart';
 import 'package:fcd_app/src/features/downloads/data/repositories/download_repository.dart';
 import 'package:fcd_app/src/features/downloads/presentation/download_task_controller.dart';
 import 'package:fcd_app/src/features/home/presentation/home_shell.dart';
@@ -35,6 +36,9 @@ void main() {
       await tester.pumpWidget(
         MultiProvider(
           providers: [
+            ChangeNotifierProvider<HomeTabController>(
+              create: (_) => HomeTabController(),
+            ),
             ChangeNotifierProvider<DownloadTaskController>(
               create: (_) => DownloadTaskController(
                 downloadRepository: DownloadRepository(apiClient: FakeApiClient()),

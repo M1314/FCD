@@ -23,19 +23,16 @@ class _DownloadedVideoPageState extends State<DownloadedVideoPage> {
   bool _isPreparingController = false;
 
   @override
-  void initState() {
-    super.initState();
-    SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
-  }
-
-  @override
   void didChangeDependencies() {
     super.didChangeDependencies();
     final mediaQuery = MediaQuery.maybeOf(context);
     if (mediaQuery == null) {
       return;
     }
+    // Tablet classification can change on iPad when the app window is resized,
+    // so keep system UI mode aligned with the current layout each rebuild.
     _isTablet = OrientationPolicy.isTabletForSize(mediaQuery.size);
+    _applySystemUiModeForCurrentLayout();
     if (_controller == null && !_isPreparingController) {
       _prepareController();
     }
@@ -48,9 +45,22 @@ class _DownloadedVideoPageState extends State<DownloadedVideoPage> {
       isTablet: _isTablet,
       ignoreFullscreenFlag: true,
     );
-    SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+    if (!_isTablet) {
+      SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+    }
     _controller?.dispose(forceDispose: true);
     super.dispose();
+  }
+
+  void _applySystemUiModeForCurrentLayout() {
+    // iPad should stay edge-to-edge; immersive mode shifts safe-area insets
+    // when the fullscreen route opens/closes and causes a visible jump.
+    //
+    // Re-apply when MediaQuery changes so resizable tablet windows that cross
+    // the tablet breakpoint keep the same intended phone/tablet behavior.
+    SystemChrome.setEnabledSystemUIMode(
+      _isTablet ? SystemUiMode.edgeToEdge : SystemUiMode.immersiveSticky,
+    );
   }
 
   Future<void> _prepareController() async {
@@ -91,6 +101,8 @@ class _DownloadedVideoPageState extends State<DownloadedVideoPage> {
         allowedScreenSleep: false,
         handleLifecycle: false,
         autoDispose: false,
+        // Keep downloaded videos opening fullscreen on phones, but not on iPad
+        // where entering fullscreen should not toggle immersive system UI.
         fullScreenByDefault: !_isTablet,
         eventListener: _handleVideoEvents,
         routePageBuilder: _buildFullscreenRoute,
@@ -127,6 +139,8 @@ class _DownloadedVideoPageState extends State<DownloadedVideoPage> {
   }
 
   void _handleVideoEvents(BetterPlayerEvent event) {
+    // Ignore fullscreen orientation/system-UI transitions on iPad to keep
+    // layout insets stable while BetterPlayer opens and closes fullscreen.
     if (_isTablet) {
       return;
     }
