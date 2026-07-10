@@ -1,4 +1,6 @@
 import 'package:fcd_app/src/core/theme/app_theme.dart';
+import 'package:fcd_app/src/features/downloads/data/repositories/download_repository.dart';
+import 'package:fcd_app/src/features/downloads/presentation/downloads_page.dart';
 import 'package:fcd_app/src/features/auth/presentation/register_page.dart';
 import 'package:fcd_app/src/state/session_controller.dart';
 import 'package:flutter/material.dart';
@@ -21,10 +23,12 @@ String? validateLoginPassword(String? value) {
 }
 
 class LoginPage extends StatefulWidget {
-  const LoginPage({super.key, this.localAuth});
+  const LoginPage({super.key, this.localAuth, this.downloadRepository});
 
   @visibleForTesting
   final LocalAuthentication? localAuth;
+  @visibleForTesting
+  final DownloadRepository? downloadRepository;
 
   @override
   State<LoginPage> createState() => _LoginPageState();
@@ -43,12 +47,40 @@ class _LoginPageState extends State<LoginPage> {
   bool _canUseBiometrics = false;
   bool _canUseDeviceAuth = false;
   String? _storedEmail;
+  bool _hasOfflineDownloads = false;
 
   @override
   void initState() {
     super.initState();
     _localAuth = widget.localAuth ?? LocalAuthentication();
     _checkBiometrics();
+    _checkOfflineDownloads();
+  }
+
+  DownloadRepository _buildDownloadRepository() {
+    return widget.downloadRepository ??
+        DownloadRepository(
+          apiClient: context.read<SessionController>().apiClient,
+        );
+  }
+
+  Future<void> _checkOfflineDownloads() async {
+    try {
+      final cleanup = await _buildDownloadRepository().removeMissingDownloads();
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _hasOfflineDownloads = cleanup.files.isNotEmpty;
+      });
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _hasOfflineDownloads = false;
+      });
+    }
   }
 
   Future<void> _checkBiometrics() async {
@@ -185,9 +217,9 @@ class _LoginPageState extends State<LoginPage> {
             child: Text(
               'Tu sesión expiró. Por favor, inicia sesión de nuevo.',
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: Colors.amber.shade900,
-                    fontWeight: FontWeight.w500,
-                  ),
+                color: Colors.amber.shade900,
+                fontWeight: FontWeight.w500,
+              ),
             ),
           ),
         ],
@@ -299,6 +331,18 @@ class _LoginPageState extends State<LoginPage> {
                       _canUseBiometrics ? Icons.face : Icons.lock_outline,
                     ),
                     label: Text('Ingresar como $_storedEmail'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: AppTheme.deepBrown,
+                    ),
+                  ),
+                ),
+              if (_hasOfflineDownloads)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: OutlinedButton.icon(
+                    onPressed: _isSubmitting ? null : _openOfflineDownloads,
+                    icon: const Icon(Icons.download_rounded),
+                    label: const Text('Ver descargas sin conexión'),
                     style: OutlinedButton.styleFrom(
                       foregroundColor: AppTheme.deepBrown,
                     ),
@@ -427,10 +471,12 @@ class _LoginPageState extends State<LoginPage> {
       debugPrint('Starting device auth...');
       bool authenticated = false;
       try {
-        authenticated = await _localAuth.authenticate(
-          localizedReason: 'Inicia sesión con tu cuenta',
-          persistAcrossBackgrounding: false,
-        ).timeout(const Duration(seconds: 30));
+        authenticated = await _localAuth
+            .authenticate(
+              localizedReason: 'Inicia sesión con tu cuenta',
+              persistAcrossBackgrounding: false,
+            )
+            .timeout(const Duration(seconds: 30));
 
         debugPrint('Auth result: $authenticated');
       } catch (authError) {
@@ -442,7 +488,9 @@ class _LoginPageState extends State<LoginPage> {
         }
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('No se pudo autenticar. Inténtalo de nuevo.')),
+            const SnackBar(
+              content: Text('No se pudo autenticar. Inténtalo de nuevo.'),
+            ),
           );
         }
         return;
@@ -473,5 +521,20 @@ class _LoginPageState extends State<LoginPage> {
         });
       }
     }
+  }
+
+  Future<void> _openOfflineDownloads() async {
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => Scaffold(
+          appBar: AppBar(title: const Text('Mis Descargas')),
+          body: DownloadsPage(downloadRepository: _buildDownloadRepository()),
+        ),
+      ),
+    );
+    if (!mounted) {
+      return;
+    }
+    await _checkOfflineDownloads();
   }
 }

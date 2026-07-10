@@ -211,6 +211,17 @@ class _HomeShellState extends State<HomeShell> {
       body: Stack(
         children: <Widget>[
           Positioned.fill(child: shellContent),
+          if (hasDownloads)
+            Positioned(
+              left: 0,
+              right: 0,
+              bottom: 0,
+              child: DownloadProgressBanner(
+                controller: downloadController,
+                expanded: isDownloadsExpanded,
+                onToggle: _toggleDownloadsBanner,
+              ),
+            ),
           if (playbackController.player != null)
             Positioned(
               left: 12,
@@ -227,17 +238,6 @@ class _HomeShellState extends State<HomeShell> {
               child: GestureDetector(
                 onTap: _collapseDownloadsBanner,
                 behavior: HitTestBehavior.translucent,
-              ),
-            ),
-          if (hasDownloads)
-            Positioned(
-              top: 0,
-              left: 0,
-              right: 0,
-              child: DownloadProgressBanner(
-                controller: downloadController,
-                expanded: isDownloadsExpanded,
-                onToggle: _toggleDownloadsBanner,
               ),
             ),
         ],

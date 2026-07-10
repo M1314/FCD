@@ -1,6 +1,10 @@
 import 'package:dio/dio.dart';
 import 'package:fcd_app/src/core/http/api_client.dart';
 import 'package:fcd_app/src/core/storage/app_storage.dart';
+import 'package:fcd_app/src/features/downloads/data/models/downloaded_file.dart';
+import 'package:fcd_app/src/features/downloads/data/repositories/download_repository.dart';
+import 'package:fcd_app/src/features/downloads/presentation/download_task_controller.dart';
+import 'package:fcd_app/src/features/downloads/presentation/downloads_page.dart';
 import 'package:fcd_app/src/features/auth/presentation/login_page.dart';
 import 'package:fcd_app/src/state/session_controller.dart';
 import 'package:flutter/material.dart';
@@ -52,12 +56,18 @@ void main() {
         );
 
         await tester.pumpWidget(
-          _wrap(session, LoginPage(localAuth: _FakeLocalAuth(biometricsAvailable: false))),
+          _wrap(
+            session,
+            LoginPage(localAuth: _FakeLocalAuth(biometricsAvailable: false)),
+          ),
         );
         await tester.pumpAndSettle();
 
         // Fill in a valid email, leave password empty (default empty).
-        await tester.enterText(find.byType(TextFormField).first, 'user@example.com');
+        await tester.enterText(
+          find.byType(TextFormField).first,
+          'user@example.com',
+        );
 
         // Tap the submit button.
         await tester.tap(find.text('Ingresar'));
@@ -100,7 +110,10 @@ void main() {
         // Device auth quick-login button is shown with lock icon.
         expect(quickLoginButton, findsOneWidget);
         expect(
-          find.descendant(of: quickLoginButton, matching: find.byIcon(Icons.lock_outline)),
+          find.descendant(
+            of: quickLoginButton,
+            matching: find.byIcon(Icons.lock_outline),
+          ),
           findsOneWidget,
         );
       },
@@ -128,21 +141,20 @@ void main() {
       },
     );
 
-    testWidgets(
-      'no quick-login button shown when there is no stored account',
-      (tester) async {
-        final session = SessionController.forTesting(
-          apiClient: _FakeApiClient(), // storedEmail is null
-        );
-        final fakeAuth = _FakeLocalAuth(biometricsAvailable: false);
+    testWidgets('no quick-login button shown when there is no stored account', (
+      tester,
+    ) async {
+      final session = SessionController.forTesting(
+        apiClient: _FakeApiClient(), // storedEmail is null
+      );
+      final fakeAuth = _FakeLocalAuth(biometricsAvailable: false);
 
-        await tester.pumpWidget(_wrap(session, LoginPage(localAuth: fakeAuth)));
-        await tester.pumpAndSettle();
+      await tester.pumpWidget(_wrap(session, LoginPage(localAuth: fakeAuth)));
+      await tester.pumpAndSettle();
 
-        expect(find.byIcon(Icons.face), findsNothing);
-        expect(find.byIcon(Icons.person_outline), findsNothing);
-      },
-    );
+      expect(find.byIcon(Icons.face), findsNothing);
+      expect(find.byIcon(Icons.person_outline), findsNothing);
+    });
 
     testWidgets(
       'face icon is shown when biometrics available and email is stored',
@@ -210,31 +222,100 @@ void main() {
     );
   });
 
+  group('LoginPage offline downloads button', () {
+    testWidgets('shows offline downloads button when local downloads exist', (
+      tester,
+    ) async {
+      final session = SessionController.forTesting(apiClient: _FakeApiClient());
+      final downloadRepository = _FakeDownloadRepository(hasDownloads: true);
+
+      await tester.pumpWidget(
+        _wrap(
+          session,
+          LoginPage(
+            localAuth: _FakeLocalAuth(biometricsAvailable: false),
+            downloadRepository: downloadRepository,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Ver descargas sin conexión'), findsOneWidget);
+    });
+
+    testWidgets(
+      'hides offline downloads button when there are no local downloads',
+      (tester) async {
+        final session = SessionController.forTesting(
+          apiClient: _FakeApiClient(),
+        );
+        final downloadRepository = _FakeDownloadRepository(hasDownloads: false);
+
+        await tester.pumpWidget(
+          _wrap(
+            session,
+            LoginPage(
+              localAuth: _FakeLocalAuth(biometricsAvailable: false),
+              downloadRepository: downloadRepository,
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        expect(find.text('Ver descargas sin conexión'), findsNothing);
+      },
+    );
+
+    testWidgets('opens downloads screen from login without authenticating', (
+      tester,
+    ) async {
+      final session = SessionController.forTesting(apiClient: _FakeApiClient());
+      final downloadRepository = _FakeDownloadRepository(hasDownloads: true);
+
+      await tester.pumpWidget(
+        _wrap(
+          session,
+          LoginPage(
+            localAuth: _FakeLocalAuth(biometricsAvailable: false),
+            downloadRepository: downloadRepository,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Ver descargas sin conexión'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Mis Descargas'), findsOneWidget);
+      expect(find.byType(CircularProgressIndicator), findsNothing);
+      expect(find.byType(DownloadsPage), findsOneWidget);
+    });
+  });
+
   // ─── Fix 2: biometric cancel / error handling ─────────────────────────────
 
   group('LoginPage biometric cancel / error handling', () {
-    testWidgets(
-      'no snackbar when user cancels biometric (userCanceled)',
-      (tester) async {
-        final session = SessionController.forTesting(
-          apiClient: _FakeApiClient(storedEmail: 'user@example.com'),
-        );
-        final fakeAuth = _FakeLocalAuth(
-          biometricsAvailable: true,
-          throwOnAuthenticate: const LocalAuthException(
-            code: LocalAuthExceptionCode.userCanceled,
-          ),
-        );
+    testWidgets('no snackbar when user cancels biometric (userCanceled)', (
+      tester,
+    ) async {
+      final session = SessionController.forTesting(
+        apiClient: _FakeApiClient(storedEmail: 'user@example.com'),
+      );
+      final fakeAuth = _FakeLocalAuth(
+        biometricsAvailable: true,
+        throwOnAuthenticate: const LocalAuthException(
+          code: LocalAuthExceptionCode.userCanceled,
+        ),
+      );
 
-        await tester.pumpWidget(_wrap(session, LoginPage(localAuth: fakeAuth)));
-        await tester.pumpAndSettle();
+      await tester.pumpWidget(_wrap(session, LoginPage(localAuth: fakeAuth)));
+      await tester.pumpAndSettle();
 
-        await tester.tap(find.byIcon(Icons.face));
-        await tester.pumpAndSettle();
+      await tester.tap(find.byIcon(Icons.face));
+      await tester.pumpAndSettle();
 
-        expect(find.byType(SnackBar), findsNothing);
-      },
-    );
+      expect(find.byType(SnackBar), findsNothing);
+    });
 
     testWidgets(
       'no snackbar when authenticate() returns false (silent cancel)',
@@ -288,8 +369,15 @@ void main() {
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 Widget _wrap(SessionController session, Widget child) {
-  return ChangeNotifierProvider<SessionController>.value(
-    value: session,
+  return MultiProvider(
+    providers: [
+      ChangeNotifierProvider<SessionController>.value(value: session),
+      ChangeNotifierProvider<DownloadTaskController>(
+        create: (_) => DownloadTaskController(
+          downloadRepository: _FakeDownloadRepository(hasDownloads: false),
+        ),
+      ),
+    ],
     child: MaterialApp(
       theme: ThemeData(splashFactory: NoSplash.splashFactory),
       home: child,
@@ -305,8 +393,9 @@ class _FakeLocalAuth extends LocalAuthentication {
     bool? deviceSupported,
     bool? authenticateResult,
     this.throwOnAuthenticate,
-  })  : deviceSupported = deviceSupported ?? biometricsAvailable,
-        authenticateResult = authenticateResult ?? (deviceSupported ?? biometricsAvailable);
+  }) : deviceSupported = deviceSupported ?? biometricsAvailable,
+       authenticateResult =
+           authenticateResult ?? (deviceSupported ?? biometricsAvailable);
 
   final bool biometricsAvailable;
   final bool deviceSupported;
@@ -342,7 +431,10 @@ class _FakeLocalAuth extends LocalAuthentication {
 
 class _FakeApiClient extends ApiClient {
   _FakeApiClient({String? storedEmail})
-      : super(dio: Dio(), storage: _FakeStorage(storedEmail: storedEmail));
+    : super(
+        dio: Dio(),
+        storage: _FakeStorage(storedEmail: storedEmail),
+      );
 
   @override
   Future<Map<String, dynamic>> post(
@@ -350,16 +442,14 @@ class _FakeApiClient extends ApiClient {
     dynamic data,
     Map<String, dynamic>? queryParameters,
     bool authenticated = false,
-  }) async =>
-      <String, dynamic>{};
+  }) async => <String, dynamic>{};
 
   @override
   Future<Map<String, dynamic>> get(
     String path, {
     Map<String, dynamic>? queryParameters,
     bool authenticated = false,
-  }) async =>
-      <String, dynamic>{};
+  }) async => <String, dynamic>{};
 }
 
 class _FakeStorage extends AppStorage {
@@ -409,4 +499,33 @@ class _FakeStorage extends AppStorage {
 
   @override
   Future<void> clearCredentials() async {}
+}
+
+class _FakeDownloadRepository extends DownloadRepository {
+  _FakeDownloadRepository({required this.hasDownloads})
+    : super(apiClient: _FakeApiClient());
+
+  final bool hasDownloads;
+
+  @override
+  Future<DownloadCleanupResult> removeMissingDownloads() async {
+    if (!hasDownloads) {
+      return const DownloadCleanupResult(removed: 0, files: <DownloadedFile>[]);
+    }
+
+    return DownloadCleanupResult(
+      removed: 0,
+      files: <DownloadedFile>[
+        DownloadedFile(
+          id: 'download-1',
+          url: 'https://example.com/file.pdf',
+          name: 'file.pdf',
+          type: 'document',
+          localPath: '/tmp/file.pdf',
+          downloadedAt: DateTime(2026, 1, 1),
+          localArtworkPath: '',
+        ),
+      ],
+    );
+  }
 }
