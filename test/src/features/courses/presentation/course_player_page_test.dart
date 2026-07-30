@@ -154,6 +154,47 @@ void main() {
     });
   });
 
+  group('coursePlayerScrollBottomPadding', () {
+    test('uses base padding when no overlays are visible', () {
+      expect(
+        coursePlayerScrollBottomPadding(
+          showMiniPlayer: false,
+          hasDownloads: false,
+        ),
+        16,
+      );
+    });
+
+    test('uses mini player padding when mini player is visible', () {
+      expect(
+        coursePlayerScrollBottomPadding(
+          showMiniPlayer: true,
+          hasDownloads: false,
+        ),
+        86,
+      );
+    });
+
+    test('adds downloads padding when downloads banner is visible', () {
+      expect(
+        coursePlayerScrollBottomPadding(
+          showMiniPlayer: false,
+          hasDownloads: true,
+        ),
+        102,
+      );
+    });
+
+    test('adds both overlays when mini player and downloads are visible', () {
+      expect(
+        coursePlayerScrollBottomPadding(
+          showMiniPlayer: true,
+          hasDownloads: true,
+        ),
+        172,
+      );
+    });
+  });
   group('sharedPlaybackKeyFor', () {
     test('includes course, lesson, and resource indices', () {
       expect(

@@ -14,6 +14,11 @@ import 'package:fcd_app/src/core/widgets/audio_mini_player.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+@visibleForTesting
+double homeShellContentBottomPadding({required bool showMiniPlayer}) {
+  return showMiniPlayer ? 86 : 0;
+}
+
 class HomeShell extends StatefulWidget {
   const HomeShell({super.key, this.pages});
 
@@ -149,6 +154,9 @@ class _HomeShellState extends State<HomeShell> {
     final playbackController = context.watch<AudioPlaybackController>();
     final hasDownloads = downloadController.hasActiveDownloads;
     final isDownloadsExpanded = _downloadsExpanded && hasDownloads;
+    final contentBottomPadding = homeShellContentBottomPadding(
+      showMiniPlayer: playbackController.player != null,
+    );
     if (_downloadsExpanded && !hasDownloads) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) {
@@ -183,7 +191,10 @@ class _HomeShellState extends State<HomeShell> {
         }
         return false;
       },
-      child: shellBody,
+      child: Padding(
+        padding: EdgeInsets.only(bottom: contentBottomPadding),
+        child: shellBody,
+      ),
     );
 
     return Scaffold(

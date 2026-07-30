@@ -10,6 +10,22 @@ import 'package:provider/provider.dart';
 import '../../../test_helpers/fake_api_client.dart';
 
 void main() {
+  group('homeShellContentBottomPadding', () {
+    test('returns zero when mini player is hidden', () {
+      expect(
+        homeShellContentBottomPadding(showMiniPlayer: false),
+        0,
+      );
+    });
+
+    test('returns mini player inset when shown', () {
+      expect(
+        homeShellContentBottomPadding(showMiniPlayer: true),
+        86,
+      );
+    });
+  });
+
   testWidgets(
     'reselecting current destination scrolls that tab to top',
     (tester) async {
