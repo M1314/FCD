@@ -70,6 +70,27 @@ DownloadedFile? downloadedFileForResource(
 }
 
 @visibleForTesting
+bool downloadedFileMatchesResource({
+  required DownloadedFile file,
+  required LessonResource resource,
+}) {
+  final resourceType = resource.type.name;
+  if (file.type.isNotEmpty && file.type != resourceType) {
+    return false;
+  }
+  final normalizedKey = resourceDownloadKeyFor(resource);
+  if (file.id == normalizedKey ||
+      file.id == '$resourceType:${resource.url}' ||
+      file.id == '$resourceType:${resource.url.hashCode}') {
+    return true;
+  }
+  if (file.url.isEmpty) {
+    return false;
+  }
+  return normalizeResourceUrl(file.url) == normalizeResourceUrl(resource.url);
+}
+
+@visibleForTesting
 String sharedPlaybackKeyFor({
   required int courseId,
   required int lessonIndex,
@@ -484,6 +505,31 @@ class _CoursePlayerPageState extends State<CoursePlayerPage>
       resourceIndex: _resourceIndex,
     );
     if (targetKey != _playbackController.activeMediaResourceKey) {
+      final resource = currentResource;
+      final sharedFile = _playbackController.downloadedFile;
+      if (resource == null ||
+          sharedFile == null ||
+          !resource.isAudio ||
+          !downloadedFileMatchesResource(file: sharedFile, resource: resource)) {
+        return;
+      }
+      _audioPlayer = player;
+      _isAudioLoading = false;
+      _reuseSharedAudio = true;
+      _resumeSharedAudio = player.playing;
+      _savedMediaPositionMs = player.position.inMilliseconds;
+      _playbackController.setSession(
+        player: player,
+        courseId: widget.course.id,
+        lessonIndex: _lessonIndex,
+        resourceIndex: _resourceIndex,
+        resourceTitle:
+            resource.name.isEmpty ? 'Audio de la lección' : resource.name,
+        courseTitle: widget.course.name,
+        course: widget.course,
+        lessons: widget.lessons,
+        onPersistCourseProgress: _persistSharedPlaybackProgress,
+      );
       return;
     }
     _audioPlayer = player;
